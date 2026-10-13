@@ -57,6 +57,6 @@ Files: `generated/tools.ts`, `scripts/codegen.ts`, `src/api/rewatches.ts`, `src/
 - [x] Run focused batch, coordinator, retry, adapter, rewatch, generated-tool, and runtime smoke tests.
 - [x] Run the complete Bun suite, code generation drift check, TypeScript check, Wrangler dry-run, and `git diff --check`.
 - [x] Request independent review of the final diff; resolve valid findings with regression tests.
-- [ ] Commit the implementation on `codex/issue-16-batched-serialized-writes`.
-- [ ] Push and open a PR against `main` with `Closes #16`, summarize relationship to issue #17, and include verification evidence. Do not merge or deploy.
+- [x] Commit the implementation on `codex/issue-16-batched-serialized-writes`.
+- [x] Push and open a PR against `main` with `Closes #16`, summarize relationship to issue #17, and include verification evidence. Do not merge or deploy.
 
