@@ -5,8 +5,12 @@ mock.module('cloudflare:workers', () => ({ DurableObject: class {}, WorkerEntryp
 const { SimklLibraryCache } = await import('../src/library/cache');
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
-const env = { SIMKL_CLIENT_ID: 'app', SIMKL_API_BASE_URL: 'https://api.simkl.com' };
-const cache = (storage: DurableObjectStorage) => new SimklLibraryCache({ storage } as DurableObjectState, env as any);
+const env = { SIMKL_CLIENT_ID: 'app', SIMKL_API_BASE_URL: 'https://api.simkl.com', SIMKL_LIBRARY_CACHE_TTL_SECONDS: '300' };
+const cache = (storage: DurableObjectStorage) => {
+  const object = new SimklLibraryCache({ storage } as DurableObjectState, env as any);
+  (object as any).env = env;
+  return object;
+};
 function upstream(onCall: (path: string, token: string) => Promise<void> | void = () => {}) {
   const calls: string[] = [];
   globalThis.fetch = (async (input, init) => {
@@ -52,6 +56,34 @@ test('independent objects initialize independently', async () => {
   await Promise.all([cache(a.storage).ensureInitialized('a'), cache(b.storage).ensureInitialized('b')]);
   expect(calls).toHaveLength(8);
   a.db.close(); b.db.close();
+});
+
+test('initialization, queued write, and stats reads preserve per-account order', async () => {
+  const adapter = sqliteStorage(); const object = cache(adapter.storage);
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const calls: string[] = [];
+  globalThis.fetch = (async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    calls.push(path);
+    if (path === '/sync/activities' && calls.length === 1) await gate;
+    if (path === '/sync/activities') return Response.json({ all: '2026-10-09T12:00:00Z', settings: { all: '2026-10-09T12:00:00Z' } });
+    if (path === '/users/settings') return Response.json({ account: { id: 42 } });
+    if (path === '/users/42/stats') return Response.json({ total_mins: 20 });
+    if (path === '/sync/history') return Response.json({ added: {} });
+    return Response.json({ [path.split('/')[3]]: [] });
+  }) as typeof fetch;
+  const initialization = object.ensureInitialized('token');
+  const write = object.write('token', '/sync/history', { method: 'POST', body: {} });
+  const stats = object.getStats('token', '42');
+  expect(calls).toEqual(['/sync/activities']);
+  release();
+  await Promise.all([initialization, write, stats]);
+  expect(calls).toEqual([
+    '/sync/activities', '/sync/all-items/shows', '/sync/all-items/movies', '/sync/all-items/anime',
+    '/sync/history', '/sync/activities', '/users/settings', '/users/42/stats',
+  ]);
+  adapter.db.close();
 });
 
 test('partial failure leaves no snapshot and rejected coordination permits retry with a new token', async () => {

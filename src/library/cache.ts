@@ -94,7 +94,7 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     const userId = normalizeSimklId(simklUserId);
     if (!accessToken) return Promise.reject(new Error('Simkl authentication required'));
     if (!userId) return Promise.reject(new Error('Invalid verified Simkl account ID'));
-    return this.library.withExclusive(async () => {
+    return this.enqueue(() => this.library.withExclusive(async () => {
       const previous = this.store.loadProfile();
       const librarySnapshot = this.store.loadActivitySnapshot();
       const result = await refreshUserProfile(this.client, accessToken, userId, previous, librarySnapshot, {
@@ -103,6 +103,6 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
       });
       if (JSON.stringify(previous) !== JSON.stringify(result.snapshot)) this.store.saveProfile(result.snapshot);
       return result.stats;
-    });
+    }));
   }
 }
