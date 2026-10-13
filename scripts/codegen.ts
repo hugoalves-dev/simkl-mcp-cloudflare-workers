@@ -323,6 +323,7 @@ function generateHandler(path: string, method: string, params: any[], responseFo
 
 const tools: string[] = [];
 const formatters: string[] = [];
+const customImports = Array.from(new Set(toolsWhitelist.flatMap(config => config.custom?.imports || [])));
 
 for (const config of toolsWhitelist) {
   if (config.omitFromGenerated) continue;
@@ -401,7 +402,7 @@ ${toolsWhitelist.some(config => config.requestPath?.helper === 'simklTrendingPat
 import { toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
 import { LibraryWriteInvalidationError } from '../src/library/errors.js';
-${toolsWhitelist.some(config => config.custom) ? "import { getTrendingByGenre } from '../src/api/trending.js';" : ''}
+${customImports.join('\n')}
 
 const formatters: Record<string, (result: any, args: any) => string> = {
 ${formatters.join(',\n')}

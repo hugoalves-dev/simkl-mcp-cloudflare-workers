@@ -9,6 +9,8 @@ import { toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
 import { LibraryWriteInvalidationError } from '../src/library/errors.js';
 import { getTrendingByGenre } from '../src/api/trending.js';
+import { getMediaById } from '../src/api/id-lookup.js';
+import { formatAiringTool } from '../src/api/airing.js';
 
 const formatters: Record<string, (result: any, args: any) => string> = {
   'simkl_search_by_text': (results, args) => results.length > 0 ? formatList(results, withImdb, 10) : [`no results for "${args.q}"`],
@@ -23,8 +25,6 @@ const formatters: Record<string, (result: any, args: any) => string> = {
   'simkl_get_trending_anime': (results) => formatList(results),
   'simkl_get_best_shows': (results) => formatList(results, withRating),
   'simkl_get_best_anime': (results) => formatList(results, withRating),
-  'simkl_get_airing_shows': (results) => formatList(results, asAiring),
-  'simkl_get_airing_anime': (results) => formatList(results, asAiring),
   'simkl_get_shows_by_genre': (results) => Array.isArray(results) ? formatList(results) : ["no results for this genre"],
   'simkl_get_anime_by_genre': (results) => Array.isArray(results) ? formatList(results) : ["no results for this genre"],
   'simkl_get_movies_by_genre': (results) => Array.isArray(results) ? formatList(results) : ["no results for this genre"]
@@ -99,52 +99,15 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_search_by_id',
-      { description: 'Find items by external ID', inputSchema: {
-      simkl: z.number().optional().describe('Simkl `id`.'),
-      hulu: z.number().optional().describe('hulu_id. All other parameters can be empty if this one specified.'),
-      netflix: z.number().optional().describe('Netflix `movieid`, this parameter is in beta and may not work.'),
-      mal: z.number().optional().describe('MyAnimeList `id`.'),
-      tvdb: z.string().optional().describe('TVDB ID. All other parameters can be empty if this one specified.'),
-      tmdb: z.number().optional().describe('The Movie Database (TMDb) ID. All other parameters can be empty if this one specified. `type` parameter is required if you want to search for TV Shows'),
-      imdb: z.string().optional().describe('can be IMDB ID or full IMDB URL. All other parameters can be empty if this one specified.'),
-      anidb: z.number().optional().describe('AniDB ID. All other parameters can be empty if this one specified.'),
-      crunchyroll: z.string().optional().describe('Crunchyroll ID. You can pass episode ID or url ID(sword-art-online)'),
-      anilist: z.number().optional().describe('AniList ID'),
-      kitsu: z.number().optional().describe('Kitsu ID'),
-      livechart: z.number().optional().describe('LiveChart ID'),
-      anisearch: z.number().optional().describe('aniSearch ID'),
-      animeplanet: z.string().optional().describe('Anime-Planet ID'),
-      type: z.enum(['show', 'movie']).optional().describe('Only used when sending tmdb.'),
-      title: z.string().optional().describe('TV show, anime, or movie title. If this title has more then 1 item then null will be returned, add more fields to narrow down the search to 1 item(such as type,year etc.)'),
-      year: z.number().optional().describe('release year.'),
-      anfo: z.string().optional().describe('AniFox / anfo.org ID. Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      ann: z.number().optional().describe('Anime News Network (ANN) ID. Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      tvcom: z.string().optional().describe('TV.com ID (legacy). Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      zap2it: z.string().optional().describe('Zap2it (TVScheduleDirect) ID. Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      traktslug: z.string().optional().describe('Trakt URL slug. Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      letterboxd: z.string().optional().describe('Letterboxd film slug (movies). Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      boxd: z.string().optional().describe('Letterboxd alias — same as `letterboxd`. Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).'),
-      mdl: z.string().optional().describe('MyDramaList slug or ID (Korean / Asian dramas). Returns the matching Simkl title(s). See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys).')
-    }, annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Resolve a supported media ID through Simkl’s public redirect endpoint, then return the matching cached detail record.', inputSchema: z.object({ simkl: z.number().int().positive().optional(), hulu: z.number().int().positive().optional(), netflix: z.number().int().positive().optional(), mal: z.number().int().positive().optional(), tvdb: z.string().optional(), tmdb: z.number().int().positive().optional(), imdb: z.string().regex(/^tt\d+$/).optional(), anidb: z.number().int().positive().optional(), crunchyroll: z.string().optional(), anilist: z.number().int().positive().optional(), kitsu: z.number().int().positive().optional(), livechart: z.number().int().positive().optional(), anisearch: z.number().int().positive().optional(), animeplanet: z.string().optional(), anfo: z.string().optional(), ann: z.number().int().positive().optional(), tvcom: z.string().optional(), zap2it: z.string().optional(), traktslug: z.string().optional(), letterboxd: z.string().optional(), boxd: z.string().optional(), mdl: z.string().optional(), type: z.enum(['show', 'tv', 'movie', 'anime']).optional(), title: z.string().optional(), year: z.number().int().optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
-    try {
-      const result = await client.request(`/search/id`, {
-        method: 'GET',
-        query: { simkl: args.simkl, hulu: args.hulu, netflix: args.netflix, mal: args.mal, tvdb: args.tvdb, tmdb: args.tmdb, imdb: args.imdb, anidb: args.anidb, crunchyroll: args.crunchyroll, anilist: args.anilist, kitsu: args.kitsu, livechart: args.livechart, anisearch: args.anisearch, animeplanet: args.animeplanet, type: args.type, title: args.title, year: args.year, anfo: args.anfo, ann: args.ann, tvcom: args.tvcom, zap2it: args.zap2it, traktslug: args.traktslug, letterboxd: args.letterboxd, boxd: args.boxd, mdl: args.mdl },
-        token: getToken()
-      });
-
-      const formatted = JSON.stringify(result, null, 2);
-      return {
-        content: Array.isArray(formatted)
-          ? formatted.map((text: string) => ({ type: 'text', text }))
-          : [{ type: 'text', text: formatted }]
-      };
-    } catch (error) {
-      if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
-      return toMcpErrorResult(error);
-    }
-    }
+        try {
+          const result = await getMediaById(client, args);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          return toMcpErrorResult(error);
+        }
+      }
     );
 
     server.registerTool(
@@ -602,56 +565,26 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_airing_shows',
-      { description: 'TV shows airing today, tomorrow, or on a specific date', inputSchema: {
-      date: z.string().optional().describe('only data within this date'),
-      sort: z.enum(['time', 'rank', 'popularity']).optional().describe('sort the results by the specified option')
-    }, annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Get TV episode airings from Simkl’s free v2 calendar file.', inputSchema: z.object({ date: z.string().regex(/^(today|tomorrow|\d{2}-\d{2}-\d{4})$/).optional(), sort: z.enum(['time', 'rank', 'popularity']).optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
-    try {
-      const result = await client.request(`/tv/airing`, {
-        method: 'GET',
-        query: { date: args.date, sort: args.sort },
-        token: getToken()
-      });
-
-      const formatted = formatters['simkl_get_airing_shows'](result, args);
-      return {
-        content: Array.isArray(formatted)
-          ? formatted.map((text: string) => ({ type: 'text', text }))
-          : [{ type: 'text', text: formatted }]
-      };
-    } catch (error) {
-      if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
-      return toMcpErrorResult(error);
-    }
-    }
+        try {
+          return await formatAiringTool(client, 'tv', args);
+        } catch (error) {
+          return toMcpErrorResult(error);
+        }
+      }
     );
 
     server.registerTool(
       'simkl_get_airing_anime',
-      { description: 'Anime airing today, tomorrow, or on a specific date', inputSchema: {
-      date: z.string().optional().describe('only data within this date'),
-      sort: z.enum(['time', 'rank', 'popularity']).optional().describe('sort the results by the specified option')
-    }, annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Get anime episode airings from Simkl’s free v2 calendar file.', inputSchema: z.object({ date: z.string().regex(/^(today|tomorrow|\d{2}-\d{2}-\d{4})$/).optional(), sort: z.enum(['time', 'rank', 'popularity']).optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
-    try {
-      const result = await client.request(`/anime/airing`, {
-        method: 'GET',
-        query: { date: args.date, sort: args.sort },
-        token: getToken()
-      });
-
-      const formatted = formatters['simkl_get_airing_anime'](result, args);
-      return {
-        content: Array.isArray(formatted)
-          ? formatted.map((text: string) => ({ type: 'text', text }))
-          : [{ type: 'text', text: formatted }]
-      };
-    } catch (error) {
-      if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
-      return toMcpErrorResult(error);
-    }
-    }
+        try {
+          return await formatAiringTool(client, 'anime', args);
+        } catch (error) {
+          return toMcpErrorResult(error);
+        }
+      }
     );
 
     server.registerTool(
