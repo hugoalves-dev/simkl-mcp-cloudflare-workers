@@ -124,7 +124,7 @@ jobs:
         if: steps.current.outputs.deploy == 'true'
         shell: bash
         env:
-          OBSERVABILITY_ENABLED: ${{ vars.CLOUDFLARE_OBSERVABILITY_ENABLED || 'true' }}
+          OBSERVABILITY_ENABLED: ${{ vars.CLOUDFLARE_OBSERVABILITY_ENABLED || 'false' }}
         run: |
           # Optional GitHub Actions repository variable: CLOUDFLARE_OBSERVABILITY_ENABLED=true|false.
           # The upstream-compatible wrangler.toml remains unchanged in Git.
