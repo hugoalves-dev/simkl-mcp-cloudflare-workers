@@ -41,7 +41,10 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
     const rewatchService = new RewatchService(this.client, () => this.simklToken);
     this.library = createLibraryAdapter(this.env, this.client, () => this.props);
     registerTools(this.server, this.client, () => this.simklToken, {
-      getWatchlist: async args => selectWatchlist(await this.library.read(), args),
+      getWatchlist: async args => {
+        const lines = selectWatchlist(await this.library.read(), args);
+        return lines.length ? lines.join('\n') : 'no watchlist items matched';
+      },
       afterLibraryWrite: () => this.library.invalidate(),
     });
     registerRewatchTools(this.server, rewatchService, () => this.library.invalidate());
@@ -102,7 +105,7 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
                 uri: `simkl://watchlist/${type}/${status}`,
                 name: `${type} ${status}`,
                 description: `${status} ${type}`,
-                mimeType: 'application/json' as const,
+                mimeType: 'text/plain' as const,
               }))
             )
           };

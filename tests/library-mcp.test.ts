@@ -29,8 +29,8 @@ test('MCP resource and watchlist tool both route through cache', async () => {
   const s = await setup();
   const tool = await s.tools.get('simkl_get_watchlist')({ type: 'shows', status: 'watching' });
   const resource = await s.resources.get('watchlist')(new URL('simkl://watchlist/shows/watching'), { type: 'shows', status: 'watching' });
-  expect(JSON.parse(tool.content[0].text).shows[0].show.title).toBe('Title');
-  expect(resource.contents[0].text).toBe('0: [SIMKL #1] - Title (2020) - added on 2026-10-01'); expect(s.calls).toHaveLength(2);
+  expect(tool.content[0].text).toBe('Title (2020) | status: watching | progress: unavailable | rating: unrated | Simkl: <https://simkl.com/tv/1>');
+  expect(resource.contents[0].text).toBe(tool.content[0].text); expect(s.calls).toHaveLength(2);
 });
 test('actual MCP mutation integration invalidates the same verified cache', async () => {
   globalThis.fetch = (async () => Response.json({})) as typeof fetch;
