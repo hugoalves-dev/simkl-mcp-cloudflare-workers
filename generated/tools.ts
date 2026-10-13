@@ -78,14 +78,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/search/${encodePathValue(args.type, "type")}`, {
+      const response = await client.requestWithMetadata(`/search/${encodePathValue(args.type, "type")}`, {
         method: 'GET',
         query: { q: args.q, page: args.page, limit: args.limit, extended: args.extended, sort: args.sort },
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_search_by_text'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -124,8 +126,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         query: { allow_rewatch: args.allow_rewatch, min_progress: args.min_progress },
         body: args.body
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = formatters['simkl_start_watching'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -151,8 +155,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         query: { allow_rewatch: args.allow_rewatch },
         body: args.body
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = formatters['simkl_pause_watching'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -176,8 +182,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         method: 'POST',
         body: args.body
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = formatters['simkl_add_to_watchlist'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -208,8 +216,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         query: { allow_rewatch: args.allow_rewatch, skip_auto_watching: args.skip_auto_watching },
         body: { ...(args.movies !== undefined ? { movies: args.movies } : {}), ...(args.shows !== undefined ? { shows: args.shows } : {}), ...(args.episodes !== undefined ? { episodes: args.episodes } : {}), ...(args.anime !== undefined ? { anime: args.anime } : {}), ...(args.episodes === undefined && args.episode !== undefined ? { episodes: [args.episode] } : {}) }
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -237,8 +247,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         method: 'POST',
         body: { ...(args.movies !== undefined ? { movies: args.movies } : {}), ...(args.shows !== undefined ? { shows: args.shows } : {}), ...(args.episodes !== undefined ? { episodes: args.episodes } : {}), ...(args.anime !== undefined ? { anime: args.anime } : {}), ...(args.episodes === undefined && args.episode !== undefined ? { episodes: [args.episode] } : {}) }
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -262,8 +274,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         method: 'POST',
         body: args.body
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -287,8 +301,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
         method: 'POST',
         body: args.body
       }, getToken());
+      const responseHeaders = undefined;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -308,14 +324,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(simklTrendingPath('tv', args.interval), {
+      const response = await client.requestWithMetadata(simklTrendingPath('tv', args.interval), {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_trending_shows'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -334,14 +352,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(simklTrendingPath('movies', args.interval), {
+      const response = await client.requestWithMetadata(simklTrendingPath('movies', args.interval), {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_trending_movies'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -360,14 +380,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(simklTrendingPath('anime', args.interval), {
+      const response = await client.requestWithMetadata(simklTrendingPath('anime', args.interval), {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_trending_anime'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -386,14 +408,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/tv/${encodePathValue(args.id, "id")}`, {
+      const response = await client.requestWithMetadata(`/tv/${encodePathValue(args.id, "id")}`, {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -412,14 +436,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/movies/${encodePathValue(args.id, "id")}`, {
+      const response = await client.requestWithMetadata(`/movies/${encodePathValue(args.id, "id")}`, {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -438,14 +464,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/anime/${encodePathValue(args.id, "id")}`, {
+      const response = await client.requestWithMetadata(`/anime/${encodePathValue(args.id, "id")}`, {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -464,14 +492,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/tv/episodes/${encodePathValue(args.id, "id")}`, {
+      const response = await client.requestWithMetadata(`/tv/episodes/${encodePathValue(args.id, "id")}`, {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -490,14 +520,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/anime/episodes/${encodePathValue(args.id, "id")}`, {
+      const response = await client.requestWithMetadata(`/anime/episodes/${encodePathValue(args.id, "id")}`, {
         method: 'GET',
         authorization: 'none',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -517,14 +549,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/tv/best/${encodePathValue(args.filter, "filter")}`, {
+      const response = await client.requestWithMetadata(`/tv/best/${encodePathValue(args.filter, "filter")}`, {
         method: 'GET',
         query: { type: args.type },
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_best_shows'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -544,14 +578,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/anime/best/${encodePathValue(args.filter, "filter")}`, {
+      const response = await client.requestWithMetadata(`/anime/best/${encodePathValue(args.filter, "filter")}`, {
         method: 'GET',
         query: { type: args.type },
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_best_anime'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -601,14 +637,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/tv/genres/${encodePathValue(args.genre, "genre")}/${encodePathValue(args.type, "type")}/${encodePathValue(args.country, "country")}/${encodePathValue(args.network, "network")}/${encodePathValue(args.year, "year")}/${encodePathValue(args.sort, "sort")}`, {
+      const response = await client.requestWithMetadata(`/tv/genres/${encodePathValue(args.genre, "genre")}/${encodePathValue(args.type, "type")}/${encodePathValue(args.country, "country")}/${encodePathValue(args.network, "network")}/${encodePathValue(args.year, "year")}/${encodePathValue(args.sort, "sort")}`, {
         method: 'GET',
         query: { page: args.page, limit: args.limit },
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_shows_by_genre'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -633,14 +671,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/anime/genres/${encodePathValue(args.genre, "genre")}/${encodePathValue(args.type, "type")}/${encodePathValue(args.network, "network")}/${encodePathValue(args.year, "year")}/${encodePathValue(args.sort, "sort")}`, {
+      const response = await client.requestWithMetadata(`/anime/genres/${encodePathValue(args.genre, "genre")}/${encodePathValue(args.type, "type")}/${encodePathValue(args.network, "network")}/${encodePathValue(args.year, "year")}/${encodePathValue(args.sort, "sort")}`, {
         method: 'GET',
         query: { page: args.page, limit: args.limit },
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_anime_by_genre'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -665,14 +705,16 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/movies/genres/${encodePathValue(args.genre, "genre")}/${encodePathValue(args.type, "type")}/${encodePathValue(args.country, "country")}/${encodePathValue(args.year, "year")}/${encodePathValue(args.sort, "sort")}`, {
+      const response = await client.requestWithMetadata(`/movies/genres/${encodePathValue(args.genre, "genre")}/${encodePathValue(args.type, "type")}/${encodePathValue(args.country, "country")}/${encodePathValue(args.year, "year")}/${encodePathValue(args.sort, "sort")}`, {
         method: 'GET',
         query: { page: args.page, limit: args.limit },
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = formatters['simkl_get_movies_by_genre'](result, args);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
@@ -691,13 +733,15 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/users/${encodePathValue(args.user_id, "user_id")}/stats`, {
+      const response = await client.requestWithMetadata(`/users/${encodePathValue(args.user_id, "user_id")}/stats`, {
         method: 'GET',
         token: getToken()
       });
-
+      const result = response.data;
+      const responseHeaders = response.headers;
       const formatted = JSON.stringify(result, null, 2);
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]

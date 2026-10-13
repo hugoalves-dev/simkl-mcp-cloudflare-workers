@@ -3,6 +3,10 @@
 import { APP_NAME, APP_VERSION, USER_AGENT } from '../app-info';
 import { createResponseCacheKey, getResponseCachePolicy } from './response-cache';
 
+const MAX_SERVER_RETRIES = 2;
+const SERVER_RETRY_BASE_DELAY_MS = 100;
+const RATE_LIMIT_RETRY_DELAY_MS = 1000;
+
 export interface SimklClientOptions {
   baseUrl: string;
   clientId: string;
@@ -14,6 +18,7 @@ export interface RequestOptions {
   authorization?: 'bearer' | 'none';
   redirect?: 'follow' | 'error' | 'manual';
   responseProfile?: 'library';
+  rateLimitRetry?: boolean;
   body?: unknown;
   query?: Record<string, string | number | undefined>;
 }
@@ -146,10 +151,38 @@ export class SimklClient {
     }
 
     if (!response) {
-      try {
-        response = await fetch(url, init);
-      } catch {
-        throw new SimklApiError('simkl api request failed', 0, null);
+      let serverRetries = 0;
+      let rateLimitRetried = false;
+      while (true) {
+        try {
+          response = await fetch(url, init);
+        } catch {
+          // A failed connection does not tell us whether a write reached Simkl.
+          throw new SimklApiError('simkl api request failed', 0, null);
+        }
+
+        if (response.status === 429) {
+          const responseText = await this.readResponseBody(response);
+          const error = new SimklApiError(
+            `simkl api error: ${response.status} ${response.statusText}`,
+            response.status,
+            responseText,
+            this.parseResponseHeaders(response)
+          );
+          if (options.rateLimitRetry !== false && error.upstreamCode === 'rate_limit' && !rateLimitRetried) {
+            rateLimitRetried = true;
+            await this.delay(RATE_LIMIT_RETRY_DELAY_MS);
+            continue;
+          }
+          throw error;
+        }
+
+        if (response.status >= 500 && serverRetries < MAX_SERVER_RETRIES) {
+          await this.delay(SERVER_RETRY_BASE_DELAY_MS * (2 ** serverRetries));
+          serverRetries++;
+          continue;
+        }
+        break;
       }
 
       if (cache && cacheKey && cachePolicy && response.ok) {
@@ -297,6 +330,10 @@ export class SimklClient {
       if (value !== null) headers[property] = value;
     }
     return headers;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private parsePaginationInfo(response: Response, strict = false): PaginationInfo | null {

@@ -20,7 +20,7 @@ export function toMcpErrorResult(error: unknown): McpErrorResult {
   if (error.statusCode === 429 && upstreamCode === 'rate_limit') {
     message = 'Per-second rate limit reached; pause for about one second before another request.';
   } else if (error.statusCode === 429 && upstreamCode === 'user_limit_exceeded') {
-    message = 'This user has reached the AUTH V2 daily allowance. Wait for the daily reset before retrying.';
+    message = 'This user has reached the AUTH V2 daily allowance. The allowance resets at midnight New York time. Manage Connected Apps: https://simkl.com/settings/apps';
   } else if (error.statusCode === 429 && upstreamCode === 'app_limit_exceeded') {
     message = 'The AUTH V1 app daily allowance is exhausted. Wait for the daily reset before retrying.';
   } else if (error.statusCode === 401 && upstreamCode === 'user_token_required') {

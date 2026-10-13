@@ -65,7 +65,7 @@ export class CachedLibrary {
       const allowed = new Set(['/scrobble/start', '/scrobble/pause', '/scrobble/stop', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/ratings', '/sync/ratings/remove']);
       if (!allowed.has(endpoint)) throw new Error('Unsupported Simkl write endpoint');
       if (!token) throw new Error('Simkl authentication required');
-      const request = () => this.client.request<T>(endpoint, { ...options, method: 'POST', token });
+      const request = () => this.client.request<T>(endpoint, { ...options, method: 'POST', token, rateLimitRetry: false });
       let result: T;
       try {
         result = await request();

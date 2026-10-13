@@ -76,11 +76,19 @@ test('invalidation failure reports possible upstream success', async () => {
   expect((await callbacks.get('simkl_add_rating')!({})).content[0].text).toContain('Upstream write succeeded, but library cache invalidation failed');
 });
 test('catalog reads never invalidate and callers without hooks are compatible', async () => {
-  let invalidations = 0; const client = { async request() { return { shows: [] }; } };
+  let invalidations = 0; const client = { async requestWithMetadata() { return { data: { shows: [] }, headers: {} }; } };
   const callbacks = tools(client, { async afterLibraryWrite() { invalidations++; } });
   await callbacks.get('simkl_get_show_by_id')!({ id: '1' }); expect(invalidations).toBe(0);
   const without = tools(client);
   expect((await without.get('simkl_get_watchlist')!({})).isError).toBe(true);
+});
+
+test('generated API tools surface the remaining allowance as MCP metadata', async () => {
+  const callbacks = tools({
+    async requestWithMetadata() { return { data: [], headers: { rateLimitRemaining: '27' } }; },
+  });
+  const result = await callbacks.get('simkl_get_show_by_id')!({ id: '42' });
+  expect(result._meta).toEqual({ simklRateLimitRemaining: '27' });
 });
 
 for (const name of ['simkl_mark_watched', 'simkl_remove_from_history']) test(name+' accepts plural history arrays and sends them in one request', async () => {
