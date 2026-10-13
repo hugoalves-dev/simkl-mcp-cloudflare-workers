@@ -4,6 +4,8 @@ import { LibraryStore } from './store.js';
 import { CachedLibrary } from './coordinator';
 import { parseLibraryCacheTtlSeconds } from './refresh';
 import { fetchInitialLibrary } from './sync.js';
+import { refreshUserProfile } from './profile.js';
+import { normalizeSimklId } from './identity.js';
 import type { LibraryInitialization, LibraryItemRow } from './types.js';
 
 export interface LibraryCacheEnv {
@@ -56,5 +58,21 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
   async readItems(): Promise<LibraryItemRow[]> {
     if (!this.store.getInitialization()) throw new Error('Library cache is not initialized');
     return this.store.readItems();
+  }
+
+  getStats(accessToken: string, simklUserId: string): Promise<Record<string, unknown>> {
+    const userId = normalizeSimklId(simklUserId);
+    if (!accessToken) return Promise.reject(new Error('Simkl authentication required'));
+    if (!userId) return Promise.reject(new Error('Invalid verified Simkl account ID'));
+    return this.library.withExclusive(async () => {
+      const previous = this.store.loadProfile();
+      const librarySnapshot = this.store.loadSnapshot();
+      const result = await refreshUserProfile(this.client, accessToken, userId, previous, librarySnapshot, {
+        ttlSeconds: parseLibraryCacheTtlSeconds(this.env.SIMKL_LIBRARY_CACHE_TTL_SECONDS),
+        now: Date.now(),
+      });
+      if (JSON.stringify(previous) !== JSON.stringify(result.snapshot)) this.store.saveProfile(result.snapshot);
+      return result.stats;
+    });
   }
 }

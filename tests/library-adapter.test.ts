@@ -5,13 +5,20 @@ const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
 function setup(props: any) {
   const names: string[] = [], reads: any[] = [], invalidations: string[] = [];
-  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async invalidate() { invalidations.push(name); } }; } } };
-  return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations };
+  const stats: any[] = [];
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async invalidate() { invalidations.push(name); } }; } } };
+  return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations, stats };
 }
 test('verified props route without settings and force is forwarded', async () => {
   globalThis.fetch = (async () => { throw new Error('unexpected'); }) as typeof fetch;
   const s = setup({ simklToken: 'token', simklUserId: '42' }); await s.adapter.read(true); await s.adapter.invalidate();
   expect(s.names).toEqual(['simkl-library:v1:42', 'simkl-library:v1:42']); expect(s.reads[0].force).toBe(true); expect(s.invalidations).toEqual(['simkl-library:v1:42']);
+});
+test('stats route through the verified account cache and preserve canonical decimal IDs', async () => {
+  globalThis.fetch = (async () => { throw new Error('unexpected'); }) as typeof fetch;
+  const s = setup({ simklToken: 'token', simklUserId: '9007199254740993' });
+  expect(await s.adapter.getStats()).toEqual({ total_mins: 20 });
+  expect(s.stats).toEqual([{ name: 'simkl-library:v1:9007199254740993', token: 'token', userId: '9007199254740993' }]);
 });
 test('legacy account verifies settings and memoizes within token identity', async () => {
   let calls = 0; globalThis.fetch = (async () => { calls++; return Response.json({ account: { id: 42 } }); }) as typeof fetch;

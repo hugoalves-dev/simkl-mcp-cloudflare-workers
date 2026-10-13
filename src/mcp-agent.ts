@@ -5,7 +5,6 @@ import { McpAgent } from 'agents/mcp';
 import { z } from 'zod';
 import { SimklClient } from './api/client.js';
 import { simklTrendingPath } from './api/trending.js';
-import { getCurrentUserSettings, getUserStats } from './api/user.js';
 import { RewatchService } from './api/rewatches.js';
 import { registerRewatchTools } from './tools/rewatches.js';
 import { registerTools } from '../generated/tools.js';
@@ -71,22 +70,10 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
         inputSchema: z.object({}),
       },
       async () => {
-        // get current user id from settings
-        const settings = await getCurrentUserSettings(this.client, this.simklToken ?? '');
-
-        const userId = settings?.account?.id;
-        if (!userId) {
-          return {
-            content: [{ type: 'text', text: 'failed to get current user id' }],
-          };
-        }
-
-        // get stats for current user
-        const stats = await getUserStats(this.client, Number(userId), this.simklToken ?? '');
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }],
-        };
+        try {
+          const stats = await this.library.getStats();
+          return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
+        } catch (error) { return { ...toMcpErrorResult(error) }; }
       }
     );
   }

@@ -6,6 +6,7 @@ import type { LibraryItems } from './types';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
   invalidate(): Promise<void>;
+  getStats(): Promise<Record<string, unknown>>;
 }
 export const verifiedAccountId = normalizeSimklId;
 export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNamespace<SimklLibraryCache> }, client: SimklClient, getProps: () => SimklAuthProps | undefined): LibraryAdapter {
@@ -28,7 +29,7 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       }
       userId = await memo.promise;
     }
-    return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token };
+    return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token, userId };
   }
   return {
     async read(force = false) {
@@ -56,5 +57,9 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       }
     },
     async invalidate() { const { object } = await stub(); await object.invalidate(); },
+    async getStats() {
+      const { object, token, userId } = await stub();
+      return object.getStats(token, userId);
+    },
   };
 }
