@@ -139,6 +139,14 @@ reconstruction once persisted. Successful library writes, including manual
 rewatch/history/stop tools, force the next read to check activities. Call
 `simkl_refresh_library` to bypass the interval explicitly without discarding data.
 
+`simkl_my_stats` uses the same per-account Durable Object to cache user settings
+and statistics. It checks `/sync/activities` on the configured lazy interval,
+refreshes settings when `activities.settings.all` changes, and refreshes stats
+when top-level `activities.all` changes. Stats reads reuse an already-fresh
+library activity snapshot when available and never initialize or advance the
+watchlist cache. Profile values and their activity markers persist in the
+existing metadata table; access tokens remain operation arguments only.
+
 Cached watchlists return the foundation's default rich summary. Type/status
 selection is supported; request-specific delta filters and enhanced/reduced
 projections (`date_from`, `extended`, `episode_watched_at`, `memos`) are rejected
