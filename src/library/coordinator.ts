@@ -15,6 +15,10 @@ export class CachedLibrary {
     this.queue = result.catch(() => undefined);
     return result;
   }
+  /** Runs a related cache operation in the same queue as library refreshes and invalidations. */
+  withExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    return this.enqueue(operation);
+  }
   read(token: string, force = false): Promise<LibraryItems> {
     return this.enqueue(async () => {
       try {

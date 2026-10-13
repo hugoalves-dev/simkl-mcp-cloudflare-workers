@@ -34,4 +34,15 @@ describe('current user API helpers', () => {
     expect(requests[0].init.method).toBe('GET');
     expect(new Headers(requests[0].init.headers).get('Authorization')).toBe('Bearer user-token');
   });
+
+  test('preserves a large decimal account ID without converting through number', async () => {
+    await getUserStats(createClient(), '9007199254740993', 'user-token');
+
+    expect(requests[0].url.pathname).toBe('/users/9007199254740993/stats');
+  });
+
+  test.each([0, -1, '0', '-1', '1.5', 'not-an-id'])('rejects invalid account ID %s without a request', async userId => {
+    await expect(getUserStats(createClient(), userId as number | string, 'user-token')).rejects.toThrow();
+    expect(requests).toHaveLength(0);
+  });
 });
