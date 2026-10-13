@@ -5,8 +5,8 @@ import {
   type LibraryCandidate, type LibraryItemRow, type MediaType,
 } from './types.js';
 
-export async function fetchInitialLibrary(client: SimklClient, accessToken: string): Promise<LibraryCandidate> {
-  const activities = await client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken });
+export async function fetchInitialLibrary(client: SimklClient, accessToken: string, knownActivities?: Record<string, unknown>): Promise<LibraryCandidate> {
+  const activities = knownActivities ?? await client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken });
   if (!isRecord(activities) || typeof activities.all !== 'string' || !Number.isFinite(Date.parse(activities.all))) {
     throw new Error('Invalid Simkl activities snapshot');
   }
@@ -40,21 +40,28 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
     }
   }
 
-  const pull = (path: string) => client.request<unknown>(path, {
-    method: 'GET', token: accessToken, responseProfile: 'library',
-  });
+  async function pull(path: string, mediaType: MediaType): Promise<void> {
+    let page = 1, pageCount = 1;
+    do {
+      const response = await client.requestPaginated<unknown>(path, {
+        method: 'GET', token: accessToken, responseProfile: 'library',
+        pagination: { page, limit: 100, requireComplete: true },
+      });
+      append(response.data, mediaType);
+      if (response.pagination) {
+        if (response.pagination.page !== page || (page > 1 && response.pagination.pageCount !== pageCount)) throw new Error('Invalid Simkl library pagination');
+        pageCount = response.pagination.pageCount;
+      } else if (page > 1) throw new Error('Missing Simkl library pagination');
+      page++;
+    } while (page <= pageCount);
+  }
   for (const mediaType of MEDIA_TYPES) {
-    let response: unknown;
     try {
-      response = await pull(`/sync/all-items/${mediaType}`);
+      await pull(`/sync/all-items/${mediaType}`, mediaType);
     } catch (error) {
       if (!(error instanceof SimklApiError) || error.statusCode !== 400 || error.upstreamCode !== 'max_items') throw error;
-      for (const status of STATUSES_BY_MEDIA[mediaType]) {
-        append(await pull(`/sync/all-items/${mediaType}/${status}`), mediaType);
-      }
-      continue;
+      for (const status of STATUSES_BY_MEDIA[mediaType]) await pull(`/sync/all-items/${mediaType}/${status}`, mediaType);
     }
-    append(response, mediaType);
   }
   return { activities, items: [...items.values()] };
 }

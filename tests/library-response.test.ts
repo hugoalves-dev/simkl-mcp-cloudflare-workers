@@ -33,7 +33,7 @@ test('accepts >2MiB and exactly 16MiB only for successful library GET profile', 
 test('keeps unrelated, absolute, POST and error responses at 2MiB', async () => {
   for (const [path, method, status] of [
     ['/users/settings', 'GET', 200], ['/sync/activities', 'GET', 200],
-    ['/sync/ratings', 'GET', 200], ['/sync/all-items/shows/invalid', 'GET', 200],
+    ['/sync/ratings', 'POST', 200], ['/sync/all-items/shows/invalid', 'GET', 200],
     ['https://api.simkl.com/sync/all-items/shows', 'GET', 200],
     ['//api.simkl.com/sync/all-items/shows', 'GET', 200],
     ['/sync/all-items/shows', 'POST', 200], ['/sync/all-items/shows', 'GET', 400],
@@ -71,4 +71,14 @@ test('accepts exact default byte limit and measures fallback in UTF-8 bytes', as
     text: async () => JSON.stringify('é'.repeat(DEFAULT / 2)),
   }) as Response) as typeof fetch;
   await expect(client().request('/users/settings', { method: 'GET' })).rejects.toThrow('response too large');
+});
+
+
+test('all-types library and ratings deltas retain bounded large-response support', async () => {
+  for (const path of ['/sync/all-items', '/sync/ratings']) {
+    respond(body(DEFAULT + 1));
+    expect((await client().request<string>(path, { method: 'GET', responseProfile: 'library' })).length).toBe(DEFAULT - 1);
+    respond(body(LIBRARY + 1));
+    await expect(client().request(path, { method: 'GET', responseProfile: 'library' })).rejects.toThrow('response too large');
+  }
 });

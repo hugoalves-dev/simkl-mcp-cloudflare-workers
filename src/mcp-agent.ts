@@ -9,6 +9,8 @@ import { getCurrentUserSettings, getUserStats } from './api/user.js';
 import { RewatchService } from './api/rewatches.js';
 import { registerRewatchTools } from './tools/rewatches.js';
 import { registerTools } from '../generated/tools.js';
+import { createLibraryAdapter, type LibraryAdapter } from './library/adapter';
+import { selectWatchlist, watchlistResourceContents } from './library/watchlist';
 
 interface Env extends WorkerEnv, SimklOAuthEnv {}
 
@@ -24,6 +26,7 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
   });
 
   private client!: SimklClient;
+  private library!: LibraryAdapter;
   private get simklToken(): string | undefined {
     return this.props?.simklToken;
   }
@@ -35,13 +38,25 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
     });
 
     const rewatchService = new RewatchService(this.client, () => this.simklToken);
-    registerTools(this.server, this.client, () => this.simklToken);
-    registerRewatchTools(this.server, rewatchService);
+    this.library = createLibraryAdapter(this.env, this.client, () => this.props);
+    registerTools(this.server, this.client, () => this.simklToken, {
+      getWatchlist: async args => selectWatchlist(await this.library.read(), args),
+      afterLibraryWrite: () => this.library.invalidate(),
+    });
+    registerRewatchTools(this.server, rewatchService, () => this.library.invalidate());
     this.registerCustomTools();
     this.registerResources();
   }
 
   private registerCustomTools() {
+    this.server.registerTool('simkl_refresh_library', {
+      description: 'Force an incremental refresh of the authenticated Simkl library, bypassing the activities check interval',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    }, async () => {
+      await this.library.read(true);
+      return { content: [{ type: 'text', text: 'Simkl library refreshed' }] };
+    });
     // simkl_my_stats - get stats for current user
     this.server.registerTool(
       'simkl_my_stats',
@@ -105,56 +120,7 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
       },
       async (uri, variables) => {
         const { type, status } = variables;
-        const typeKey = type as string;
-        const fetchPage = async (page: number) =>
-          this.client.requestPaginated<any>(`/sync/all-items/${typeKey}/${status}`, {
-            method: 'GET',
-            query: { extended: 'full' },
-            token: this.simklToken,
-            pagination: { page, limit: 100 },
-          });
-
-        const firstPage = await fetchPage(1);
-        const items = ((firstPage.data && firstPage.data[typeKey]) || []) as any[];
-        const pagination = firstPage.pagination;
-
-        if (pagination && pagination.pageCount > 1) {
-          for (let page = 2; page <= pagination.pageCount; page++) {
-            const pageData = await fetchPage(page);
-            const pageItems = ((pageData.data && pageData.data[typeKey]) || []) as any[];
-            items.push(...pageItems);
-          }
-        }
-
-        const baseUri = uri.toString();
-
-        // return empty content if no items
-        if (items.length === 0) {
-          return {
-            contents: [{
-              uri: baseUri,
-              mimeType: 'text/plain',
-              text: `no ${type} with status ${status}`,
-            }],
-          };
-        }
-
-        return {
-          contents: items.map((item: any, index: number) => {
-            const show = item.show || item.movie || item.anime || {};
-            const simklId = show.ids?.simkl || 'unknown';
-            const title = show.title || 'unknown';
-            const year = show.year || 'N/A';
-            const addedDate = item.added_to_watchlist_at?.split('T')[0] || 'unknown';
-            const text = `${index}: [SIMKL #${simklId}] - ${title} (${year}) - added on ${addedDate}`;
-
-            return {
-              uri: `${baseUri}#${index}`,
-              mimeType: 'text/plain',
-              text,
-            };
-          }),
-        };
+        return watchlistResourceContents(uri.toString(), type as string, status as string, await this.library.read());
       }
     );
 

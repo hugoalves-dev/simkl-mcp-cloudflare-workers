@@ -35,3 +35,5 @@ run_worker_first = [ "!/", "/*", "!/index.html" ]
 
 [vars]
 SIMKL_API_BASE_URL = "https://api.simkl.com"
+# Minimum lazy activity-check interval; invalid values fall back to 300 seconds.
+SIMKL_LIBRARY_CACHE_TTL_SECONDS = "300"

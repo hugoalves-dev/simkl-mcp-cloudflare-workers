@@ -17,6 +17,7 @@ function setup(handle?: (path: string) => unknown | Promise<unknown>) {
       return (handle ? await handle(path) : path === '/sync/activities' ? activities : { [path.split('/')[3]]: [item(path.split('/')[3])] }) as any;
     } finally { active--; }
   };
+  client.requestPaginated = async (path, options) => ({ data: await client.request(path, options), pagination: null }) as any;
   return { client, calls, peak: () => peak };
 }
 

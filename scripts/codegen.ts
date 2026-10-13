@@ -272,10 +272,14 @@ function generateHandler(path: string, method: string, params: any[], responseFo
 
   return `async (args: any) => {
     try {
-      const result = await client.request(${requestPathExpression}, {
+      const result = ${toolName === 'simkl_get_watchlist' ? 'hooks.getWatchlist ? await hooks.getWatchlist(args) : ' : ''}await client.request(${requestPathExpression}, {
         ${parts.join(',\n        ')},
         token: getToken()
       });
+      ${['/scrobble/start', '/scrobble/pause', '/scrobble/stop', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/ratings', '/sync/ratings/remove'].includes(path) && method === 'post' ? `if (hooks.afterLibraryWrite) {
+        try { await hooks.afterLibraryWrite(); }
+        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
+      }` : ''}
       const formatted = ${formatResponse};
       return {
         content: Array.isArray(formatted)
@@ -283,6 +287,7 @@ function generateHandler(path: string, method: string, params: any[], responseFo
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
     }`;
@@ -366,6 +371,7 @@ import { z } from 'zod';
 import { asAiring, formatList, withImdb, withRating } from '../src/format/media.js';
 ${toolsWhitelist.some(config => config.requestPath?.helper === 'simklTrendingPath') ? "import { simklTrendingPath } from '../src/api/trending.js';" : ''}
 import { toMcpErrorResult } from '../src/api/errors.js';
+import { LibraryQueryError } from '../src/library/watchlist.js';
 ${toolsWhitelist.some(config => config.custom) ? "import { getTrendingByGenre } from '../src/api/trending.js';" : ''}
 
 const formatters: Record<string, (result: any, args: any) => string> = {
@@ -379,7 +385,11 @@ function encodePathValue(value: unknown, name: string) {
   return encodeURIComponent(String(value));
 }
 
-export function registerTools(server: McpServer, client: any, getToken: () => string | undefined) {
+export interface LibraryToolHooks {
+  getWatchlist?: (args: Record<string, unknown>) => Promise<unknown>;
+  afterLibraryWrite?: () => Promise<void>;
+}
+export function registerTools(server: McpServer, client: any, getToken: () => string | undefined, hooks: LibraryToolHooks = {}) {
 ${tools.join('\n')}
 }
 `;

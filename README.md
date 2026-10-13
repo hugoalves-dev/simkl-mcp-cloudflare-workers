@@ -112,10 +112,38 @@ and error responses retain the 2 MiB cap. Pending item JSON is capped at 32 MiB 
 total, and each stored item or metadata JSON at 1 MiB. Exceeding a limit fails
 initialization without recording completion or truncating data.
 
-This implements the storage/initialization foundation in #13. Incremental freshness
-is tracked in #14, and routing the watchlist tool/resource through the cache in #15;
-existing watchlist reads still use Simkl directly until that integration lands.
+The #13 foundation now supports incremental freshness for #14. Watchlist tools
+and resources use the same per-user object; existing initialization and stored rows
+remain compatible. Queries and filtering beyond type/status remain separate work.
 Migration `v2` adds the library object without changing the existing MCP migration.
+
+### Incremental freshness
+
+`SIMKL_LIBRARY_CACHE_TTL_SECONDS` sets the minimum interval between successful
+`GET /sync/activities` checks per verified user. It defaults to **300 seconds**.
+Use a positive decimal integer string such as `"60"`; missing, undefined, null,
+empty, whitespace-only, fractional, non-positive, nonnumeric, exponent, boolean,
+and unsafe values fall back to 300. Refresh is lazy: inactive users are not polled.
+
+An unchanged top-level `activities.all` makes no item or ratings calls. Changed
+list/status buckets fetch one all-types `/sync/all-items` delta, and changed
+`rated_at` fetches `/sync/ratings`, using the previous top-level `all` as
+`date_from`. A removal change reconciles current `extended=simkl_ids_only`
+membership. Both documented `{}` empty responses and legacy `null` refresh
+responses are supported; malformed data or incomplete advertised pagination fails
+without advancing the snapshot. Ratings with `user_rating: null` clear the score.
+
+Items and the activity snapshot commit atomically after every required pull
+succeeds. A failed forced refresh retains retry intent, including across object
+reconstruction once persisted. Successful library writes, including manual
+rewatch/history/stop tools, force the next read to check activities. Call
+`simkl_refresh_library` to bypass the interval explicitly without discarding data.
+
+Cached watchlists return the foundation's default rich summary. Type/status
+selection is supported; request-specific delta filters and enhanced/reduced
+projections (`date_from`, `extended`, `episode_watched_at`, `memos`) are rejected
+explicitly rather than returning a mismatched cached view. This change reuses
+migration `v2` and requires no additional migration.
 
 Run the fixture-only Worker RPC/persistence smoke test with
 `node tests/library-runtime/smoke.mjs`. It uses Wrangler's installed Miniflare and
