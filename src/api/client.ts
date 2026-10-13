@@ -1,6 +1,7 @@
 // simkl api http client
 
 import { APP_NAME, APP_VERSION, USER_AGENT } from '../app-info';
+import { createResponseCacheKey, getResponseCachePolicy } from './response-cache';
 
 export interface SimklClientOptions {
   baseUrl: string;
@@ -129,13 +130,41 @@ export class SimklClient {
       init.body = JSON.stringify(options.body);
     }
 
-    let response: Response;
-    try {
-      response = await fetch(url, init);
-    } catch (error) {
-      throw new SimklApiError('simkl api request failed', 0, null);
+    const cachePolicy = getResponseCachePolicy(new URL(url), options.method);
+    const cache = cachePolicy && typeof caches !== 'undefined' ? caches.default : undefined;
+    const cacheKey = cache && cachePolicy ? createResponseCacheKey(new URL(url)) : undefined;
+
+    let response: Response | undefined;
+    if (cache && cacheKey) {
+      try {
+        response = await cache.match(cacheKey);
+      } catch {
+        // Cache failures should not make the upstream API unavailable.
+      }
     }
 
+    if (!response) {
+      try {
+        response = await fetch(url, init);
+      } catch {
+        throw new SimklApiError('simkl api request failed', 0, null);
+      }
+
+      if (cache && cacheKey && cachePolicy && response.ok) {
+        const headers = new Headers(response.headers);
+        headers.set('Cache-Control', `public, max-age=${cachePolicy.ttlSeconds}`);
+        const cacheableResponse = new Response(response.clone().body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        });
+        try {
+          await cache.put(cacheKey, cacheableResponse);
+        } catch {
+          // Cache writes are best-effort; return the successful upstream response.
+        }
+      }
+    }
     const responseHeaders = this.parseResponseHeaders(response);
 
     if (response.status === 204) {
