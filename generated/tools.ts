@@ -7,6 +7,7 @@ import { asAiring, formatList, withImdb, withRating } from '../src/format/media.
 import { simklTrendingPath } from '../src/api/trending.js';
 import { toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
+import { LibraryWriteInvalidationError } from '../src/library/errors.js';
 import { getTrendingByGenre } from '../src/api/trending.js';
 
 const formatters: Record<string, (result: any, args: any) => string> = {
@@ -39,6 +40,16 @@ function encodePathValue(value: unknown, name: string) {
 export interface LibraryToolHooks {
   getWatchlist?: (args: Record<string, unknown>) => Promise<string>;
   afterLibraryWrite?: () => Promise<void>;
+  write?: (path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown }) => Promise<unknown>;
+}
+async function requestWrite(client: any, hooks: LibraryToolHooks, path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown; authorization?: 'bearer' | 'none' }, token: string | undefined) {
+  if (hooks.write) return hooks.write(path, options);
+  const result = await client.request(path, { ...options, token });
+  if (hooks.afterLibraryWrite) {
+    try { await hooks.afterLibraryWrite(); }
+    catch { throw new LibraryWriteInvalidationError(); }
+  }
+  return result;
 }
 export function registerTools(server: McpServer, client: any, getToken: () => string | undefined, hooks: LibraryToolHooks = {}) {
 
@@ -145,16 +156,11 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     } },
       async (args: any) => {
     try {
-      const result = await client.request(`/scrobble/start`, {
+      const result = await requestWrite(client, hooks, `/scrobble/start`, {
         method: 'POST',
         query: { allow_rewatch: args.allow_rewatch, min_progress: args.min_progress },
-        body: args.body,
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: args.body
+      }, getToken());
       const formatted = formatters['simkl_start_watching'](result, args);
       return {
         content: Array.isArray(formatted)
@@ -162,6 +168,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
@@ -176,16 +183,11 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     } },
       async (args: any) => {
     try {
-      const result = await client.request(`/scrobble/pause`, {
+      const result = await requestWrite(client, hooks, `/scrobble/pause`, {
         method: 'POST',
         query: { allow_rewatch: args.allow_rewatch },
-        body: args.body,
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: args.body
+      }, getToken());
       const formatted = formatters['simkl_pause_watching'](result, args);
       return {
         content: Array.isArray(formatted)
@@ -193,6 +195,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
@@ -206,15 +209,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     } },
       async (args: any) => {
     try {
-      const result = await client.request(`/sync/add-to-list`, {
+      const result = await requestWrite(client, hooks, `/sync/add-to-list`, {
         method: 'POST',
-        body: args.body,
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: args.body
+      }, getToken());
       const formatted = formatters['simkl_add_to_watchlist'](result, args);
       return {
         content: Array.isArray(formatted)
@@ -222,6 +220,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
@@ -230,23 +229,22 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_mark_watched',
-      { description: 'Add to History', inputSchema: {
+      { description: 'Add one or more items to history in a single request using movies[], shows[], anime[], and/or episodes[]. The legacy single episode argument remains supported.', inputSchema: {
       allow_rewatch: z.enum(['yes', 'no']).optional().describe('Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry '),
       skip_auto_watching: z.enum(['yes']).optional().describe('When `yes`, suppresses the implicit episode auto-fill that happens when you POST a show without explicit `seasons`/`episodes`. Use when the client manages episode-level state itself.'),
+      movies: z.array(z.unknown()).optional(),
+      shows: z.array(z.unknown()).optional(),
+      episodes: z.array(z.object({}).passthrough()).optional(),
+      anime: z.array(z.unknown()).optional(),
       episode: z.object({}).passthrough().optional()
     } },
       async (args: any) => {
     try {
-      const result = await client.request(`/sync/history`, {
+      const result = await requestWrite(client, hooks, `/sync/history`, {
         method: 'POST',
         query: { allow_rewatch: args.allow_rewatch, skip_auto_watching: args.skip_auto_watching },
-        body: { ...(args.episode ? { episodes: [args.episode] } : {}) },
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: { ...(args.movies !== undefined ? { movies: args.movies } : {}), ...(args.shows !== undefined ? { shows: args.shows } : {}), ...(args.episodes !== undefined ? { episodes: args.episodes } : {}), ...(args.anime !== undefined ? { anime: args.anime } : {}), ...(args.episodes === undefined && args.episode !== undefined ? { episodes: [args.episode] } : {}) }
+      }, getToken());
       const formatted = JSON.stringify(result, null, 2);
       return {
         content: Array.isArray(formatted)
@@ -254,6 +252,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
@@ -262,20 +261,19 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_remove_from_history',
-      { description: 'Remove from History', inputSchema: {
+      { description: 'Remove one or more items from history in a single request using movies[], shows[], anime[], and/or episodes[]. The legacy single episode argument remains supported.', inputSchema: {
+      movies: z.array(z.unknown()).optional(),
+      shows: z.array(z.unknown()).optional(),
+      episodes: z.array(z.object({}).passthrough()).optional(),
+      anime: z.array(z.unknown()).optional(),
       episode: z.object({}).passthrough().optional()
     }, annotations: { destructiveHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/sync/history/remove`, {
+      const result = await requestWrite(client, hooks, `/sync/history/remove`, {
         method: 'POST',
-        body: { ...(args.episode ? { episodes: [args.episode] } : {}) },
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: { ...(args.movies !== undefined ? { movies: args.movies } : {}), ...(args.shows !== undefined ? { shows: args.shows } : {}), ...(args.episodes !== undefined ? { episodes: args.episodes } : {}), ...(args.anime !== undefined ? { anime: args.anime } : {}), ...(args.episodes === undefined && args.episode !== undefined ? { episodes: [args.episode] } : {}) }
+      }, getToken());
       const formatted = JSON.stringify(result, null, 2);
       return {
         content: Array.isArray(formatted)
@@ -283,6 +281,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
@@ -296,15 +295,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     } },
       async (args: any) => {
     try {
-      const result = await client.request(`/sync/ratings`, {
+      const result = await requestWrite(client, hooks, `/sync/ratings`, {
         method: 'POST',
-        body: args.body,
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: args.body
+      }, getToken());
       const formatted = JSON.stringify(result, null, 2);
       return {
         content: Array.isArray(formatted)
@@ -312,6 +306,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
@@ -325,15 +320,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
     }, annotations: { destructiveHint: true } },
       async (args: any) => {
     try {
-      const result = await client.request(`/sync/ratings/remove`, {
+      const result = await requestWrite(client, hooks, `/sync/ratings/remove`, {
         method: 'POST',
-        body: args.body,
-        token: getToken()
-      });
-      if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }
+        body: args.body
+      }, getToken());
       const formatted = JSON.stringify(result, null, 2);
       return {
         content: Array.isArray(formatted)
@@ -341,6 +331,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
+      if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }

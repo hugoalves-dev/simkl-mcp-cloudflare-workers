@@ -1,13 +1,12 @@
 import { afterEach, expect, test } from 'bun:test';
-import { SimklClient } from '../src/api/client';
+import { SimklApiError, SimklClient } from '../src/api/client';
 import { createLibraryAdapter } from '../src/library/adapter';
 const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original; });
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
 function setup(props: any) {
-  const names: string[] = [], reads: any[] = [], invalidations: string[] = [];
-  const stats: any[] = [];
-  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async invalidate() { invalidations.push(name); } }; } } };
-  return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations, stats };
+  const names: string[] = [], reads: any[] = [], invalidations: string[] = [], stats: any[] = [], writes: any[] = [];
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async invalidate() { invalidations.push(name); }, async write(token: string, path: string, options: any) { writes.push({ name, token, path, options }); return { ok: true }; } }; } } };
+  return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations, stats, writes };
 }
 test('verified props route without settings and force is forwarded', async () => {
   globalThis.fetch = (async () => { throw new Error('unexpected'); }) as typeof fetch;
@@ -28,6 +27,16 @@ test('legacy account verifies settings and memoizes within token identity', asyn
 test('different accounts isolate objects; sessions share verified account', async () => {
   const a = setup({ simklToken: 'one', simklUserId: '42' }), b = setup({ simklToken: 'two', simklUserId: '42' }), c = setup({ simklToken: 'three', simklUserId: '43' });
   await Promise.all([a.adapter.read(), b.adapter.read(), c.adapter.read()]); expect(a.names).toEqual(b.names); expect(c.names).not.toEqual(a.names);
+});
+test('queued writer routes through the verified account object with operation-local token', async () => {
+  const s = setup({ simklToken: 'write-token', simklUserId: '42' });
+  await expect(s.adapter.write('/sync/history', { method: 'POST', body: { movies: [{ ids: { simkl: 1 } }] } })).resolves.toEqual({ ok: true });
+  expect(s.writes).toEqual([{ name: 'simkl-library:v1:42', token: 'write-token', path: '/sync/history', options: { method: 'POST', body: { movies: [{ ids: { simkl: 1 } }] } } }]);
+});
+test('rejects a stale rewatch token rather than queueing it under a changed account', async () => {
+  const props = { simklToken: 'new-token', simklUserId: '43' }, s = setup(props);
+  await expect(s.adapter.write('/sync/history', { method: 'POST', body: {} }, 'old-token')).rejects.toThrow(/token changed/);
+  expect(s.writes).toEqual([]);
 });
 for (const id of [undefined, null, 0, -1, 'simkl_user_uuid', 'x', 1.5]) test('failed legacy verification does not access cache '+String(id), async () => {
   globalThis.fetch = (async () => Response.json({ account: { id } })) as typeof fetch;
@@ -52,5 +61,20 @@ test('restores sanitized API errors returned by cached stats operations', async 
   const env = { SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async getStats() { throw rpcError; } }) } };
   const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
   const error = await adapter.getStats().catch(error => error);
+  expect(error).toBeInstanceOf(SimklApiError); expect(error.upstreamCode).toBe('user_limit_exceeded'); expect(error.headers.retryAfter).toBe('3600'); expect(error.message).not.toContain('sensitive');
+});
+
+test('restores mutation cache invalidation failure across Worker RPC', async () => {
+  const rpcError = Object.assign(new Error('sanitized'), { name: 'LibraryWriteInvalidationError' });
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async write() { throw rpcError; } }) } };
+  const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
+  await expect(adapter.write('/sync/history', { method: 'POST', body: {} })).rejects.toThrow('Upstream write succeeded, but library cache invalidation failed');
+});
+
+test('restores Simkl quota errors from a queued write across Worker RPC', async () => {
+  const rpcError = Object.assign(new Error('sensitive upstream message'), { name: 'SimklApiError', statusCode: 429, upstreamCode: 'user_limit_exceeded', headers: { retryAfter: '3600' } });
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async write() { throw rpcError; } }) } };
+  const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
+  const error = await adapter.write('/sync/history', { method: 'POST', body: {} }).catch(error => error);
   expect(error).toBeInstanceOf(SimklApiError); expect(error.upstreamCode).toBe('user_limit_exceeded'); expect(error.headers.retryAfter).toBe('3600'); expect(error.message).not.toContain('sensitive');
 });

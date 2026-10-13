@@ -1,8 +1,9 @@
-import type { SimklClient } from './client.js';
+import type { RequestOptions, SimklClient } from './client.js';
 
 export type RewatchMediaType = 'all' | 'movies' | 'shows' | 'anime';
 export type RewatchWriteMediaType = Exclude<RewatchMediaType, 'all'>;
 export type RewatchStatus = 'active' | 'closed' | 'completed';
+type RewatchWriteOptions = Omit<RequestOptions, 'method'> & { method: 'POST' };
 
 export interface RewatchItem extends Record<string, unknown> {
   ids: Record<string, string | number>;
@@ -52,12 +53,14 @@ export function hasValidMediaIds(ids: Record<string, string | number> | undefine
 
 export class RewatchService {
   private eligibility = new Map<string, { allowed: boolean; expiresAt: number }>();
+  private writeRequest: (endpoint: string, options: RewatchWriteOptions) => Promise<any>;
 
   constructor(
     private readonly client: SimklClient,
     private readonly getToken: () => string | undefined,
     private readonly now: () => number = Date.now,
-  ) {}
+    writer?: (endpoint: string, options: RewatchWriteOptions) => Promise<any>,
+  ) { this.writeRequest = writer ?? ((endpoint, options) => this.client.request(endpoint, options)); }
 
   async start(input: RewatchStartInput): Promise<any> {
     if (input.rewatch_id !== undefined) this.validateId(input.rewatch_id);
@@ -69,7 +72,7 @@ export class RewatchService {
     item.is_rewatch = true;
     if (input.rewatch_id !== undefined) item.rewatch_id = input.rewatch_id;
     if (input.rewatch_status) item.rewatch_status = input.rewatch_status;
-    return this.client.request('/sync/history', {
+    return this.writeRequest('/sync/history', {
       method: 'POST', token, query: { allow_rewatch: 'yes' },
       body: { [mediaKeys[input.mediaType]]: [item] },
     });
@@ -84,7 +87,7 @@ export class RewatchService {
     const token = await this.requireEligiblePlan();
     item.rewatch_id = input.rewatch_id;
     if (input.rewatch_status) item.rewatch_status = input.rewatch_status;
-    return this.client.request('/sync/history', {
+    return this.writeRequest('/sync/history', {
       method: 'POST', token, query: { allow_rewatch: 'yes' },
       body: { [mediaKeys[input.mediaType]]: [item] },
     });
@@ -113,7 +116,7 @@ export class RewatchService {
       }
     }
     const token = useRewatch ? await this.requireEligiblePlan() : this.getToken();
-    const result = await this.client.request<any>('/scrobble/stop', {
+    const result = await this.writeRequest('/scrobble/stop', {
       method: 'POST', token,
       ...(useRewatch ? { query: { allow_rewatch: 'yes' } } : {}),
       body: input.body,

@@ -26,6 +26,12 @@ export default { async fetch(request, env) {
    try { await adapter.read(true); return Response.json({ content: [] }); }
    catch (error) { return Response.json(toMcpErrorResult(error)); }
  }
+ if (url.pathname === '/write') {
+   try {
+     await adapter.write('/sync/history', { method: 'POST', body: { movies: [{ ids: { simkl: 7 } }] } });
+     return Response.json({ ok: true });
+   } catch (error) { return Response.json(toMcpErrorResult(error)); }
+ }
  const cache = env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName('simkl-library:v1:' + user));
  if (url.pathname === '/invalidate') { await cache.invalidate(); return new Response('ok'); }
  try { return Response.json(await cache.read('synthetic-token', url.searchParams.has('force'))); }
@@ -44,7 +50,8 @@ const config = {
  outboundService: async request => {
   const url = new URL(request.url); calls.push(url.pathname);
   if (mode === 'quota') return Response.json({ error: 'user_limit_exceeded', secret: 'sensitive-upstream-body' }, { status: 429, headers: { 'Retry-After': '3600', 'X-RateLimit-Remaining': '0' } });
-  if (url.pathname === '/sync/activities') return Response.json({ all: mode === 'initial' ? oldDate : newDate, tv_shows: { completed: mode === 'initial' ? oldDate : newDate, rated_at: mode === 'fail' ? newDate : oldDate } });
+  if (url.pathname === '/sync/history') return Response.json({ added: { movies: 1 } });
+  if (url.pathname === '/sync/activities') { const date = mode === 'initial' ? oldDate : mode === 'post-write' ? '2026-10-03T00:00:00Z' : newDate; return Response.json({ all: date, tv_shows: { completed: date, rated_at: mode === 'fail' ? newDate : oldDate } }); }
   if (url.pathname.startsWith('/sync/all-items/')) return Response.json({ [url.pathname.split('/')[3]]: url.pathname.endsWith('/shows') ? [item('watching')] : [] });
   if (url.pathname === '/sync/all-items') return Response.json({ shows: [item(mode === 'initial' ? 'watching' : 'completed')] });
   if (url.pathname === '/sync/ratings' && mode === 'fail') return new Response('failed', { status: 503 });
@@ -71,6 +78,11 @@ try {
  assert.equal((await read()).shows[0].status, 'completed');
  const count = calls.length; await read(); assert.equal(calls.length, count);
  await read('?user=43'); assert.equal(calls.length, count + 4); // independent user initializes
+ mode = 'initial'; const stableReadCount = calls.length; await read(); assert.equal(calls.length, stableReadCount);
+ const writeResponse = await mf.dispatchFetch('http://cache.test/write'); assert.equal(writeResponse.status, 200);
+ assert.equal((await writeResponse.json()).ok, true); assert.equal(calls.at(-1), '/sync/history');
+ mode = 'post-write'; const afterWriteCount = calls.length; assert.equal((await read()).shows[0].status, 'completed');
+ assert.ok(calls.length > afterWriteCount); assert.equal(calls[afterWriteCount], '/sync/activities');
  mode = 'quota'; await mf.dispatchFetch('http://cache.test/invalidate');
  for (const path of ['/quota-watchlist', '/quota-refresh']) {
    const response = await mf.dispatchFetch('http://cache.test' + path); const result = await response.json();
