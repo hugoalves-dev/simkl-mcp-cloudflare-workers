@@ -6,6 +6,7 @@ type ResponseFormat =
 
 interface ToolConfig {
   path: string;
+  schemaPath?: string;
   method: string;
   schemaMethod?: string;
   authorization?: 'bearer' | 'none';
@@ -79,15 +80,15 @@ export const toolsWhitelist: ToolConfig[] = [
   { path: '/sync/ratings/remove', method: 'post', responseFormat: { 'type': 'json' }},
 
   // discovery
-  { path: '/tv/trending/:interval', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'tv'", 'args.interval'] }, responseFormat: {
+  { path: '/tv/trending/:interval', schemaPath: '/discover/trending/{type}/{file}.json', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'tv'", 'args.interval'] }, responseFormat: {
     type: 'simple',
     template: (results: any) => formatList(results)
   }},
-  { path: '/movies/trending/:interval', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'movies'", 'args.interval'] }, responseFormat: {
+  { path: '/movies/trending/:interval', schemaPath: '/discover/trending/{type}/{file}.json', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'movies'", 'args.interval'] }, responseFormat: {
     type: 'simple',
     template: (results: any) => formatList(results)
   }},
-  { path: '/anime/trending/:interval', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'anime'", 'args.interval'] }, responseFormat: {
+  { path: '/anime/trending/:interval', schemaPath: '/discover/trending/{type}/{file}.json', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'anime'", 'args.interval'] }, responseFormat: {
     type: 'simple',
     template: (results: any) => formatList(results)
   }},
@@ -108,11 +109,11 @@ export const toolsWhitelist: ToolConfig[] = [
     template: (results: any) => formatList(results, withRating)
   }},
 
-  { path: '/tv/airing?:date', method: 'get', responseFormat: {
+  { path: '/tv/airing', method: 'get', responseFormat: {
     type: 'simple',
     template: (results: any) => formatList(results, asAiring)
   }},
-  { path: '/anime/airing?:date', method: 'get', responseFormat: {
+  { path: '/anime/airing', method: 'get', responseFormat: {
     type: 'simple',
     template: (results: any) => formatList(results, asAiring)
   }},
@@ -132,7 +133,7 @@ export const toolsWhitelist: ToolConfig[] = [
   }},
 
   // user stats
-  { path: '/users/:user_id/stats', method: 'get', schemaMethod: 'post', responseFormat: { type: 'json' }},
+  { path: '/users/:user_id/stats', method: 'get', responseFormat: { type: 'json' }},
 
   // watchlist (sync)
   { path: '/sync/all-items/:type/:status', method: 'get', responseFormat: { type: 'json' }},

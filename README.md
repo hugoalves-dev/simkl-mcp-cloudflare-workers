@@ -151,8 +151,14 @@ esbuild dependencies, redirects upstream fetches to fixture data, and makes no l
 Simkl requests. Fixtures never become production routes.
 
 ```bash
-# regenerate tools from the OpenAPI spec
+# Download the latest Simkl OpenAPI document into api/simkl-openapi.json
+bun run refresh:openapi
+
+# Regenerate tools from the checked-in OpenAPI document
 bun run codegen
+
+# Check that generated tools match the checked-in source and configuration
+bun run codegen:check
 
 # typecheck
 bun run typecheck
@@ -160,6 +166,8 @@ bun run typecheck
 # health check
 curl http://localhost:8787/health
 ```
+
+The generator reads the checked-in snapshot at `api/simkl-openapi.json`, so code generation works without network access and produces repeatable output. After refreshing the snapshot, review and commit both it and `generated/tools.ts`. CI runs `bun run codegen:check` to catch generated output drift.
 
 ## License
 MIT

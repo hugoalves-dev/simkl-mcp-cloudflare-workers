@@ -9,7 +9,8 @@ dist/
 *.d.ts.map
 
 # generated code
-generated/
+generated/*
+!generated/tools.ts
 
 # cloudflare
 .wrangler/
