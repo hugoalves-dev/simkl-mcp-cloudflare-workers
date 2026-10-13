@@ -1,3 +1,5 @@
+import { addSimklItemLinks } from '../format/media';
+
 export type SimklMediaType = 'tv' | 'movies' | 'anime';
 export type SimklTrendingInterval = 'today' | 'week' | 'month' | 'daily' | 'weekly' | 'monthly';
 
@@ -72,6 +74,6 @@ export async function getTrendingByGenre(
     genre,
     total: items.length,
     returned: Math.min(items.length, maxResults),
-    results: items.slice(0, maxResults),
+    results: addSimklItemLinks(items.slice(0, maxResults), type),
   };
 }

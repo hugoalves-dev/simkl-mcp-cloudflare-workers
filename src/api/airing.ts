@@ -42,6 +42,6 @@ export async function formatAiringTool(
   args: { date?: string; sort?: SimklAiringSort },
 ) {
   const items = await getAiringItems(client, type, args.date, args.sort);
-  return { content: formatList(items, asAiring).map(text => ({ type: 'text' as const, text })) };
+  return { content: formatList(items, asAiring, 20, type).map(text => ({ type: 'text' as const, text })) };
 }
 

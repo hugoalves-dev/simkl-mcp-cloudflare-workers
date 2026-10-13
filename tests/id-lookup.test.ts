@@ -32,7 +32,7 @@ describe('getMediaById', () => {
     } as any;
 
     const result = await getMediaById(client, { imdb: 'tt1375666' });
-    expect(result).toEqual({ title: 'Inception', ids: { simkl: 472214 } });
+    expect(result).toEqual({ title: 'Inception', ids: { simkl: 472214 }, simkl_url: 'https://simkl.com/movies/472214/inception' });
     expect(calls).toHaveLength(2);
     expect(calls[0]).toEqual({
       path: '/redirect',
@@ -54,8 +54,9 @@ describe('getMediaById', () => {
         return path === '/redirect' ? { redirectUrl: 'https://simkl.com/anime/2345/title' } : { title: 'Anime' };
       },
     } as any;
-    await getMediaById(client, { mal: 1 });
+    const result = await getMediaById(client, { mal: 1 });
     expect(paths).toEqual(['/redirect', '/anime/2345']);
+    expect(result).toEqual({ title: 'Anime', simkl_url: 'https://simkl.com/anime/2345/title' });
   });
 
   test('rejects missing or malformed IDs without making a request', async () => {

@@ -3,7 +3,7 @@
 // @ts-nocheck
 
 import { z } from 'zod';
-import { asAiring, formatList, withImdb, withRating } from '../src/format/media.js';
+import { asAiring, formatList, withImdb, withRating, withSimklItemLink } from '../src/format/media.js';
 import { simklTrendingPath } from '../src/api/trending.js';
 import { toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
@@ -13,21 +13,21 @@ import { getMediaById } from '../src/api/id-lookup.js';
 import { formatAiringTool } from '../src/api/airing.js';
 
 const formatters: Record<string, (result: any, args: any) => string> = {
-  'simkl_search_by_text': (results, args) => results.length > 0 ? formatList(results, withImdb, 10) : [`no results for "${args.q}"`],
+  'simkl_search_by_text': (results, args) => results.length > 0 ? formatList(results, withImdb, 10, args.type) : [`no results for "${args.q}"`],
   'simkl_start_watching': (_, args) => `started: ${args.movie?.title || args.show?.title}`,
   'simkl_pause_watching': (_, args) => {
       const body = args.body || args, title = body.movie?.title || body.show?.title || body.anime?.title;
       return `paused at ${body.progress}%${title ? `: ${title}` : ""}`;
     },
   'simkl_add_to_watchlist': (_, args) => `added to watchlist: ${(args.movie || args.show || args.anime)?.title}`,
-  'simkl_get_trending_shows': (results) => formatList(results),
-  'simkl_get_trending_movies': (results) => formatList(results),
-  'simkl_get_trending_anime': (results) => formatList(results),
-  'simkl_get_best_shows': (results) => formatList(results, withRating),
-  'simkl_get_best_anime': (results) => formatList(results, withRating),
-  'simkl_get_shows_by_genre': (results) => Array.isArray(results) ? formatList(results) : ["no results for this genre"],
-  'simkl_get_anime_by_genre': (results) => Array.isArray(results) ? formatList(results) : ["no results for this genre"],
-  'simkl_get_movies_by_genre': (results) => Array.isArray(results) ? formatList(results) : ["no results for this genre"]
+  'simkl_get_trending_shows': (results) => formatList(results, void 0, 20, "tv"),
+  'simkl_get_trending_movies': (results) => formatList(results, void 0, 20, "movies"),
+  'simkl_get_trending_anime': (results) => formatList(results, void 0, 20, "anime"),
+  'simkl_get_best_shows': (results) => formatList(results, withRating, 20, "tv"),
+  'simkl_get_best_anime': (results) => formatList(results, withRating, 20, "anime"),
+  'simkl_get_shows_by_genre': (results) => Array.isArray(results) ? formatList(results, void 0, 20, "tv") : ["no results for this genre"],
+  'simkl_get_anime_by_genre': (results) => Array.isArray(results) ? formatList(results, void 0, 20, "anime") : ["no results for this genre"],
+  'simkl_get_movies_by_genre': (results) => Array.isArray(results) ? formatList(results, void 0, 20, "movies") : ["no results for this genre"]
 };
 
 function encodePathValue(value: unknown, name: string) {
@@ -415,7 +415,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
       });
       const result = response.data;
       const responseHeaders = response.headers;
-      const formatted = JSON.stringify(result, null, 2);
+      const formatted = JSON.stringify(withSimklItemLink(result, 'tv', args.id), null, 2);
       return {
         _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
@@ -443,7 +443,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
       });
       const result = response.data;
       const responseHeaders = response.headers;
-      const formatted = JSON.stringify(result, null, 2);
+      const formatted = JSON.stringify(withSimklItemLink(result, 'movies', args.id), null, 2);
       return {
         _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
@@ -471,7 +471,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
       });
       const result = response.data;
       const responseHeaders = response.headers;
-      const formatted = JSON.stringify(result, null, 2);
+      const formatted = JSON.stringify(withSimklItemLink(result, 'anime', args.id), null, 2);
       return {
         _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)

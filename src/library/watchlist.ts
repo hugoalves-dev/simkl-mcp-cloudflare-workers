@@ -1,7 +1,8 @@
 import { MEDIA_TYPES, type LibraryItem, type LibraryItems, type MediaType } from './types';
+import { simklItemUrl } from '../format/media';
 
 const statuses = ['watching', 'plantowatch', 'hold', 'completed', 'dropped'];
-const mediaPath: Record<MediaType, string> = { shows: 'tv', movies: 'movies', anime: 'anime' };
+const mediaPath: Record<MediaType, 'tv' | 'movies' | 'anime'> = { shows: 'tv', movies: 'movies', anime: 'anime' };
 const DEFAULT_WATCHLIST_LIMIT = 50;
 
 export class LibraryQueryError extends Error {}
@@ -14,8 +15,8 @@ function formatWatchlistItem(item: LibraryItem, type: MediaType): string {
 
   const title = typeof media.title === 'string' && media.title ? media.title : 'unknown';
   const year = typeof media.year === 'number' ? String(media.year) : 'N/A';
-  const slug = typeof ids.slug === 'string' && ids.slug ? `/${encodeURIComponent(ids.slug)}` : '';
-  const url = `https://simkl.com/${mediaPath[type]}/${encodeURIComponent(String(simklId))}${slug}`;
+  const url = simklItemUrl(mediaPath[type], simklId, typeof ids.slug === 'string' ? ids.slug : undefined);
+  if (!url) throw new LibraryQueryError('Cached watchlist item is missing its Simkl ID');
   const watched = item.watched_episodes_count;
   const total = item.total_episodes_count;
   const progress = typeof watched === 'number' && Number.isFinite(watched)

@@ -37,7 +37,7 @@ describe('getTrendingByGenre', () => {
         }
         return {
           data: [
-            { title: 'One', overview: 'richer fields stay available', ratings: { simkl: { rating: 8 } } },
+            { title: 'One', ids: { simkl: 17, slug: 'one-title' }, overview: 'richer fields stay available', ratings: { simkl: { rating: 8 } } },
             { title: 'Two', overview: 'also rich' },
           ],
           headers: { lastModified: 'Thu, 08 Oct 2026 00:00:00 GMT' },
@@ -54,6 +54,7 @@ describe('getTrendingByGenre', () => {
     expect(result.total).toBe(2);
     expect(result.results).toHaveLength(1);
     expect(result.results[0].ratings.simkl.rating).toBe(8);
+    expect(result.results[0].simkl_url).toBe('https://simkl.com/tv/17/one-title');
     expect(result.updatedAt).toBe('Thu, 08 Oct 2026 00:00:00 GMT');
   });
 
