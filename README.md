@@ -85,6 +85,10 @@ The genre CDN requests include the required app identification and omit `Authori
 
 Keep the live `simkl_get_shows_by_genre`, `simkl_get_movies_by_genre`, and `simkl_get_anime_by_genre` tools for other sorts and filters such as country, network, year, and type, and for queries the monthly files do not cover. Under AUTH V2, live genre requests require the user's access token and consume that user's shared daily allowance; under AUTH V1 they consume the app's daily allowance. Live requests also count toward the applicable per-second limit (10 GET requests per second). Live pagination caps are 20 pages and 60 items per page.
 
+### API response caching
+
+Public catalog GET responses are cached in the Cloudflare Workers Cache API using the complete request URL, including query parameters. Authorization headers are never part of the cache key. Search, best, and genre results are cached for **1 hour**; detail and episode responses for **6 hours**. The trending data index and genre files are cached for at most **1 hour**, in line with Simkl's CDN freshness guidance. Cached trending responses retain the upstream `Last-Modified` header. User-specific endpoints and failed upstream responses are not cached.
+
 ## Authentication
 - Public requests add `client_id` as a query param; authenticated calls use `Authorization: Bearer <token>`.
 - The Worker handles OAuth: `/auth/simkl` redirects to Simkl, `/oauth/callback` exchanges the code and issues MCP credentials.
