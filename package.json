@@ -5,8 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "openapi": "mkdir -p generated && bunx apib2swagger -i specs/apiary.apib -o generated/simkl-openapi3.json --open-api-3",
-    "codegen": "bun run openapi && bun run scripts/codegen.ts",
+    "refresh:openapi": "bun run scripts/refresh-openapi.ts",
+    "codegen": "bun run scripts/codegen.ts",
+    "codegen:check": "bun run codegen && git diff --exit-code HEAD -- generated/tools.ts",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "deploy:production": "wrangler deploy --env production",

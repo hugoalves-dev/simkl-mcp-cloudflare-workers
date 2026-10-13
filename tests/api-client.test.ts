@@ -93,24 +93,25 @@ describe('generated tool request policy configuration', () => {
     }
   });
 
-  test('uses GET for stats while reading the existing POST schema', () => {
+  test('uses the current OpenAPI GET operation for stats', () => {
     const stats = toolsWhitelist.find(tool => tool.path === '/users/:user_id/stats');
     expect(stats?.method).toBe('get');
-    expect(stats?.schemaMethod).toBe('post');
+    expect(stats?.schemaMethod).toBeUndefined();
   });
 
   test('configures existing trending tools for public data files', () => {
     const trendingTools = [
-      '/tv/trending/:interval',
-      '/movies/trending/:interval',
-      '/anime/trending/:interval',
+      ['/tv/trending/:interval', '/discover/trending/{type}/{file}.json'],
+      ['/movies/trending/:interval', '/discover/trending/{type}/{file}.json'],
+      ['/anime/trending/:interval', '/discover/trending/{type}/{file}.json'],
     ];
 
-    for (const path of trendingTools) {
+    for (const [path, schemaPath] of trendingTools) {
       const tool = toolsWhitelist.find(candidate => candidate.path === path);
       expect(tool?.method).toBe('get');
       expect(tool?.authorization).toBe('none');
       expect(tool?.requestPath?.helper).toBe('simklTrendingPath');
+      expect(tool?.schemaPath).toBe(schemaPath);
     }
   });
 
