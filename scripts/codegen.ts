@@ -403,7 +403,7 @@ function encodePathValue(value: unknown, name: string) {
 }
 
 export interface LibraryToolHooks {
-  getWatchlist?: (args: Record<string, unknown>) => Promise<unknown>;
+  getWatchlist?: (args: Record<string, unknown>) => Promise<string>;
   afterLibraryWrite?: () => Promise<void>;
 }
 export function registerTools(server: McpServer, client: any, getToken: () => string | undefined, hooks: LibraryToolHooks = {}) {

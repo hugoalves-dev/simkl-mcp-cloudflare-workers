@@ -37,7 +37,7 @@ function encodePathValue(value: unknown, name: string) {
 }
 
 export interface LibraryToolHooks {
-  getWatchlist?: (args: Record<string, unknown>) => Promise<unknown>;
+  getWatchlist?: (args: Record<string, unknown>) => Promise<string>;
   afterLibraryWrite?: () => Promise<void>;
 }
 export function registerTools(server: McpServer, client: any, getToken: () => string | undefined, hooks: LibraryToolHooks = {}) {
@@ -787,39 +787,15 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_watchlist',
-      { description: 'Get all items of one type in one status bucket', inputSchema: {
-      type: z.enum(['movies', 'shows', 'anime', 'all']).describe('One of `shows`, `movies`, `anime`, or `all`. Pass `all` to skip filtering on type even when the runtime accepts the segment-less form, so for spec strictness this is `true`. To call without it in prac'),
-      status: z.enum(['watching', 'plantowatch', 'hold', 'completed', 'dropped', 'all']).describe('One of `watching`, `plantowatch`, `hold`, `completed`, `dropped`, or `all`. Movies accept only `plantowatch`, `completed`, `dropped`, and `all`; TV and anime accept all six. Pass `all` to skip filteri'),
-      allow_rewatch: z.enum(['yes', 'no']).optional().describe('Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry '),
-      date_from: z.string().optional().describe('ISO-8601 timestamp. Returns only items changed **strictly after** this time — one stamped exactly at this value is not returned. Pass the top-level `all` from the `/sync/activities` response you saved'),
-      extended: z.enum(['full', 'full_anime_seasons', 'simkl_ids_only', 'ids_only']).optional().describe('Controls response richness. Omit for the default (summary fields only — status, counters, `last_watched` / `next_to_watch` markers, no episode arrays).  - `simkl_ids_only` — smallest payload: just `id'),
-      next_watch_info: z.enum(['yes']).optional().describe('When `yes`, attaches a `next_to_watch_info` object to each watched item, indicating the next episode to watch.'),
-      episode_tvdb_id: z.enum(['yes']).optional().describe('When `yes`, includes TVDB IDs on each episode in episode-bearing responses.'),
-      episode_runtime: z.enum(['yes']).optional().describe('When `yes`, adds `runtime` (whole minutes, or `null` when unknown) to each episode row. Like the other episode modifiers it needs `extended=full`, since episode rows are not loaded without it.'),
-      language: z.enum(['en']).optional().describe('`en` forces English titles. It\'s the only accepted value — any other value is ignored and titles fall back to the user\'s profile language.'),
-      anime_type: z.enum(['movies']).optional().describe('When `movies`, restricts the `anime` results to anime-movie subtype only.'),
-      episode_watched_at: z.string().optional().describe('`yes` adds per-episode `watched_at` timestamps to every loaded episode. **Requires `extended=full`** (or `extended=full_anime_seasons`) — it\'s a modifier on already-loaded episodes, so on its own it '),
-      include_all_episodes: z.enum(['yes', 'original', 'no']).optional().describe('Three-value flag that controls per-episode loading on canonical entries. **Requires `extended=full`** — it has no effect on its own.  - `no` *(default)* — Episode lists are loaded only for items in `w'),
-      memos: z.string().optional().describe('`yes` includes the user\'s per-item `memo` object (`text` capped at 140 chars, plus `is_private`) in addition to all other data. Field name is singular `memo`; empty memos render as `{}`.')
-    }, annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Search the authenticated user’s cached watchlist. Filters by media type, status, and title, then returns compact matching items with progress, next episode, rating, and a Simkl link.', inputSchema: z.object({ type: z.enum(['shows', 'movies', 'anime']).optional(), status: z.enum(['watching', 'plantowatch', 'hold', 'completed', 'dropped']).optional(), title: z.string().optional().describe('Case-insensitive title substring.'), limit: z.number().int().min(1).max(100).optional().describe('Maximum results; defaults to 50.'), offset: z.number().int().min(0).optional().describe('Zero-based number of matching results to skip; defaults to 0.') }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
-    try {
-      const result = hooks.getWatchlist ? await hooks.getWatchlist(args) : await client.request(`/sync/all-items/${encodePathValue(args.type, "type")}/${encodePathValue(args.status, "status")}`, {
-        method: 'GET',
-        query: { allow_rewatch: args.allow_rewatch, date_from: args.date_from, extended: args.extended, next_watch_info: args.next_watch_info, episode_tvdb_id: args.episode_tvdb_id, episode_runtime: args.episode_runtime, language: args.language, anime_type: args.anime_type, episode_watched_at: args.episode_watched_at, include_all_episodes: args.include_all_episodes, memos: args.memos },
-        token: getToken()
-      });
-
-      const formatted = JSON.stringify(result, null, 2);
-      return {
-        content: Array.isArray(formatted)
-          ? formatted.map((text: string) => ({ type: 'text', text }))
-          : [{ type: 'text', text: formatted }]
-      };
-    } catch (error) {
-      if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
-      return toMcpErrorResult(error);
-    }
-    }
+        try {
+          if (!hooks.getWatchlist) throw new Error('Cached watchlist is unavailable');
+          return { content: [{ type: 'text', text: await hooks.getWatchlist(args) }] };
+        } catch (error) {
+          if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
+          return toMcpErrorResult(error);
+        }
+      }
     );
 }
