@@ -24,6 +24,8 @@ describe('shared response cache policy', () => {
       .toBe(RESPONSE_CACHE_TTL_SECONDS.details);
     expect(getResponseCachePolicy(new URL('https://data.simkl.in/discover/trending/tv/index.json'), 'GET')?.ttlSeconds)
       .toBe(RESPONSE_CACHE_TTL_SECONDS.trending);
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/tv.json'), 'GET')).toBeNull();
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/2026/8/anime.json'), 'GET')).toBeNull();
     expect(getResponseCachePolicy(new URL('https://api.simkl.com/users/settings'), 'GET')).toBeNull();
     expect(getResponseCachePolicy(new URL('https://api.simkl.com/search/tv?q=x'), 'POST')).toBeNull();
   });

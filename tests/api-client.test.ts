@@ -61,6 +61,21 @@ describe('SimklClient request policy', () => {
     expect(new Headers(requests[0].init.headers).has('Authorization')).toBe(false);
   });
 
+  test('can inspect a redirect Location header without following it', async () => {
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestInit = init;
+      return new Response(null, {
+        status: 301,
+        headers: { Location: 'https://simkl.com/movies/42/title' },
+      });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/redirect', { method: 'GET', authorization: 'none', redirect: 'manual' }))
+      .resolves.toEqual({ redirectUrl: 'https://simkl.com/movies/42/title' });
+    expect(requestInit?.redirect).toBe('manual');
+  });
+
   test('preserves quota headers on upstream errors', async () => {
     globalThis.fetch = (async () => new Response('{"error":"user_limit_exceeded"}', {
       status: 429,
@@ -131,5 +146,22 @@ describe('generated tool request policy configuration', () => {
         expect(liveTool.authorization).not.toBe('none');
       }
     }
+  });
+
+  test('routes airing and ID lookup through public data helpers', () => {
+    const airingTools = [
+      ['/tv/airing', 'simkl_get_airing_shows'],
+      ['/anime/airing', 'simkl_get_airing_anime'],
+    ];
+    for (const [path, name] of airingTools) {
+      const tool = toolsWhitelist.find(candidate => candidate.path === path);
+      expect(tool?.custom?.name).toBe(name);
+      expect(tool?.custom?.imports?.[0]).toContain('formatAiringTool');
+    }
+
+    const lookup = toolsWhitelist.find(tool => tool.custom?.name === 'simkl_search_by_id');
+    expect(lookup?.custom?.handler).toContain('getMediaById');
+    expect(lookup?.custom?.schema).toContain('imdb: z.string().regex');
+    expect(toolsWhitelist.find(tool => tool.path === '/search/id')?.custom).toBeDefined();
   });
 });

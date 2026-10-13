@@ -1,4 +1,4 @@
-import { asAiring, formatList, withImdb, withRating } from './format/media.js';
+import { formatList, withImdb, withRating } from './format/media.js';
 
 type ResponseFormat =
   | { type: 'simple', template: (result: any, args: any) => string | string[] }
@@ -23,6 +23,7 @@ interface ToolConfig {
     name: string;
     schema: string;
     handler: string;
+    imports?: string[];
   };
 }
 
@@ -34,6 +35,7 @@ export const toolsWhitelist: ToolConfig[] = [
     custom: {
       name: 'simkl_get_trending_by_genre',
       schema: "z.object({ type: z.enum(['tv', 'movies', 'anime']), genre: z.string().min(1).max(100), maxResults: z.number().int().min(1).max(100).optional() })",
+      imports: ["import { getTrendingByGenre } from '../src/api/trending.js';"],
       handler: `async (args: any) => {
         try {
           const result = await getTrendingByGenre(client, args.type, args.genre, args.maxResults);
@@ -51,7 +53,24 @@ export const toolsWhitelist: ToolConfig[] = [
       ? formatList(results, withImdb, 10)
       : [`no results for "${args.q}"`]
   }},
-  { path: '/search/id', method: 'get', responseFormat: { type: 'json' }},
+  {
+    path: '/search/id',
+    method: 'get',
+    description: 'Resolve a supported media ID through Simkl’s public redirect endpoint, then return the matching cached detail record.',
+    custom: {
+      name: 'simkl_search_by_id',
+      schema: "z.object({ simkl: z.number().int().positive().optional(), hulu: z.number().int().positive().optional(), netflix: z.number().int().positive().optional(), mal: z.number().int().positive().optional(), tvdb: z.string().optional(), tmdb: z.number().int().positive().optional(), imdb: z.string().regex(/^tt\\d+$/).optional(), anidb: z.number().int().positive().optional(), crunchyroll: z.string().optional(), anilist: z.number().int().positive().optional(), kitsu: z.number().int().positive().optional(), livechart: z.number().int().positive().optional(), anisearch: z.number().int().positive().optional(), animeplanet: z.string().optional(), anfo: z.string().optional(), ann: z.number().int().positive().optional(), tvcom: z.string().optional(), zap2it: z.string().optional(), traktslug: z.string().optional(), letterboxd: z.string().optional(), boxd: z.string().optional(), mdl: z.string().optional(), type: z.enum(['show', 'tv', 'movie', 'anime']).optional(), title: z.string().optional(), year: z.number().int().optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() })",
+      imports: ["import { getMediaById } from '../src/api/id-lookup.js';"],
+      handler: `async (args: any) => {
+        try {
+          const result = await getMediaById(client, args);
+          return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
+          return toMcpErrorResult(error);
+        }
+      }`,
+    },
+  },
 
   // scrobble
   { path: '/scrobble/start', method: 'post', responseFormat: {
@@ -111,14 +130,40 @@ export const toolsWhitelist: ToolConfig[] = [
     template: (results: any) => formatList(results, withRating)
   }},
 
-  { path: '/tv/airing', method: 'get', responseFormat: {
-    type: 'simple',
-    template: (results: any) => formatList(results, asAiring)
-  }},
-  { path: '/anime/airing', method: 'get', responseFormat: {
-    type: 'simple',
-    template: (results: any) => formatList(results, asAiring)
-  }},
+  {
+    path: '/tv/airing',
+    method: 'get',
+    description: 'Get TV episode airings from Simkl’s free v2 calendar file.',
+    custom: {
+      name: 'simkl_get_airing_shows',
+      schema: "z.object({ date: z.string().regex(/^(today|tomorrow|\\d{2}-\\d{2}-\\d{4})$/).optional(), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
+      imports: ["import { formatAiringTool } from '../src/api/airing.js';"],
+      handler: `async (args: any) => {
+        try {
+          return await formatAiringTool(client, 'tv', args);
+        } catch (error) {
+          return toMcpErrorResult(error);
+        }
+      }`,
+    },
+  },
+  {
+    path: '/anime/airing',
+    method: 'get',
+    description: 'Get anime episode airings from Simkl’s free v2 calendar file.',
+    custom: {
+      name: 'simkl_get_airing_anime',
+      schema: "z.object({ date: z.string().regex(/^(today|tomorrow|\\d{2}-\\d{2}-\\d{4})$/).optional(), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
+      imports: ["import { formatAiringTool } from '../src/api/airing.js';"],
+      handler: `async (args: any) => {
+        try {
+          return await formatAiringTool(client, 'anime', args);
+        } catch (error) {
+          return toMcpErrorResult(error);
+        }
+      }`,
+    },
+  },
 
   // genre filtering
   { path: '/tv/genres/:genre/:type/:country/:network/:year/:sort', method: 'get', extraQueryParams: ['page', 'limit'], description: 'Live TV genre browsing supports other sorts and country, network, and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).', responseFormat: {

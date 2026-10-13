@@ -12,6 +12,7 @@ export interface RequestOptions {
   method: 'GET' | 'POST' | 'DELETE';
   token?: string;
   authorization?: 'bearer' | 'none';
+  redirect?: 'follow' | 'error' | 'manual';
   responseProfile?: 'library';
   body?: unknown;
   query?: Record<string, string | number | undefined>;
@@ -124,6 +125,7 @@ export class SimklClient {
     const init: RequestInit = {
       method: options.method,
       headers,
+      redirect: options.redirect,
     };
 
     if (options.body && options.method !== 'GET') {
@@ -171,7 +173,7 @@ export class SimklClient {
       return { data: {} as T, pagination: null, headers: responseHeaders };
     }
 
-    if (response.status === 302) {
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('Location') || response.headers.get('location');
       return { data: { redirectUrl: location } as T, pagination: null, headers: responseHeaders };
     }
