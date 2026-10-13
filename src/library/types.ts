@@ -33,3 +33,16 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 export function jsonBytes(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
+
+export interface MediaMetadata { ids: { simkl: number | string; [key: string]: unknown }; title?: string; [key: string]: unknown }
+export interface LibraryItem {
+  status?: string;
+  show?: MediaMetadata;
+  movie?: MediaMetadata;
+  anime?: MediaMetadata;
+  user_rating?: number | null;
+  [key: string]: unknown;
+}
+export type LibraryItems = Record<MediaType, LibraryItem[]>;
+export interface Activities { all: string; tv_shows?: Record<string, string | null>; movies?: Record<string, string | null>; anime?: Record<string, string | null>; [key: string]: unknown }
+export interface LibrarySnapshot { version: 1; items: LibraryItems; activities: Activities; checkedAt: number; forceCheck: boolean }

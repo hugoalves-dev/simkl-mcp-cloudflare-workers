@@ -21,6 +21,7 @@ export interface PaginationOptions {
   limit?: number;
   fetchAllPages?: boolean;
   maxPages?: number;
+  requireComplete?: boolean;
 }
 
 export interface PaginationInfo {
@@ -82,7 +83,7 @@ export class SimklClient {
       baseQuery.limit = paginationOptions.limit;
     }
 
-    const firstPage = await this.doRequest<T>(endpoint, { ...baseOptions, query: baseQuery });
+    const firstPage = await this.doRequest<T>(endpoint, { ...baseOptions, query: baseQuery }, paginationOptions?.requireComplete);
     const firstPagination = firstPage.pagination;
 
     if (!paginationOptions?.fetchAllPages || !firstPagination) {
@@ -99,7 +100,7 @@ export class SimklClient {
 
     for (let page = firstPagination.page + 1; page <= lastPage; page++) {
       const query = { ...baseQuery, page };
-      const nextPage = await this.doRequest<T>(endpoint, { ...baseOptions, query });
+      const nextPage = await this.doRequest<T>(endpoint, { ...baseOptions, query }, paginationOptions?.requireComplete);
       if (!Array.isArray(nextPage.data)) {
         throw new SimklApiError('simkl api error: fetchAllPages requires array response', 0, null);
       }
@@ -115,7 +116,7 @@ export class SimklClient {
     };
   }
 
-  private async doRequest<T = unknown>(endpoint: string, options: RequestOptions): Promise<RequestResult<T>> {
+  private async doRequest<T = unknown>(endpoint: string, options: RequestOptions, strictPagination = false): Promise<RequestResult<T>> {
     const url = this.buildUrl(endpoint, options.query);
     const headers = this.buildHeaders(options.token, options.authorization);
 
@@ -150,7 +151,7 @@ export class SimklClient {
     try {
       const libraryResponse = response.ok && options.method === 'GET'
         && options.responseProfile === 'library'
-        && /^\/sync\/all-items\/(shows|movies|anime)(\/(watching|plantowatch|hold|completed|dropped))?$/.test(endpoint);
+        && /^\/sync\/(all-items|ratings)(\/(shows|movies|anime)(\/(watching|plantowatch|hold|completed|dropped))?)?$/.test(endpoint);
       responseText = await this.readResponseBody(response, libraryResponse ? 16 * 1024 * 1024 : 2 * 1024 * 1024);
     } catch (error) {
       if (error instanceof SimklApiError) throw error;
@@ -167,14 +168,14 @@ export class SimklClient {
     }
 
     if (!responseText) {
-      return { data: null as T, pagination: this.parsePaginationInfo(response), headers: responseHeaders };
+      return { data: null as T, pagination: this.parsePaginationInfo(response, strictPagination), headers: responseHeaders };
     }
 
     try {
       const data = JSON.parse(responseText);
       return {
         data,
-        pagination: this.parsePaginationInfo(response),
+        pagination: this.parsePaginationInfo(response, strictPagination),
         headers: responseHeaders,
       };
     } catch {
@@ -267,11 +268,11 @@ export class SimklClient {
     return headers;
   }
 
-  private parsePaginationInfo(response: Response): PaginationInfo | null {
-    const page = this.parsePaginationHeader(response, 'X-Pagination-Page');
-    const limit = this.parsePaginationHeader(response, 'X-Pagination-Limit');
-    const pageCount = this.parsePaginationHeader(response, 'X-Pagination-Page-Count');
-    const itemCount = this.parsePaginationHeader(response, 'X-Pagination-Item-Count');
+  private parsePaginationInfo(response: Response, strict = false): PaginationInfo | null {
+    const page = this.parsePaginationHeader(response, 'X-Pagination-Page', strict);
+    const limit = this.parsePaginationHeader(response, 'X-Pagination-Limit', strict);
+    const pageCount = this.parsePaginationHeader(response, 'X-Pagination-Page-Count', strict);
+    const itemCount = this.parsePaginationHeader(response, 'X-Pagination-Item-Count', strict);
 
     if (
       page === null ||
@@ -279,15 +280,17 @@ export class SimklClient {
       pageCount === null ||
       itemCount === null
     ) {
+      if (strict && ['Page', 'Limit', 'Page-Count', 'Item-Count'].some(name => response.headers.has(`X-Pagination-${name}`))) throw new SimklApiError('simkl api error: incomplete or invalid pagination', response.status, null);
       return null;
     }
-
+    if (strict && (page < 1 || limit < 1 || pageCount < page || itemCount < 0)) throw new SimklApiError('simkl api error: invalid pagination values', response.status, null);
     return { page, limit, pageCount, itemCount };
   }
 
-  private parsePaginationHeader(response: Response, name: string): number | null {
+  private parsePaginationHeader(response: Response, name: string, strict = false): number | null {
     const value = response.headers.get(name) || response.headers.get(name.toLowerCase());
     if (!value) return null;
+    if (strict && (!/^\d+$/.test(value.trim()) || !Number.isSafeInteger(Number(value)))) return null;
     const parsed = Number.parseInt(value, 10);
     return Number.isNaN(parsed) ? null : parsed;
   }

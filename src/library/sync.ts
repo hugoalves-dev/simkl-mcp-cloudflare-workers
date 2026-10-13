@@ -5,8 +5,8 @@ import {
   type LibraryCandidate, type LibraryItemRow, type MediaType,
 } from './types.js';
 
-export async function fetchInitialLibrary(client: SimklClient, accessToken: string): Promise<LibraryCandidate> {
-  const activities = await client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken });
+export async function fetchInitialLibrary(client: SimklClient, accessToken: string, knownActivities?: Record<string, unknown>): Promise<LibraryCandidate> {
+  const activities = knownActivities ?? await client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken });
   if (!isRecord(activities) || typeof activities.all !== 'string' || !Number.isFinite(Date.parse(activities.all))) {
     throw new Error('Invalid Simkl activities snapshot');
   }
@@ -14,8 +14,9 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
   const items = new Map<string, LibraryItemRow>();
   let pendingBytes = 0;
   function append(response: unknown, mediaType: MediaType): void {
-    // Simkl omits all media keys for an empty filtered result.
-    if (isRecord(response) && Object.keys(response).length === 0) return;
+    // Current Simkl uses {}; older client IDs may receive null for emptiness.
+    if (response === null || (isRecord(response) && Object.keys(response).length === 0)) return;
+    if (isRecord(response) && Object.keys(response).some(key => !MEDIA_TYPES.includes(key as MediaType))) throw new Error('Invalid Simkl library response');
     if (!isRecord(response) || !Array.isArray(response[mediaType])) {
       throw new Error('Invalid Simkl library response');
     }
@@ -40,21 +41,37 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
     }
   }
 
-  const pull = (path: string) => client.request<unknown>(path, {
-    method: 'GET', token: accessToken, responseProfile: 'library',
-  });
+  async function pull(path: string, mediaType: MediaType): Promise<void> {
+    let page = 1, pageCount = 1;
+    let advertisedTotal: number | undefined;
+    const received = new Set<string>();
+    do {
+      const response = await client.requestPaginated<unknown>(path, {
+        method: 'GET', token: accessToken, responseProfile: 'library',
+        pagination: { page, limit: 100, requireComplete: true },
+      });
+      append(response.data, mediaType);
+      if (isRecord(response.data) && Array.isArray(response.data[mediaType])) {
+        const key = mediaType === 'movies' ? 'movie' : 'show';
+        for (const item of response.data[mediaType]) received.add(normalizeSimklId(item[key].ids.simkl)!);
+      }
+      if (response.pagination) {
+        if (response.pagination.page !== page || (page > 1 && response.pagination.pageCount !== pageCount)) throw new Error('Invalid Simkl library pagination');
+        if (advertisedTotal !== undefined && advertisedTotal !== response.pagination.itemCount) throw new Error('Inconsistent Simkl library item total');
+        advertisedTotal = response.pagination.itemCount;
+        pageCount = response.pagination.pageCount;
+      } else if (page > 1) throw new Error('Missing Simkl library pagination');
+      page++;
+    } while (page <= pageCount);
+    if (advertisedTotal !== undefined && received.size !== advertisedTotal) throw new Error('Incomplete Simkl library response');
+  }
   for (const mediaType of MEDIA_TYPES) {
-    let response: unknown;
     try {
-      response = await pull(`/sync/all-items/${mediaType}`);
+      await pull(`/sync/all-items/${mediaType}`, mediaType);
     } catch (error) {
       if (!(error instanceof SimklApiError) || error.statusCode !== 400 || error.upstreamCode !== 'max_items') throw error;
-      for (const status of STATUSES_BY_MEDIA[mediaType]) {
-        append(await pull(`/sync/all-items/${mediaType}/${status}`), mediaType);
-      }
-      continue;
+      for (const status of STATUSES_BY_MEDIA[mediaType]) await pull(`/sync/all-items/${mediaType}/${status}`, mediaType);
     }
-    append(response, mediaType);
   }
   return { activities, items: [...items.values()] };
 }

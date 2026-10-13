@@ -26,7 +26,14 @@ function rewatchErrorResult(error: unknown, mutation = false) {
   return { isError: true, content: [{ type: 'text' as const, text: error instanceof Error ? error.message : 'Simkl request failed' }] };
 }
 
-export function registerRewatchTools(server: McpServer, service: RewatchService): void {
+export function registerRewatchTools(server: McpServer, service: RewatchService, afterLibraryWrite?: () => Promise<void>): void {
+  async function mutationResult(value: unknown) {
+    if (afterLibraryWrite) {
+      try { await afterLibraryWrite(); }
+      catch { throw new Error('Upstream write succeeded, but library cache invalidation failed'); }
+    }
+    return jsonResult(value);
+  }
   server.registerTool('simkl_start_rewatch', {
     description: 'Explicitly start or resume a Simkl rewatch session for a movie, TV show or anime already in the user history. Requires PRO/VIP. Simkl applies a two-day gap between repeat watches. The response includes the upstream rewatch_id and status; retain the ID for later updates.',
     inputSchema: {
@@ -40,7 +47,7 @@ export function registerRewatchTools(server: McpServer, service: RewatchService)
     annotations: { destructiveHint: true },
   }, async args => {
     try {
-      return jsonResult(await service.start({
+      return await mutationResult(await service.start({
         mediaType: args.mediaType as RewatchWriteMediaType,
         ids: args.ids,
         ...(args.rewatch_id !== undefined ? { rewatch_id: args.rewatch_id } : {}),
@@ -64,7 +71,7 @@ export function registerRewatchTools(server: McpServer, service: RewatchService)
     annotations: { destructiveHint: true },
   }, async args => {
     try {
-      return jsonResult(await service.update({
+      return await mutationResult(await service.update({
         mediaType: args.mediaType as RewatchWriteMediaType,
         ids: args.ids,
         rewatch_id: args.rewatch_id,
@@ -104,7 +111,7 @@ export function registerRewatchTools(server: McpServer, service: RewatchService)
     annotations: { destructiveHint: true },
   }, async args => {
     try {
-      return jsonResult(await service.stop({ body: args.body, allow_rewatch: args.allow_rewatch }));
+      return await mutationResult(await service.stop({ body: args.body, allow_rewatch: args.allow_rewatch }));
     } catch (error) { return rewatchErrorResult(error, true); }
   });
 }
