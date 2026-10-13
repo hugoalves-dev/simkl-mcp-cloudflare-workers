@@ -304,12 +304,19 @@ function generateHandler(path: string, method: string, params: any[], responseFo
   const mutation = ['/scrobble/start', '/scrobble/pause', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/ratings', '/sync/ratings/remove'].includes(path) && method === 'post';
   const request = mutation
     ? `await requestWrite(client, hooks, ${requestPathExpression}, {\n        ${parts.join(',\n        ')}\n      }, getToken())`
-    : `await client.request(${requestPathExpression}, {\n        ${parts.join(',\n        ')},\n        token: getToken()\n      })`;
+    : `await client.requestWithMetadata(${requestPathExpression}, {\n        ${parts.join(',\n        ')},\n        token: getToken()\n      })`;
+  const handlerPrelude = mutation
+    ? `const result = ${request};\n      const responseHeaders = undefined;`
+    : toolName === 'simkl_get_watchlist'
+      ? `let result: any;\n      let responseHeaders: any;\n      if (hooks.getWatchlist) {\n        result = await hooks.getWatchlist(args);\n      } else {\n        const response = ${request};\n        result = response.data;\n        responseHeaders = response.headers;\n      }`
+      : `const response = ${request};\n      const result = response.data;\n      const responseHeaders = response.headers;`;
 
   return `async (args: any) => {
     try {
-      const result = ${toolName === 'simkl_get_watchlist' ? 'hooks.getWatchlist ? await hooks.getWatchlist(args) : ' : ''}${request};${mutation ? '\n' : '\n\n'}      const formatted = ${formatResponse};
+      ${handlerPrelude}
+      const formatted = ${formatResponse};
       return {
+        _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]

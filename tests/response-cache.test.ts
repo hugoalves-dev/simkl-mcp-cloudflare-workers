@@ -86,7 +86,7 @@ describe('SimklClient shared cache behavior', () => {
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
     await expect(client.request('/search/tv', { method: 'GET' })).rejects.toBeInstanceOf(SimklApiError);
     expect(putCount).toBe(0);
-    expect(fetchCount).toBe(1);
+    expect(fetchCount).toBe(3);
   });
 
   test('stores explicit cache TTL and preserves Last-Modified', async () => {

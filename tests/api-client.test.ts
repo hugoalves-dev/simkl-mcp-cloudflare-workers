@@ -93,6 +93,65 @@ describe('SimklClient request policy', () => {
     }
   });
 
+  test('retries a per-second rate limit once and returns remaining allowance metadata', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      if (attempts === 1) return new Response('{"error":"rate_limit"}', { status: 429 });
+      return new Response('{"ok":true}', { status: 200, headers: { 'X-RateLimit-Remaining': '37' } });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+
+    const result = await client.requestWithMetadata<{ ok: boolean }>('/test', { method: 'GET' });
+    expect(attempts).toBe(2);
+    expect(result).toEqual({ data: { ok: true }, headers: { rateLimitRemaining: '37' } });
+  });
+
+  test('retries direct writes once unless a coordinator disables client retry', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return attempts === 1
+        ? Response.json({ error: 'rate_limit' }, { status: 429 })
+        : Response.json({ added: {} });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+
+    await client.request('/sync/history', { method: 'POST', body: {} });
+    expect(attempts).toBe(2);
+  });
+
+  test('does not assume remaining allowance when the response omits the header', async () => {
+    globalThis.fetch = (async () => new Response('{"ok":true}', { status: 200 })) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    const result = await client.requestWithMetadata('/free-endpoint', { method: 'GET', authorization: 'none' });
+    expect(result.headers.rateLimitRemaining).toBeUndefined();
+  });
+
+  test('does not retry exhausted user allowance', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return new Response('{"error":"user_limit_exceeded"}', { status: 429 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+
+    await expect(client.request('/test', { method: 'GET' })).rejects.toMatchObject({ upstreamCode: 'user_limit_exceeded' });
+    expect(attempts).toBe(1);
+  });
+
+  test('retries server errors with a bounded count', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return new Response('unavailable', { status: 503 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+
+    await expect(client.request('/test', { method: 'GET' })).rejects.toBeInstanceOf(SimklApiError);
+    expect(attempts).toBe(3);
+  });
+
   test('keeps the streamed response reader bounded at two mebibytes', async () => {
     globalThis.fetch = (async () => new Response('x'.repeat(2 * 1024 * 1024 + 1))) as typeof fetch;
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
