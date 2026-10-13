@@ -1,8 +1,23 @@
 import { normalizeSimklId } from './identity';
 import {
   isRecord, jsonBytes, MAX_ROW_JSON_BYTES, MAX_PENDING_ITEM_BYTES,
-  type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, MEDIA_TYPES,
+  type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
 } from './types.js';
+
+function isActivityTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function isUserProfileSnapshot(value: unknown): value is UserProfileSnapshot {
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.activities)
+    || !isActivityTimestamp(value.activities.all)
+    || !Number.isFinite(value.checkedAt) || (value.checkedAt as number) < 0) return false;
+  if (value.settingsActivity !== undefined && !isActivityTimestamp(value.settingsActivity)) return false;
+  if (value.statsActivity !== undefined && !isActivityTimestamp(value.statsActivity)) return false;
+  if (value.settings !== undefined && !isRecord(value.settings)) return false;
+  if (value.stats !== undefined && !isRecord(value.stats)) return false;
+  return true;
+}
 
 /** Network-free SQLite storage; all serialization happens before transactionSync. */
 export class LibraryStore {
@@ -24,6 +39,28 @@ export class LibraryStore {
       throw new Error('Invalid library cache completion metadata');
     }
     return { initialized: true, itemCount: value.itemCount as number };
+  }
+
+  loadProfile(): UserProfileSnapshot | undefined {
+    const row = this.storage.sql.exec<{ value_json: string }>(
+      "SELECT value_json FROM library_metadata WHERE key = 'user-profile'",
+    ).toArray()[0];
+    if (!row) return undefined;
+    const value: unknown = JSON.parse(row.value_json);
+    if (!isUserProfileSnapshot(value)) throw new Error('Invalid user profile cache record');
+    return value;
+  }
+
+  saveProfile(snapshot: UserProfileSnapshot): void {
+    if (!isUserProfileSnapshot(snapshot)) throw new Error('Invalid user profile cache record');
+    const serialized = JSON.stringify(snapshot);
+    if (jsonBytes(serialized) > MAX_ROW_JSON_BYTES) throw new Error('User profile cache too large');
+    this.storage.transactionSync(() => {
+      this.storage.sql.exec(
+        "INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('user-profile', ?)",
+        serialized,
+      );
+    });
   }
 
   commit(candidate: LibraryCandidate, freshness?: { checkedAt: number; forceCheck: boolean }): LibraryInitialization {

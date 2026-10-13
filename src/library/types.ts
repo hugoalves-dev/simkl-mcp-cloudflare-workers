@@ -46,3 +46,12 @@ export interface LibraryItem {
 export type LibraryItems = Record<MediaType, LibraryItem[]>;
 export interface Activities { all: string; tv_shows?: Record<string, string | null>; movies?: Record<string, string | null>; anime?: Record<string, string | null>; [key: string]: unknown }
 export interface LibrarySnapshot { version: 1; items: LibraryItems; activities: Activities; checkedAt: number; forceCheck: boolean }
+export interface UserProfileSnapshot {
+  version: 1;
+  activities: Activities;
+  checkedAt: number;
+  settingsActivity?: string;
+  settings?: Record<string, unknown>;
+  statsActivity?: string;
+  stats?: Record<string, unknown>;
+}
