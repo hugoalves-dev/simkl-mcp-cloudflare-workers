@@ -87,4 +87,5 @@ test('watchlist schema exposes only cache filters and pagination', () => {
   registerTools({ registerTool(name: string, config: any) { if (name === 'simkl_get_watchlist') schema = config.inputSchema; } } as any, {}, () => undefined);
   expect(Object.keys(schema.shape).sort()).toEqual(['limit', 'offset', 'status', 'title', 'type']);
   expect(schema.safeParse({ title: 'planet', limit: 10, offset: 0 }).success).toBe(true);
+  expect(schema.safeParse({ date_from: '2020-01-01' }).success).toBe(false);
 });

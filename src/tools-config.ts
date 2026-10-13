@@ -142,7 +142,7 @@ export const toolsWhitelist: ToolConfig[] = [
     description: 'Search the authenticated user’s cached watchlist. Filters by media type, status, and title, then returns compact matching items with progress, next episode, rating, and a Simkl link.',
     custom: {
       name: 'simkl_get_watchlist',
-      schema: "z.object({ type: z.enum(['shows', 'movies', 'anime']).optional(), status: z.enum(['watching', 'plantowatch', 'hold', 'completed', 'dropped']).optional(), title: z.string().optional().describe('Case-insensitive title substring.'), limit: z.number().int().min(1).max(100).optional().describe('Maximum results; defaults to 50.'), offset: z.number().int().min(0).optional().describe('Zero-based number of matching results to skip; defaults to 0.') })",
+      schema: "z.object({ type: z.enum(['shows', 'movies', 'anime']).optional(), status: z.enum(['watching', 'plantowatch', 'hold', 'completed', 'dropped']).optional(), title: z.string().optional().describe('Case-insensitive title substring.'), limit: z.number().int().min(1).max(100).optional().describe('Maximum results; defaults to 50.'), offset: z.number().int().min(0).optional().describe('Zero-based number of matching results to skip; defaults to 0.') }).strict()",
       handler: `async (args: any) => {
         try {
           if (!hooks.getWatchlist) throw new Error('Cached watchlist is unavailable');
