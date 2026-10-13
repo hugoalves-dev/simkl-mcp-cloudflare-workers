@@ -1,4 +1,4 @@
-import type { SimklClient } from '../api/client';
+import { SimklApiError, type SimklResponseHeaders, type SimklClient } from '../api/client';
 import { normalizeSimklId } from './identity';
 type SimklAuthProps = { simklToken: string; simklUserId?: string };
 import type { SimklLibraryCache } from './cache';
@@ -31,7 +31,30 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token };
   }
   return {
-    async read(force = false) { const { object, token } = await stub(); return object.read(token, force); },
+    async read(force = false) {
+      const { object, token } = await stub();
+      try { return await object.read(token, force); }
+      catch (error) {
+        // Worker RPC preserves safe custom fields but not the local class prototype.
+        if (error instanceof SimklApiError) throw error;
+        if (error && typeof error === 'object') {
+          const remote = error as Record<string, unknown>;
+          const status = remote.statusCode;
+          if (remote.name === 'SimklApiError' && typeof status === 'number' && Number.isInteger(status) && (status === 0 || (status >= 100 && status <= 599))) {
+            const headers: SimklResponseHeaders = {};
+            if (remote.headers && typeof remote.headers === 'object') {
+              const values = remote.headers as Record<string, unknown>;
+              for (const key of ['rateLimitLimit', 'rateLimitRemaining', 'retryAfter', 'lastModified'] as const) {
+                if (typeof values[key] === 'string') headers[key] = values[key];
+              }
+            }
+            const code = typeof remote.upstreamCode === 'string' ? remote.upstreamCode : '';
+            throw new SimklApiError('Simkl library request failed', status, JSON.stringify({ error: code }), headers);
+          }
+        }
+        throw error;
+      }
+    },
     async invalidate() { const { object } = await stub(); await object.invalidate(); },
   };
 }

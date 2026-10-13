@@ -109,3 +109,13 @@ for (const value of ['2junk', '-2', '1.5', '9007199254740992']) test('malformed 
   upstream([{ all: newDate, tv_shows: { watching: newDate } }, new Response(JSON.stringify({ shows: [item()] }), { headers: { 'X-Pagination-Page': '1', 'X-Pagination-Limit': '100', 'X-Pagination-Page-Count': value, 'X-Pagination-Item-Count': '1' } })]);
   await expect(refreshLibrary(client, 'token', previous(), opts)).rejects.toThrow();
 });
+test('advertised membership item total must match all received pages', async () => {
+  const before = previous(); before.items.shows.push(item(2)); const saved = structuredClone(before);
+  upstream([{ all: newDate, tv_shows: { watching: oldDate, removed_from_list: newDate } }, paged({ shows: [{ show: { ids: { simkl: 1 } } }] }, 1, 2), paged({}, 2, 2)]);
+  await expect(refreshLibrary(client, 'token', before, opts)).rejects.toThrow(); expect(before).toEqual(saved);
+});
+test('mixed unknown and recognized membership keys cannot clear the cache', async () => {
+  const before = previous(), saved = structuredClone(before);
+  upstream([{ all: newDate, tv_shows: { watching: oldDate, removed_from_list: newDate } }, { shows: [], error: 'partial upstream error' }]);
+  await expect(refreshLibrary(client, 'token', before, opts)).rejects.toThrow(); expect(before).toEqual(saved);
+});

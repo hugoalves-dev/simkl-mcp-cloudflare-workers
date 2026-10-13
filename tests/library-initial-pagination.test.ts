@@ -25,3 +25,13 @@ test('initial foundation pull also retrieves every advertised page before comple
 test('partial first-page pagination prevents initialization instead of truncating it', async () => {
   fixture(true); await expect(fetchInitialLibrary(client(), 'token')).rejects.toThrow();
 });
+test('complete headers cannot commit a truncated initial pull', async () => {
+  globalThis.fetch = (async input => {
+    const url = new URL(String(input));
+    if (url.pathname === '/sync/activities') return Response.json({ all: '2026-10-01T00:00:00Z' });
+    if (!url.pathname.endsWith('/shows')) return Response.json({});
+    const page = Number(url.searchParams.get('page') || 1);
+    return Response.json(page === 1 ? { shows: [{ show: { ids: { simkl: 1 } } }] } : {}, { headers: { 'X-Pagination-Page': String(page), 'X-Pagination-Limit': '100', 'X-Pagination-Page-Count': '2', 'X-Pagination-Item-Count': '2' } });
+  }) as typeof fetch;
+  await expect(fetchInitialLibrary(client(), 'token')).rejects.toThrow();
+});

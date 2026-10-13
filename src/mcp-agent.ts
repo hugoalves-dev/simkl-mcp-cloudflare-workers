@@ -10,6 +10,7 @@ import { RewatchService } from './api/rewatches.js';
 import { registerRewatchTools } from './tools/rewatches.js';
 import { registerTools } from '../generated/tools.js';
 import { createLibraryAdapter, type LibraryAdapter } from './library/adapter';
+import { toMcpErrorResult } from './api/errors';
 import { selectWatchlist, watchlistResourceContents } from './library/watchlist';
 
 interface Env extends WorkerEnv, SimklOAuthEnv {}
@@ -54,8 +55,10 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     }, async () => {
-      await this.library.read(true);
-      return { content: [{ type: 'text', text: 'Simkl library refreshed' }] };
+      try {
+        await this.library.read(true);
+        return { content: [{ type: 'text' as const, text: 'Simkl library refreshed' }] };
+      } catch (error) { return { ...toMcpErrorResult(error) }; }
     });
     // simkl_my_stats - get stats for current user
     this.server.registerTool(

@@ -31,3 +31,11 @@ test('missing token and revoked legacy token cannot access cache', async () => {
   globalThis.fetch = (async () => new Response('revoked', { status: 401 })) as typeof fetch;
   const revoked = setup({ simklToken: 'old' }); await expect(revoked.adapter.read()).rejects.toThrow(); expect(revoked.names).toEqual([]);
 });
+test('restores safe API quota metadata from a Worker RPC error without exposing its message', async () => {
+  const { SimklApiError } = await import('../src/api/client');
+  const rpcError = Object.assign(new Error('remote upstream sensitive message'), { name: 'SimklApiError', statusCode: 429, upstreamCode: 'user_limit_exceeded', headers: { retryAfter: '3600', rateLimitRemaining: '0' } });
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async read() { throw rpcError; } }) } };
+  const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
+  const error = await adapter.read().catch(error => error);
+  expect(error).toBeInstanceOf(SimklApiError); expect(error.upstreamCode).toBe('user_limit_exceeded'); expect(error.headers.retryAfter).toBe('3600'); expect(error.message).not.toContain('sensitive');
+});

@@ -20,7 +20,7 @@ function validateItems(value: unknown): LibraryItems {
   if (value === null) return empty();
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid Simkl library response');
   const record = value as Record<string, unknown>;
-  if (!MEDIA_TYPES.some(type => type in record) && Object.keys(record).length !== 0) throw new Error('Invalid Simkl library categories');
+  if (Object.keys(record).some(key => !MEDIA_TYPES.includes(key as typeof MEDIA_TYPES[number]))) throw new Error('Invalid Simkl library categories');
   const result = empty();
   for (const type of MEDIA_TYPES) {
     if (!(type in record)) continue;
@@ -53,17 +53,25 @@ function validateActivities(value: unknown): Activities {
 async function fetchItems(client: SimklClient, endpoint: string, options: RequestOptions): Promise<LibraryItems> {
   const result = empty();
   let page = 1, pageCount = 1;
+  let advertisedTotal: number | undefined;
+  const received = new Set<string>();
   do {
     const response = await client.requestPaginated<unknown>(endpoint, { ...options, responseProfile: 'library', pagination: { page, limit: 100, requireComplete: true } });
     const data = validateItems(response.data);
-    for (const type of MEDIA_TYPES) result[type].push(...data[type]);
+    for (const type of MEDIA_TYPES) {
+      result[type].push(...data[type]);
+      for (const item of data[type]) received.add(`${type}:${libraryItemId(item)}`);
+    }
     if (response.pagination) {
       const pagination = response.pagination;
       if (pagination.page !== page || !Number.isSafeInteger(pagination.pageCount) || pagination.pageCount < page || (page > 1 && pagination.pageCount !== pageCount)) throw new Error('Invalid Simkl library pagination');
+      if (advertisedTotal !== undefined && advertisedTotal !== pagination.itemCount) throw new Error('Inconsistent Simkl library item total');
+      advertisedTotal = pagination.itemCount;
       pageCount = pagination.pageCount;
     } else if (page > 1) throw new Error('Missing Simkl library pagination');
     page++;
   } while (page <= pageCount);
+  if (advertisedTotal !== undefined && received.size !== advertisedTotal) throw new Error('Incomplete Simkl library response');
   return result;
 }
 function merge(items: LibraryItems, updates: LibraryItems): void {
