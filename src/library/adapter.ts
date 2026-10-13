@@ -1,12 +1,14 @@
-import { SimklApiError, type SimklResponseHeaders, type SimklClient } from '../api/client';
+import { SimklApiError, type RequestOptions, type SimklResponseHeaders, type SimklClient } from '../api/client';
 import { normalizeSimklId } from './identity';
 type SimklAuthProps = { simklToken: string; simklUserId?: string };
 import type { SimklLibraryCache } from './cache';
 import type { LibraryItems } from './types';
+import { LibraryWriteInvalidationError } from './errors';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
   invalidate(): Promise<void>;
   getStats(): Promise<Record<string, unknown>>;
+  write(path: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }, token?: string): Promise<unknown>;
 }
 export const verifiedAccountId = normalizeSimklId;
 function restoreRpcError(error: unknown): unknown {
@@ -48,20 +50,43 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     }
     return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token, userId };
   }
+  function restoreRemoteError(error: unknown): never {
+    if (error instanceof SimklApiError || error instanceof LibraryWriteInvalidationError) throw error;
+    if (error && typeof error === 'object') {
+      const remote = error as Record<string, unknown>;
+      if (remote.name === 'LibraryWriteInvalidationError') throw new LibraryWriteInvalidationError();
+      const status = remote.statusCode;
+      if (remote.name === 'SimklApiError' && typeof status === 'number' && Number.isInteger(status) && (status === 0 || (status >= 100 && status <= 599))) {
+        const headers: SimklResponseHeaders = {};
+        if (remote.headers && typeof remote.headers === 'object') {
+          const values = remote.headers as Record<string, unknown>;
+          for (const key of ['rateLimitLimit', 'rateLimitRemaining', 'retryAfter', 'lastModified'] as const) {
+            if (typeof values[key] === 'string') headers[key] = values[key];
+          }
+        }
+        const code = typeof remote.upstreamCode === 'string' ? remote.upstreamCode : '';
+        throw new SimklApiError('Simkl request failed', status, JSON.stringify({ error: code }), headers);
+      }
+    }
+    throw error;
+  }
   return {
     async read(force = false) {
       const { object, token } = await stub();
       try { return await object.read(token, force); }
-      catch (error) {
-        // Worker RPC preserves safe custom fields but not the local class prototype.
-        throw restoreRpcError(error);
-      }
+      catch (error) { throw restoreRpcError(error); }
     },
     async invalidate() { const { object } = await stub(); await object.invalidate(); },
     async getStats() {
       const { object, token, userId } = await stub();
       try { return await object.getStats(token, userId); }
       catch (error) { throw restoreRpcError(error); }
+    },
+    async write(path, options, expectedToken) {
+      const { object, token } = await stub();
+      if (expectedToken !== undefined && token !== expectedToken) throw new Error('Simkl account token changed during write authorization; retry the operation');
+      try { return await object.write(token, path, options); }
+      catch (error) { return restoreRemoteError(error); }
     },
   };
 }

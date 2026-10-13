@@ -229,4 +229,20 @@ describe('RewatchService', () => {
     await expect(service.start({ mediaType: 'movies', ids: { simkl: 12 } })).rejects.toThrow('simkl api request failed');
     expect(requests.filter(request => request.url.pathname === '/sync/history')).toHaveLength(1);
   });
+
+  test('routes start, update, and stop through the injected serialized writer', async () => {
+    const writes: Array<{ path: string; options: any }> = [];
+    const service = new RewatchService(
+      new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' }),
+      () => token,
+      () => now,
+      async (path, options) => { writes.push({ path, options }); return { action: 'scrobble', rewatch_id: 42 }; },
+    );
+    await service.start({ mediaType: 'movies', ids: { simkl: 1 } });
+    await service.update({ mediaType: 'movies', ids: { simkl: 1 }, rewatch_id: 42 });
+    await service.stop({ body: { progress: 95 } });
+    expect(writes.map(write => write.path)).toEqual(['/sync/history', '/sync/history', '/scrobble/stop']);
+    expect(writes.every(write => write.options.method === 'POST' && write.options.token === token)).toBe(true);
+    expect(requests.map(request => request.url.pathname)).toEqual(['/users/settings']);
+  });
 });

@@ -37,16 +37,17 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
       clientId: this.env?.SIMKL_CLIENT_ID || '',
     });
 
-    const rewatchService = new RewatchService(this.client, () => this.simklToken);
     this.library = createLibraryAdapter(this.env, this.client, () => this.props);
+    const rewatchService = new RewatchService(this.client, () => this.simklToken, Date.now, (path, options) =>
+      this.library.write(path, options, options.token));
     registerTools(this.server, this.client, () => this.simklToken, {
       getWatchlist: async args => {
         const lines = selectWatchlist(await this.library.read(), args);
         return lines.length ? lines.join('\n') : 'no watchlist items matched';
       },
-      afterLibraryWrite: () => this.library.invalidate(),
+      write: (path, options) => this.library.write(path, options),
     });
-    registerRewatchTools(this.server, rewatchService, () => this.library.invalidate());
+    registerRewatchTools(this.server, rewatchService);
     this.registerCustomTools();
     this.registerResources();
   }

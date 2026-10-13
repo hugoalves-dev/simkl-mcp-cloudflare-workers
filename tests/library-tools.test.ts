@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { z } from 'zod';
 import { selectWatchlist, watchlistResourceContents } from '../src/library/watchlist';
 import { registerTools } from '../generated/tools';
 const items = { shows: [{ status: 'watching', show: { title: 'Title', year: 2020, ids: { simkl: 1 } }, added_to_watchlist_at: '2026-10-01T00:00:00Z' }], movies: [], anime: [] };
@@ -80,6 +81,53 @@ test('catalog reads never invalidate and callers without hooks are compatible', 
   await callbacks.get('simkl_get_show_by_id')!({ id: '1' }); expect(invalidations).toBe(0);
   const without = tools(client);
   expect((await without.get('simkl_get_watchlist')!({})).isError).toBe(true);
+});
+
+for (const name of ['simkl_mark_watched', 'simkl_remove_from_history']) test(name+' accepts plural history arrays and sends them in one request', async () => {
+  let call: any;
+  const callbacks = tools({ async request(path: string, options: any) { call = { path, options }; return {}; } });
+  const args = {
+    movies: [{ ids: { simkl: 1 } }],
+    shows: [{ ids: { simkl: 2 }, seasons: [{ number: 1 }] }],
+    anime: [{ ids: { mal: 3 } }],
+    episodes: [{ ids: { simkl: 4 }, season: 1, number: 2 }],
+  };
+  const tool = callbacks.get(name)!;
+  await tool(args);
+  expect(call.path).toBe(name === 'simkl_mark_watched' ? '/sync/history' : '/sync/history/remove');
+  expect(call.options.body).toEqual(args);
+});
+
+test('legacy episode shorthand maps to episodes and explicit episodes take precedence', async () => {
+  const calls: any[] = [];
+  const callbacks = tools({ async request(path: string, options: any) { calls.push({ path, options }); return {}; } });
+  const tool = callbacks.get('simkl_mark_watched')!;
+  await tool({ episode: { ids: { simkl: 9 } } });
+  await tool({ episode: { ids: { simkl: 9 } }, episodes: [{ ids: { simkl: 10 } }] });
+  expect(calls.map(call => call.options.body)).toEqual([
+    { episodes: [{ ids: { simkl: 9 } }] },
+    { episodes: [{ ids: { simkl: 10 } }] },
+  ]);
+});
+
+test('history tool schemas expose all documented arrays and the legacy episode alias', () => {
+  const schemas = new Map<string, any>();
+  registerTools({ registerTool(name: string, config: any) { if (['simkl_mark_watched', 'simkl_remove_from_history'].includes(name)) schemas.set(name, config.inputSchema); } } as any, {}, () => undefined);
+  for (const schema of schemas.values()) {
+    for (const key of ['movies', 'shows', 'anime', 'episodes', 'episode']) expect(schema[key]).toBeDefined();
+    const input = z.object(schema);
+    expect(input.safeParse({ movies: [{ ids: { simkl: 1 } }], episodes: [{ ids: { simkl: 2 } }] }).success).toBe(true);
+    expect(input.safeParse({ episode: { ids: { simkl: 2 } } }).success).toBe(true);
+  }
+});
+
+test('generated mutation prefers the serialized write hook', async () => {
+  const calls: string[] = [];
+  const callbacks = tools({ async request() { calls.push('direct'); return {}; } }, {
+    async write(path: string, options: any) { calls.push(`${path}:${options.method}`); return {}; },
+  });
+  await callbacks.get('simkl_add_rating')!({ body: { movies: [{ ids: { simkl: 1 }, rating: 8 }] } });
+  expect(calls).toEqual(['/sync/ratings:POST']);
 });
 
 test('watchlist schema exposes only cache filters and pagination', () => {

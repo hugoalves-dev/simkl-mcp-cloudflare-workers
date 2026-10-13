@@ -7,6 +7,7 @@ import { fetchInitialLibrary } from './sync.js';
 import { refreshUserProfile } from './profile.js';
 import { normalizeSimklId } from './identity.js';
 import type { LibraryInitialization, LibraryItemRow } from './types.js';
+import type { RequestOptions } from '../api/client.js';
 
 export interface LibraryCacheEnv {
   SIMKL_CLIENT_ID: string;
@@ -20,6 +21,8 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
   private readonly client: SimklClient;
   private readonly library: CachedLibrary;
   private initialization?: Promise<LibraryInitialization>;
+  private queue: Promise<unknown> = Promise.resolve();
+  private queuedOperations = 0;
 
   constructor(ctx: DurableObjectState, env: LibraryCacheEnv) {
     super(ctx, env);
@@ -31,7 +34,24 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     }, this.client, parseLibraryCacheTtlSeconds(env.SIMKL_LIBRARY_CACHE_TTL_SECONDS));
   }
 
-  async ensureInitialized(accessToken: string): Promise<LibraryInitialization> {
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.queue;
+    this.queuedOperations++;
+    const run = async () => {
+      try { return await operation(); }
+      finally { this.queuedOperations--; }
+    };
+    const result = this.queuedOperations === 1 ? run() : previous.then(run);
+    this.queue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  ensureInitialized(accessToken: string): Promise<LibraryInitialization> {
+    if (this.initialization) return this.initialization;
+    return this.enqueue(() => this.ensureInitializedInternal(accessToken));
+  }
+
+  private async ensureInitializedInternal(accessToken: string): Promise<LibraryInitialization> {
     const completed = this.store.getInitialization();
     if (completed) return completed;
     if (!this.initialization) {
@@ -44,27 +64,37 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
   private async initialize(accessToken: string): Promise<LibraryInitialization> {
     // Token belongs only to this operation; never assign it to object or storage state.
     const candidate = await fetchInitialLibrary(this.client, accessToken);
-    return this.store.commit(candidate);
+    const completion = this.store.commit(candidate);
+    await this.library.completeInitialization();
+    return completion;
   }
 
-  async read(accessToken: string, force = false) {
-    const initialized = this.store.getInitialization() !== null;
-    await this.ensureInitialized(accessToken);
-    return this.library.read(accessToken, force && initialized);
+  read(accessToken: string, force = false) {
+    return this.enqueue(async () => {
+      const initialized = this.store.getInitialization() !== null;
+      await this.ensureInitializedInternal(accessToken);
+      return this.library.read(accessToken, force && initialized);
+    });
   }
 
-  invalidate() { return this.library.invalidate(); }
+  invalidate() { return this.enqueue(() => this.library.invalidate()); }
 
-  async readItems(): Promise<LibraryItemRow[]> {
-    if (!this.store.getInitialization()) throw new Error('Library cache is not initialized');
-    return this.store.readItems();
+  write(accessToken: string, endpoint: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }) {
+    return this.enqueue(() => this.library.write(accessToken, endpoint, options));
+  }
+
+  readItems(): Promise<LibraryItemRow[]> {
+    return this.enqueue(async () => {
+      if (!this.store.getInitialization()) throw new Error('Library cache is not initialized');
+      return this.store.readItems();
+    });
   }
 
   getStats(accessToken: string, simklUserId: string): Promise<Record<string, unknown>> {
     const userId = normalizeSimklId(simklUserId);
     if (!accessToken) return Promise.reject(new Error('Simkl authentication required'));
     if (!userId) return Promise.reject(new Error('Invalid verified Simkl account ID'));
-    return this.library.withExclusive(async () => {
+    return this.enqueue(() => this.library.withExclusive(async () => {
       const previous = this.store.loadProfile();
       const librarySnapshot = this.store.loadActivitySnapshot();
       const result = await refreshUserProfile(this.client, accessToken, userId, previous, librarySnapshot, {
@@ -73,6 +103,6 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
       });
       if (JSON.stringify(previous) !== JSON.stringify(result.snapshot)) this.store.saveProfile(result.snapshot);
       return result.stats;
-    });
+    }));
   }
 }

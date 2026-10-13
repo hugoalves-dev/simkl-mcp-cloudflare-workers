@@ -120,7 +120,7 @@ function convertSchemaToZod(schema: any, depth = 0): string {
   }
 }
 
-function generateParamSchema(path: string, params: any[], omitParams: string[] = [], extraQueryParams: string[] = []) {
+function generateParamSchema(path: string, params: any[], omitParams: string[] = [], extraQueryParams: string[] = [], batchArrayFields: string[] = [], legacyEpisodeAlias = false) {
   const fields: string[] = [];
   const pathParams = extractPathParams(path);
   const flattenedFields: Record<string, string> = {};
@@ -163,6 +163,12 @@ function generateParamSchema(path: string, params: any[], omitParams: string[] =
       let hasArrayFields = false;
       for (const [propName, propSchema] of Object.entries(schema.properties)) {
         const ps = propSchema as any;
+        if (batchArrayFields.includes(propName) && ps.type === 'array') {
+          fields.push(`      ${propName}: ${convertSchemaToZod(ps, 1)}.optional()`);
+          flattenedFields[`@batch:${propName}`] = propName;
+          hasArrayFields = true;
+          continue;
+        }
         // check if this is an array of objects
         if (ps.type === 'array' && ps.items?.type === 'object') {
           hasArrayFields = true;
@@ -208,6 +214,11 @@ function generateParamSchema(path: string, params: any[], omitParams: string[] =
     }
 
     fields.push(`      ${name}: ${zodType}`);
+  }
+
+  if (legacyEpisodeAlias) {
+    fields.push('      episode: z.object({}).passthrough().optional()');
+    flattenedFields.episode = 'episodes';
   }
 
   for (const name of extraQueryParams) {
@@ -271,7 +282,11 @@ function generateHandler(path: string, method: string, params: any[], responseFo
     // if we have flattened fields, construct body from them
     if (Object.keys(flattenedFields).length > 0) {
       const bodyConstruction = Object.entries(flattenedFields)
-        .map(([singular, plural]) => `...(args.${singular} ? { ${plural}: [args.${singular}] } : {})`)
+        .map(([singular, plural]) => singular.startsWith('@batch:')
+          ? `...(args.${plural} !== undefined ? { ${plural}: args.${plural} } : {})`
+          : singular === 'episode'
+            ? `...(args.episodes === undefined && args.episode !== undefined ? { ${plural}: [args.episode] } : {})`
+            : `...(args.${singular} !== undefined ? { ${plural}: [args.${singular}] } : {})`)
         .join(', ');
       parts.push(`body: { ${bodyConstruction} }`);
     } else {
@@ -286,25 +301,21 @@ function generateHandler(path: string, method: string, params: any[], responseFo
   const formatResponse = responseFormat?.type === 'json'
     ? 'JSON.stringify(result, null, 2)'
     : `formatters['${toolName}'](result, args)`;
+  const mutation = ['/scrobble/start', '/scrobble/pause', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/ratings', '/sync/ratings/remove'].includes(path) && method === 'post';
+  const request = mutation
+    ? `await requestWrite(client, hooks, ${requestPathExpression}, {\n        ${parts.join(',\n        ')}\n      }, getToken())`
+    : `await client.request(${requestPathExpression}, {\n        ${parts.join(',\n        ')},\n        token: getToken()\n      })`;
 
   return `async (args: any) => {
     try {
-      const result = ${toolName === 'simkl_get_watchlist' ? 'hooks.getWatchlist ? await hooks.getWatchlist(args) : ' : ''}await client.request(${requestPathExpression}, {
-        ${parts.join(',\n        ')},
-        token: getToken()
-      });
-      ${['/scrobble/start', '/scrobble/pause', '/scrobble/stop', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/ratings', '/sync/ratings/remove'].includes(path) && method === 'post' ? `if (hooks.afterLibraryWrite) {
-        try { await hooks.afterLibraryWrite(); }
-        catch { return { isError: true, content: [{ type: 'text', text: 'Upstream write succeeded, but library cache invalidation failed' }] }; }
-      }` : ''}
-      const formatted = ${formatResponse};
+      const result = ${toolName === 'simkl_get_watchlist' ? 'hooks.getWatchlist ? await hooks.getWatchlist(args) : ' : ''}${request};${mutation ? '\n' : '\n\n'}      const formatted = ${formatResponse};
       return {
         content: Array.isArray(formatted)
           ? formatted.map((text: string) => ({ type: 'text', text }))
           : [{ type: 'text', text: formatted }]
       };
     } catch (error) {
-      if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
+      ${mutation ? "if (error instanceof LibraryWriteInvalidationError) return { isError: true, content: [{ type: 'text', text: error.message }] };\n      " : ''}if (error instanceof LibraryQueryError) return { isError: true, content: [{ type: 'text', text: error.message }] };
       return toMcpErrorResult(error);
     }
     }`;
@@ -348,7 +359,7 @@ for (const config of toolsWhitelist) {
     formatters.push(`  '${toolName}': ${config.responseFormat.template.toString()}`);
   }
 
-  const { schema, flattenedFields } = generateParamSchema(config.path, params, config.omitParams, config.extraQueryParams);
+  const { schema, flattenedFields } = generateParamSchema(config.path, params, config.omitParams, config.extraQueryParams, config.batchArrayFields, config.legacyEpisodeAlias);
   const handler = generateHandler(config.path, config.method, params, config.responseFormat, toolName, flattenedFields, config.requestPath, config.authorization, config.extraQueryParams);
 
   // extract clean description
@@ -389,6 +400,7 @@ import { asAiring, formatList, withImdb, withRating } from '../src/format/media.
 ${toolsWhitelist.some(config => config.requestPath?.helper === 'simklTrendingPath') ? "import { simklTrendingPath } from '../src/api/trending.js';" : ''}
 import { toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
+import { LibraryWriteInvalidationError } from '../src/library/errors.js';
 ${toolsWhitelist.some(config => config.custom) ? "import { getTrendingByGenre } from '../src/api/trending.js';" : ''}
 
 const formatters: Record<string, (result: any, args: any) => string> = {
@@ -405,6 +417,16 @@ function encodePathValue(value: unknown, name: string) {
 export interface LibraryToolHooks {
   getWatchlist?: (args: Record<string, unknown>) => Promise<string>;
   afterLibraryWrite?: () => Promise<void>;
+  write?: (path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown }) => Promise<unknown>;
+}
+async function requestWrite(client: any, hooks: LibraryToolHooks, path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown; authorization?: 'bearer' | 'none' }, token: string | undefined) {
+  if (hooks.write) return hooks.write(path, options);
+  const result = await client.request(path, { ...options, token });
+  if (hooks.afterLibraryWrite) {
+    try { await hooks.afterLibraryWrite(); }
+    catch { throw new LibraryWriteInvalidationError(); }
+  }
+  return result;
 }
 export function registerTools(server: McpServer, client: any, getToken: () => string | undefined, hooks: LibraryToolHooks = {}) {
 ${tools.join('\n')}

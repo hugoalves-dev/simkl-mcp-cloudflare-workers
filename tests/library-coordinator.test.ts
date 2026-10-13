@@ -3,10 +3,10 @@ import { SimklClient } from '../src/api/client';
 import { CachedLibrary } from '../src/library/coordinator';
 const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original; });
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
-function setup() {
+function setup(wait = async (_ms: number) => {}) {
   let saved: any; let failSave = false; let now = 300_000;
   const store = { async load() { return structuredClone(saved); }, async save(value: any) { if (failSave) throw new Error('storage failure'); saved = structuredClone(value); } };
-  const cache = new CachedLibrary(store, client, 300, () => now);
+  const cache = new CachedLibrary(store, client, 300, () => now, wait);
   return { cache, store, saved: () => saved, fail: (value: boolean) => { failSave = value; }, now: (value: number) => { now = value; } };
 }
 function upstream(responses: unknown[]) {
@@ -78,4 +78,91 @@ test('exclusive profile operations share the library refresh and invalidation qu
   release();
   await Promise.all([first, second]);
   expect(events).toEqual(['first-start', 'first-end', 'second']);
+});
+
+test('write retries only exact per-second rate_limit once after one second', async () => {
+  const waits: number[] = [], s = setup(async ms => { waits.push(ms); });
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts++;
+    return attempts === 1 ? Response.json({ error: 'rate_limit' }, { status: 429 }) : Response.json({ added: {} });
+  }) as typeof fetch;
+  await (s.cache as any).write('secret-token', '/sync/history', { method: 'POST', body: { movies: [{ ids: { simkl: 1 } }] } });
+  expect(attempts).toBe(2); expect(waits).toEqual([1000]); expect(s.saved()).toBeUndefined();
+});
+
+test('a second rate_limit ends the write after exactly two attempts', async () => {
+  const waits: number[] = [], s = setup(async ms => { waits.push(ms); }); let attempts = 0;
+  globalThis.fetch = (async () => { attempts++; return Response.json({ error: 'rate_limit' }, { status: 429 }); }) as typeof fetch;
+  await expect((s.cache as any).write('token', '/sync/history', { method: 'POST', body: {} })).rejects.toBeDefined();
+  expect(attempts).toBe(2); expect(waits).toEqual([1000]);
+});
+
+test('write does not retry daily limits or ambiguous network failures', async () => {
+  for (const failure of [Response.json({ error: 'user_limit_exceeded' }, { status: 429 }), new Error('network')]) {
+    const waits: number[] = [], s = setup(async ms => { waits.push(ms); }); let attempts = 0;
+    globalThis.fetch = (async () => { attempts++; if (failure instanceof Error) throw failure; return failure; }) as typeof fetch;
+    await expect((s.cache as any).write('secret-token', '/sync/history', { method: 'POST', body: {} })).rejects.toBeDefined();
+    expect(attempts).toBe(1); expect(waits).toEqual([]);
+  }
+});
+
+test('successful write and forced-refresh persistence finish before the next queued read', async () => {
+  const s = setup();
+  upstream([activities, items, { movies: [] }, { anime: [] }]); await s.cache.read('token');
+  let finish!: () => void;
+  const barrier = new Promise<void>(resolve => { finish = resolve; });
+  let writeStarted = false;
+  globalThis.fetch = (async input => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/sync/history') { writeStarted = true; await barrier; return Response.json({ added: {} }); }
+    if (path === '/sync/activities') return Response.json({ all: '2026-10-02T00:00:00Z' });
+    const media = new URL(String(input)).pathname.split('/')[3];
+    if (media === 'shows') return Response.json({ shows: items.shows });
+    return Response.json({ [media]: [] });
+  }) as typeof fetch;
+  const write = (s.cache as any).write('secret-token', '/sync/history', { method: 'POST', body: {} });
+  while (!writeStarted) await Promise.resolve();
+  const read = s.cache.read('token');
+  finish();
+  await Promise.all([write, read]);
+  expect(s.saved().forceCheck).toBe(false);
+  expect(s.saved().activities.all).toBe('2026-10-02T00:00:00Z');
+});
+
+test('same account writes serialize and a different account coordinator stays independent', async () => {
+  let finish!: () => void;
+  const barrier = new Promise<void>(resolve => { finish = resolve; });
+  const order: string[] = [];
+  globalThis.fetch = (async (_input, init) => {
+    const payload = JSON.parse(String(init?.body ?? '{}'));
+    const id = payload.movies?.[0]?.ids?.simkl ?? payload.shows?.[0]?.ids?.simkl;
+    order.push(String(id));
+    if (id === 1) await barrier;
+    return Response.json({});
+  }) as typeof fetch;
+  const one = setup(), other = setup();
+  const first = (one.cache as any).write('token', '/sync/history', { method: 'POST', body: { movies: [{ ids: { simkl: 1 } }] } });
+  const second = (one.cache as any).write('token', '/sync/ratings', { method: 'POST', body: { movies: [{ ids: { simkl: 2 } }] } });
+  const independent = (other.cache as any).write('token', '/sync/history', { method: 'POST', body: { shows: [{ ids: { simkl: 3 } }] } });
+  await Promise.resolve();
+  expect([...order].sort()).toEqual(['1', '3']);
+  finish(); await Promise.all([first, second, independent]);
+  expect(order).toEqual(['1', '3', '2']);
+});
+
+test('write persistence failure reports success without repeating upstream write', async () => {
+  const s = setup(); upstream([activities, items, { movies: [] }, { anime: [] }]); await s.cache.read('token'); s.fail(true); let attempts = 0;
+  globalThis.fetch = (async () => { attempts++; return Response.json({ added: {} }); }) as typeof fetch;
+  await expect((s.cache as any).write('token', '/sync/history', { method: 'POST', body: {} })).rejects.toThrow('Upstream write succeeded, but library cache invalidation failed');
+  s.fail(false);
+  expect(attempts).toBe(1); const reads = upstream([{ all: '2026-10-02T00:00:00Z' }]); await s.cache.read('token'); expect(reads()).toBe(1);
+});
+
+test('successful write persists forced-refresh intent without persisting the access token', async () => {
+  const s = setup(); upstream([activities, items, { movies: [] }, { anime: [] }]); await s.cache.read('secret-write-token');
+  globalThis.fetch = (async () => Response.json({ added: {} })) as typeof fetch;
+  await (s.cache as any).write('secret-write-token', '/sync/history', { method: 'POST', body: { movies: [] } });
+  expect(s.saved().forceCheck).toBe(true);
+  expect(JSON.stringify(s.saved())).not.toContain('secret-write-token');
 });
