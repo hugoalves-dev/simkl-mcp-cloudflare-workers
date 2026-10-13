@@ -112,7 +112,8 @@ jobs:
           gh issue create \
             --title "Simkl API documentation changed" \
             --body-file /tmp/issue.md \
-            --label "simkl-docs"
+            --label "simkl-docs" \
+            --assignee "$GITHUB_REPOSITORY_OWNER"
 
       - name: Save new snapshot
         if: |

@@ -120,6 +120,31 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Set the CLOUDFLARE_API_TOKEN repository secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Set the CLOUDFLARE_ACCOUNT_ID repository secret"; exit 1; }
+      - name: Configure Cloudflare Observability for this deploy
+        if: steps.current.outputs.deploy == 'true'
+        shell: bash
+        env:
+          OBSERVABILITY_ENABLED: ${{ vars.CLOUDFLARE_OBSERVABILITY_ENABLED || 'true' }}
+        run: |
+          # Optional GitHub Actions repository variable: CLOUDFLARE_OBSERVABILITY_ENABLED=true|false.
+          # The upstream-compatible wrangler.toml remains unchanged in Git.
+          case "$OBSERVABILITY_ENABLED" in
+            true|false) ;;
+            *) echo "::error::CLOUDFLARE_OBSERVABILITY_ENABLED must be 'true' or 'false'"; exit 1 ;;
+          esac
+
+          if grep -Eq '^\[observability(\.issues)?\]' wrangler.toml; then
+            echo "::error::Observability is already declared in wrangler.toml; avoid duplicate sections"
+            exit 1
+          fi
+
+          {
+            printf '\n[observability]\n'
+            printf 'enabled = %s\n' "$OBSERVABILITY_ENABLED"
+            printf 'head_sampling_rate = 1\n'
+            printf '\n[observability.issues]\n'
+            printf 'enabled = %s\n' "$OBSERVABILITY_ENABLED"
+          } >> wrangler.toml
       - name: Deploy Worker
         if: steps.current.outputs.deploy == 'true'
         run: bun run deploy
