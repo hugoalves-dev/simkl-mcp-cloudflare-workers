@@ -2,7 +2,7 @@ import { formatList, withImdb, withRating } from './format/media.js';
 
 type ResponseFormat =
   | { type: 'simple', template: (result: any, args: any) => string | string[] }
-  | { type: 'json' };
+  | { type: 'json', mediaType?: 'tv' | 'movies' | 'anime' };
 
 interface ToolConfig {
   path: string;
@@ -50,7 +50,7 @@ export const toolsWhitelist: ToolConfig[] = [
   { path: '/search/:type', method: 'get', responseFormat: {
     type: 'simple',
     template: (results: any, args: any) => results.length > 0
-      ? formatList(results, withImdb, 10)
+      ? formatList(results, withImdb, 10, args.type)
       : [`no results for "${args.q}"`]
   }},
   {
@@ -103,31 +103,31 @@ export const toolsWhitelist: ToolConfig[] = [
   // discovery
   { path: '/tv/trending/:interval', schemaPath: '/discover/trending/{type}/{file}.json', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'tv'", 'args.interval'] }, responseFormat: {
     type: 'simple',
-    template: (results: any) => formatList(results)
+    template: (results: any) => formatList(results, undefined, 20, 'tv')
   }},
   { path: '/movies/trending/:interval', schemaPath: '/discover/trending/{type}/{file}.json', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'movies'", 'args.interval'] }, responseFormat: {
     type: 'simple',
-    template: (results: any) => formatList(results)
+    template: (results: any) => formatList(results, undefined, 20, 'movies')
   }},
   { path: '/anime/trending/:interval', schemaPath: '/discover/trending/{type}/{file}.json', method: 'get', authorization: 'none', requestPath: { helper: 'simklTrendingPath', args: ["'anime'", 'args.interval'] }, responseFormat: {
     type: 'simple',
-    template: (results: any) => formatList(results)
+    template: (results: any) => formatList(results, undefined, 20, 'anime')
   }},
 
-  { path: '/tv/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
-  { path: '/movies/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
-  { path: '/anime/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
+  { path: '/tv/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'tv' }},
+  { path: '/movies/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'movies' }},
+  { path: '/anime/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'anime' }},
 
   { path: '/tv/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
   { path: '/anime/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
 
   { path: '/tv/best/:filter', method: 'get', responseFormat: {
     type: 'simple',
-    template: (results: any) => formatList(results, withRating)
+    template: (results: any) => formatList(results, withRating, 20, 'tv')
   }},
   { path: '/anime/best/:filter', method: 'get', responseFormat: {
     type: 'simple',
-    template: (results: any) => formatList(results, withRating)
+    template: (results: any) => formatList(results, withRating, 20, 'anime')
   }},
 
   {
@@ -168,15 +168,15 @@ export const toolsWhitelist: ToolConfig[] = [
   // genre filtering
   { path: '/tv/genres/:genre/:type/:country/:network/:year/:sort', method: 'get', extraQueryParams: ['page', 'limit'], description: 'Live TV genre browsing supports other sorts and country, network, and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).', responseFormat: {
     type: 'simple',
-    template: (results: any) => Array.isArray(results) ? formatList(results) : ['no results for this genre']
+    template: (results: any) => Array.isArray(results) ? formatList(results, undefined, 20, 'tv') : ['no results for this genre']
   }},
   { path: '/anime/genres/:genre/:type/:network/:year/:sort', method: 'get', extraQueryParams: ['page', 'limit'], description: 'Live anime genre browsing supports other sorts and network and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).', responseFormat: {
     type: 'simple',
-    template: (results: any) => Array.isArray(results) ? formatList(results) : ['no results for this genre']
+    template: (results: any) => Array.isArray(results) ? formatList(results, undefined, 20, 'anime') : ['no results for this genre']
   }},
   { path: '/movies/genres/:genre/:type/:country/:year/:sort', method: 'get', extraQueryParams: ['page', 'limit'], description: 'Live movie genre browsing supports other sorts and country and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).', responseFormat: {
     type: 'simple',
-    template: (results: any) => Array.isArray(results) ? formatList(results) : ['no results for this genre']
+    template: (results: any) => Array.isArray(results) ? formatList(results, undefined, 20, 'movies') : ['no results for this genre']
   }},
 
   // user stats

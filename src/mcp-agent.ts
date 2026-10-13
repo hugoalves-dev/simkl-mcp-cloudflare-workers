@@ -11,6 +11,7 @@ import { registerTools } from '../generated/tools.js';
 import { createLibraryAdapter, type LibraryAdapter } from './library/adapter';
 import { toMcpErrorResult } from './api/errors';
 import { selectWatchlist, watchlistResourceContents } from './library/watchlist';
+import { withRating } from './format/media';
 
 interface Env extends WorkerEnv, SimklOAuthEnv {}
 
@@ -173,11 +174,7 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
 
         return {
           contents: items.map((item: any, index: number) => {
-            const simklId = item.ids?.simkl || item.ids?.simkl_id || 'unknown';
-            const title = item.title || 'unknown';
-            const year = item.year || 'N/A';
-            const rating = item.ratings?.simkl?.rating || 'N/A';
-            const text = `${index}: [SIMKL #${simklId}] - ${title} (${year}) - rating: ${rating}`;
+            const text = withRating(item, index, type as 'tv' | 'movies' | 'anime');
 
             return {
               uri: `${baseUri}#${index}`,

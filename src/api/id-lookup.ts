@@ -1,3 +1,5 @@
+import { withSimklItemLink } from '../format/media';
+
 export type SimklDetailType = 'movies' | 'tv' | 'anime';
 
 interface SimklRedirectResult {
@@ -118,8 +120,20 @@ export async function getMediaById(
   const resolved = parseSimklRedirect(redirect?.redirectUrl);
   if (!resolved) throw new SimklIdLookupError('No matching Simkl title was found');
 
-  return client.request(`/${resolved.type}/${resolved.id}`, {
+  const detail = await client.request<any>(`/${resolved.type}/${resolved.id}`, {
     method: 'GET',
     authorization: 'none',
   });
+  let slug: string | undefined;
+  if (redirect?.redirectUrl) {
+    try {
+      const redirectUrl = redirect.redirectUrl.startsWith('//') ? `https:${redirect.redirectUrl}` : redirect.redirectUrl;
+      slug = new URL(redirectUrl).pathname.split('/')[3];
+      if (slug) slug = decodeURIComponent(slug);
+    } catch {
+      slug = undefined;
+    }
+  }
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return detail;
+  return withSimklItemLink(detail, resolved.type, resolved.id, slug);
 }
