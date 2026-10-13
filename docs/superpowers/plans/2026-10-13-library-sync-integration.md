@@ -52,7 +52,9 @@ Files: `src/library/{adapter,watchlist}.ts`, `src/mcp-agent.ts`, `scripts/codege
 - [x] Run full Bun suite and both real Worker runtime suites.
 - [x] Run final code generation, TypeScript, and Wrangler deployment dry-run.
 - [x] Obtain independent review of the reconciled branch; fix Important findings with red/green tests.
-- [ ] Commit, push `codex/issue-14-library-sync`, and open a PR against main with `Closes #14` and verification evidence.
+- [x] Commit, push `codex/issue-14-library-sync`, and open a PR against main with `Closes #14` and verification evidence.
 
 
 Review result: the reconciled suite passes 222 tests, plus both real Worker smoke suites, code generation, TypeScript, and Wrangler dry-run. Independent review's quota-prototype and truncated-pagination findings were fixed with red/green tests. Mixed error/data membership was regraded Important because it could erase cached items, and fixed in the same pass. Actual Worker RPC tests confirm daily-limit guidance and Retry-After survive without leaking upstream bodies. `{}` remains a valid empty response under the latest documented contract.
+
+Published PR: https://github.com/vitorhugo-dotnet/simkl-mcp/pull/26 (base main; head codex/issue-14-library-sync). No deployment performed.
