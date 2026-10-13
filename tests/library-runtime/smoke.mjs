@@ -34,7 +34,9 @@ function runtime() {
       calls.push(url.pathname); active++; peak = Math.max(peak, active);
       try {
         await new Promise(resolve => setTimeout(resolve, 15));
-        if (url.pathname === '/sync/activities') return Response.json({ all: '2026-10-09T12:00:00Z' });
+        if (url.pathname === '/sync/activities') return Response.json({ all: '2026-10-09T12:00:00Z', settings: { all: '2026-10-09T12:00:00Z' } });
+        if (url.pathname === '/users/settings') return Response.json({ account: { id: 42 }, timezone: 'UTC' });
+        if (/^\/users\/\d+\/stats$/.test(url.pathname)) return Response.json({ total_mins: 120 });
         const media = url.pathname.split('/')[3];
         const key = media === 'movies' ? 'movie' : 'show';
         return Response.json({ [media]: [{ [key]: { title: 'Fixture', ids: { simkl: 42 } }, user_rating: 8 }] });
@@ -52,6 +54,11 @@ async function read(user = '42') {
   assert.equal(response.status, 200, await response.clone().text());
   return response.json();
 }
+async function stats(user = '42') {
+  const response = await mf.dispatchFetch(`https://fixture.worker.invalid/?user=${user}&stats=1`);
+  assert.equal(response.status, 200, await response.clone().text());
+  return response.json();
+}
 try {
   mf = runtime();
   const [a, b] = await Promise.all([read(), read()]);
@@ -60,12 +67,24 @@ try {
   assert.deepEqual(calls, ['/sync/activities', '/sync/all-items/shows', '/sync/all-items/movies', '/sync/all-items/anime']);
   assert.equal(JSON.stringify(a).includes('fixture-operation-token'), false);
   for (const row of a.items) assert.equal(JSON.parse(row.itemJson).user_rating, 8);
+  const profile = await stats();
+  assert.deepEqual(profile.stats, { total_mins: 120 });
+  assert.deepEqual(calls.slice(4), ['/users/settings', '/users/42/stats']);
+  await stats();
+  assert.equal(calls.length, 6, 'fresh profile should avoid repeat settings, stats, and activity requests');
+  const uninitializedProfile = await stats('44');
+  assert.deepEqual(uninitializedProfile.stats, { total_mins: 120 });
+  assert.deepEqual(calls.slice(6), ['/sync/activities', '/users/settings', '/users/44/stats']);
+  assert.equal(calls.some(path => path.startsWith('/sync/all-items/')), true);
+  assert.equal(calls.filter(path => path.startsWith('/sync/all-items/')).length, 3, 'stats-only access must not initialize another user library');
   await read('43');
-  assert.equal(calls.length, 8);
+  assert.equal(calls.length, 13);
   await mf.dispose(); mf = runtime();
   assert.deepEqual(await read(), a);
-  assert.equal(calls.length, 8, 'reconstructed object must use persisted completion');
-  console.log('PASS: actual Worker RPC, coalescing, sequential fetches, ratings, cross-user isolation, and SQLite persistence after runtime reconstruction');
+  const reconstructedProfile = await stats();
+  assert.deepEqual(reconstructedProfile.stats, { total_mins: 120 });
+  assert.equal(calls.length, 13, 'reconstructed object must use persisted library and profile records');
+  console.log('PASS: Worker RPC, coalescing, per-user isolation, profile caching, and SQLite persistence after runtime reconstruction');
 } finally {
   if (mf) await mf.dispose();
   await rm(persist, { recursive: true, force: true });

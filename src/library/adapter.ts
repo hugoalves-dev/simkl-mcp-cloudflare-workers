@@ -6,8 +6,26 @@ import type { LibraryItems } from './types';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
   invalidate(): Promise<void>;
+  getStats(): Promise<Record<string, unknown>>;
 }
 export const verifiedAccountId = normalizeSimklId;
+function restoreRpcError(error: unknown): unknown {
+  if (error instanceof SimklApiError) return error;
+  if (!error || typeof error !== 'object') return error;
+  const remote = error as Record<string, unknown>;
+  const status = remote.statusCode;
+  if (remote.name !== 'SimklApiError' || typeof status !== 'number' || !Number.isInteger(status)
+    || !(status === 0 || (status >= 100 && status <= 599))) return error;
+  const headers: SimklResponseHeaders = {};
+  if (remote.headers && typeof remote.headers === 'object') {
+    const values = remote.headers as Record<string, unknown>;
+    for (const key of ['rateLimitLimit', 'rateLimitRemaining', 'retryAfter', 'lastModified'] as const) {
+      if (typeof values[key] === 'string') headers[key] = values[key];
+    }
+  }
+  const code = typeof remote.upstreamCode === 'string' ? remote.upstreamCode : '';
+  return new SimklApiError('Simkl request failed', status, JSON.stringify({ error: code }), headers);
+}
 export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNamespace<SimklLibraryCache> }, client: SimklClient, getProps: () => SimklAuthProps | undefined): LibraryAdapter {
   let memo: { token: string; promise: Promise<string> } | undefined;
   async function stub() {
@@ -28,7 +46,7 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       }
       userId = await memo.promise;
     }
-    return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token };
+    return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token, userId };
   }
   return {
     async read(force = false) {
@@ -36,25 +54,14 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       try { return await object.read(token, force); }
       catch (error) {
         // Worker RPC preserves safe custom fields but not the local class prototype.
-        if (error instanceof SimklApiError) throw error;
-        if (error && typeof error === 'object') {
-          const remote = error as Record<string, unknown>;
-          const status = remote.statusCode;
-          if (remote.name === 'SimklApiError' && typeof status === 'number' && Number.isInteger(status) && (status === 0 || (status >= 100 && status <= 599))) {
-            const headers: SimklResponseHeaders = {};
-            if (remote.headers && typeof remote.headers === 'object') {
-              const values = remote.headers as Record<string, unknown>;
-              for (const key of ['rateLimitLimit', 'rateLimitRemaining', 'retryAfter', 'lastModified'] as const) {
-                if (typeof values[key] === 'string') headers[key] = values[key];
-              }
-            }
-            const code = typeof remote.upstreamCode === 'string' ? remote.upstreamCode : '';
-            throw new SimklApiError('Simkl library request failed', status, JSON.stringify({ error: code }), headers);
-          }
-        }
-        throw error;
+        throw restoreRpcError(error);
       }
     },
     async invalidate() { const { object } = await stub(); await object.invalidate(); },
+    async getStats() {
+      const { object, token, userId } = await stub();
+      try { return await object.getStats(token, userId); }
+      catch (error) { throw restoreRpcError(error); }
+    },
   };
 }

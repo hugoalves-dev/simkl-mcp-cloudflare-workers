@@ -65,3 +65,17 @@ test('failed post-write invalidation still forces the next read in the current o
   s.fail(true); await expect(s.cache.invalidate()).rejects.toThrow('storage failure');
   s.fail(false); const count = upstream([activities]); await s.cache.read('token'); expect(count()).toBe(1);
 });
+test('exclusive profile operations share the library refresh and invalidation queue', async () => {
+  const s = setup();
+  expect(typeof s.cache.withExclusive).toBe('function');
+  const events: string[] = [];
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  const first = s.cache.withExclusive(async () => { events.push('first-start'); await barrier; events.push('first-end'); });
+  const second = s.cache.withExclusive(async () => { events.push('second'); });
+  await Promise.resolve();
+  expect(events).toEqual(['first-start']);
+  release();
+  await Promise.all([first, second]);
+  expect(events).toEqual(['first-start', 'first-end', 'second']);
+});

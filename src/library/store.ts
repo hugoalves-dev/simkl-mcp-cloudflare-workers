@@ -1,8 +1,25 @@
 import { normalizeSimklId } from './identity';
 import {
   isRecord, jsonBytes, MAX_ROW_JSON_BYTES, MAX_PENDING_ITEM_BYTES,
-  type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, MEDIA_TYPES,
+  type LibraryActivitySnapshot, type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
 } from './types.js';
+
+function isActivityTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function isUserProfileSnapshot(value: unknown): value is UserProfileSnapshot {
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.activities)
+    || !(value.activities.all === null || isActivityTimestamp(value.activities.all))
+    || !Number.isFinite(value.checkedAt) || (value.checkedAt as number) < 0) return false;
+  if (value.activities.settings !== undefined && (!isRecord(value.activities.settings)
+    || (value.activities.settings.all !== undefined && value.activities.settings.all !== null && !isActivityTimestamp(value.activities.settings.all)))) return false;
+  if (value.settingsActivity !== undefined && value.settingsActivity !== null && !isActivityTimestamp(value.settingsActivity)) return false;
+  if (value.statsActivity !== undefined && value.statsActivity !== null && !isActivityTimestamp(value.statsActivity)) return false;
+  if (value.settings !== undefined && !isRecord(value.settings)) return false;
+  if (value.stats !== undefined && !isRecord(value.stats)) return false;
+  return true;
+}
 
 /** Network-free SQLite storage; all serialization happens before transactionSync. */
 export class LibraryStore {
@@ -26,6 +43,28 @@ export class LibraryStore {
     return { initialized: true, itemCount: value.itemCount as number };
   }
 
+  loadProfile(): UserProfileSnapshot | undefined {
+    const row = this.storage.sql.exec<{ value_json: string }>(
+      "SELECT value_json FROM library_metadata WHERE key = 'user-profile'",
+    ).toArray()[0];
+    if (!row) return undefined;
+    const value: unknown = JSON.parse(row.value_json);
+    if (!isUserProfileSnapshot(value)) throw new Error('Invalid user profile cache record');
+    return value;
+  }
+
+  saveProfile(snapshot: UserProfileSnapshot): void {
+    if (!isUserProfileSnapshot(snapshot)) throw new Error('Invalid user profile cache record');
+    const serialized = JSON.stringify(snapshot);
+    if (jsonBytes(serialized) > MAX_ROW_JSON_BYTES) throw new Error('User profile cache too large');
+    this.storage.transactionSync(() => {
+      this.storage.sql.exec(
+        "INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('user-profile', ?)",
+        serialized,
+      );
+    });
+  }
+
   commit(candidate: LibraryCandidate, freshness?: { checkedAt: number; forceCheck: boolean }): LibraryInitialization {
     const metadata = JSON.stringify({ activities: candidate.activities, completedAt: Date.now(), itemCount: candidate.items.length, ...freshness });
     if (jsonBytes(metadata) > MAX_ROW_JSON_BYTES) throw new Error('Library metadata too large');
@@ -47,18 +86,24 @@ export class LibraryStore {
     return { initialized: true, itemCount: candidate.items.length };
   }
 
-  loadSnapshot(): LibrarySnapshot | undefined {
+  loadActivitySnapshot(): LibraryActivitySnapshot | undefined {
     const version = this.storage.sql.exec<{ value_json: string }>("SELECT value_json FROM library_metadata WHERE key = 'schema-version'").toArray()[0];
     if (version?.value_json !== '1') throw new Error('Unsupported library cache schema');
     const row = this.storage.sql.exec<{ value_json: string }>("SELECT value_json FROM library_metadata WHERE key = 'completion'").toArray()[0];
     if (!row) return undefined;
     const metadata = JSON.parse(row.value_json);
     if (!isRecord(metadata.activities) || typeof metadata.activities.all !== 'string' || !Number.isFinite(Date.parse(metadata.activities.all))) throw new Error('Invalid cached library activities');
-    const items: LibrarySnapshot['items'] = { shows: [], movies: [], anime: [] };
-    for (const row of this.readItems()) items[row.mediaType].push(JSON.parse(row.itemJson) as LibraryItem);
     const checkedAt = metadata.checkedAt ?? metadata.completedAt;
     if (!Number.isFinite(checkedAt)) throw new Error('Invalid cached library check time');
-    return { version: 1, items, activities: metadata.activities, checkedAt, forceCheck: metadata.forceCheck === true };
+    return { activities: metadata.activities, checkedAt, forceCheck: metadata.forceCheck === true };
+  }
+
+  loadSnapshot(): LibrarySnapshot | undefined {
+    const activitySnapshot = this.loadActivitySnapshot();
+    if (!activitySnapshot) return undefined;
+    const items: LibrarySnapshot['items'] = { shows: [], movies: [], anime: [] };
+    for (const row of this.readItems()) items[row.mediaType].push(JSON.parse(row.itemJson) as LibraryItem);
+    return { version: 1, items, ...activitySnapshot };
   }
 
   saveSnapshot(snapshot: LibrarySnapshot): void {
