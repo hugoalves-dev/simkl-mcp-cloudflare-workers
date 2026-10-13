@@ -1,7 +1,7 @@
 import { normalizeSimklId } from './identity';
 import {
   isRecord, jsonBytes, MAX_ROW_JSON_BYTES, MAX_PENDING_ITEM_BYTES,
-  type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
+  type LibraryActivitySnapshot, type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
 } from './types.js';
 
 function isActivityTimestamp(value: unknown): value is string {
@@ -10,10 +10,12 @@ function isActivityTimestamp(value: unknown): value is string {
 
 function isUserProfileSnapshot(value: unknown): value is UserProfileSnapshot {
   if (!isRecord(value) || value.version !== 1 || !isRecord(value.activities)
-    || !isActivityTimestamp(value.activities.all)
+    || !(value.activities.all === null || isActivityTimestamp(value.activities.all))
     || !Number.isFinite(value.checkedAt) || (value.checkedAt as number) < 0) return false;
-  if (value.settingsActivity !== undefined && !isActivityTimestamp(value.settingsActivity)) return false;
-  if (value.statsActivity !== undefined && !isActivityTimestamp(value.statsActivity)) return false;
+  if (value.activities.settings !== undefined && (!isRecord(value.activities.settings)
+    || (value.activities.settings.all !== undefined && value.activities.settings.all !== null && !isActivityTimestamp(value.activities.settings.all)))) return false;
+  if (value.settingsActivity !== undefined && value.settingsActivity !== null && !isActivityTimestamp(value.settingsActivity)) return false;
+  if (value.statsActivity !== undefined && value.statsActivity !== null && !isActivityTimestamp(value.statsActivity)) return false;
   if (value.settings !== undefined && !isRecord(value.settings)) return false;
   if (value.stats !== undefined && !isRecord(value.stats)) return false;
   return true;
@@ -84,18 +86,24 @@ export class LibraryStore {
     return { initialized: true, itemCount: candidate.items.length };
   }
 
-  loadSnapshot(): LibrarySnapshot | undefined {
+  loadActivitySnapshot(): LibraryActivitySnapshot | undefined {
     const version = this.storage.sql.exec<{ value_json: string }>("SELECT value_json FROM library_metadata WHERE key = 'schema-version'").toArray()[0];
     if (version?.value_json !== '1') throw new Error('Unsupported library cache schema');
     const row = this.storage.sql.exec<{ value_json: string }>("SELECT value_json FROM library_metadata WHERE key = 'completion'").toArray()[0];
     if (!row) return undefined;
     const metadata = JSON.parse(row.value_json);
     if (!isRecord(metadata.activities) || typeof metadata.activities.all !== 'string' || !Number.isFinite(Date.parse(metadata.activities.all))) throw new Error('Invalid cached library activities');
-    const items: LibrarySnapshot['items'] = { shows: [], movies: [], anime: [] };
-    for (const row of this.readItems()) items[row.mediaType].push(JSON.parse(row.itemJson) as LibraryItem);
     const checkedAt = metadata.checkedAt ?? metadata.completedAt;
     if (!Number.isFinite(checkedAt)) throw new Error('Invalid cached library check time');
-    return { version: 1, items, activities: metadata.activities, checkedAt, forceCheck: metadata.forceCheck === true };
+    return { activities: metadata.activities, checkedAt, forceCheck: metadata.forceCheck === true };
+  }
+
+  loadSnapshot(): LibrarySnapshot | undefined {
+    const activitySnapshot = this.loadActivitySnapshot();
+    if (!activitySnapshot) return undefined;
+    const items: LibrarySnapshot['items'] = { shows: [], movies: [], anime: [] };
+    for (const row of this.readItems()) items[row.mediaType].push(JSON.parse(row.itemJson) as LibraryItem);
+    return { version: 1, items, ...activitySnapshot };
   }
 
   saveSnapshot(snapshot: LibrarySnapshot): void {

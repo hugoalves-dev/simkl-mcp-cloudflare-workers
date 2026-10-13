@@ -33,6 +33,20 @@ test('profile cache survives LibraryStore reconstruction', () => {
   db.close();
 });
 
+test('profile cache accepts and reconstructs null Simkl activity watermarks', () => {
+  const { storage, db } = sqliteStorage();
+  const store = new LibraryStore(storage);
+  const nullProfile = profile({
+    activities: { all: null, settings: { all: null } } as any,
+    settingsActivity: null as any,
+    statsActivity: null as any,
+  });
+
+  store.saveProfile(nullProfile);
+  expect(new LibraryStore(storage).loadProfile()).toEqual(nullProfile);
+  db.close();
+});
+
 test('profile cache writes preserve library completion and item rows', () => {
   const { storage, db } = sqliteStorage();
   const store = new LibraryStore(storage);
@@ -42,6 +56,15 @@ test('profile cache writes preserve library completion and item rows', () => {
   expect(store.getInitialization()).toEqual({ initialized: true, itemCount: 1 });
   expect(store.readItems()).toEqual(candidate.items);
   expect(store.loadProfile()).toEqual(profile());
+  db.close();
+});
+
+test('library activity snapshot can be loaded without materializing item rows', () => {
+  const { storage, db } = sqliteStorage();
+  const store = new LibraryStore(storage);
+  store.commit(candidate, { checkedAt: 5678, forceCheck: false });
+
+  expect(store.loadActivitySnapshot()).toEqual({ activities: { all: activities.all }, checkedAt: 5678, forceCheck: false });
   db.close();
 });
 

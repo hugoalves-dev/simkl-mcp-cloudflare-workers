@@ -66,7 +66,7 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     if (!userId) return Promise.reject(new Error('Invalid verified Simkl account ID'));
     return this.library.withExclusive(async () => {
       const previous = this.store.loadProfile();
-      const librarySnapshot = this.store.loadSnapshot();
+      const librarySnapshot = this.store.loadActivitySnapshot();
       const result = await refreshUserProfile(this.client, accessToken, userId, previous, librarySnapshot, {
         ttlSeconds: parseLibraryCacheTtlSeconds(this.env.SIMKL_LIBRARY_CACHE_TTL_SECONDS),
         now: Date.now(),

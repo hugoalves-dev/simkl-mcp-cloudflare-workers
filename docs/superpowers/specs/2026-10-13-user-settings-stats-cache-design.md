@@ -11,6 +11,7 @@ Acceptance criteria:
 - Authenticated stats reads use the known verified Simkl account ID and do not fetch `/users/settings` to discover it again.
 - Repeated reads while the shared activities snapshot is fresh return cached settings and stats without Simkl requests.
 - Settings refresh when `activities.settings.all` changes; stats refresh when `activities.all` changes.
+- Simkl's documented `null` watermarks for a new account are valid stable markers. First access still fetches settings and stats, then cached values are reused until a marker changes.
 - Data is isolated by canonical Simkl account ID and survives Durable Object reconstruction.
 - Tests cover unchanged reads, each independent invalidation, known identity reuse, failed refresh retry, and user isolation.
 
@@ -25,8 +26,8 @@ The OAuth callback already saves a verified numeric `simklUserId` in auth proper
 Extend the existing `SimklLibraryCache` operation path to serve cached account settings and stats. The Durable Object remains keyed by verified canonical Simkl ID, so different accounts cannot share profile data. The profile record keeps its own last checked activities snapshot and check time, while reusing an already-fresh initialized library snapshot when available. A stats read must not initialize the full watchlist cache just to obtain activity timestamps. Run profile refreshes through the same per-object serialized operation path as library reads and invalidations:
 
 1. Within the configured cache TTL, reuse the profile activity snapshot without contacting Simkl. Otherwise reuse a still-fresh initialized library snapshot if one exists, or request `/sync/activities` alone and update only the profile activity snapshot. A stats read never advances the library synchronization watermark or triggers a first full-library pull.
-2. Compare `activities.settings.all` with the settings watermark stored alongside the cached settings. Fetch `/users/settings` on first access or when that timestamp moves.
-3. Compare top-level `activities.all` with the stats watermark. Fetch `/users/{verifiedSimklUserId}/stats` on first access or when it moves.
+2. Compare `activities.settings.all` with the settings watermark stored alongside the cached settings. A timestamp or `null` is valid; fetch `/users/settings` on first access or when that marker moves.
+3. Compare top-level `activities.all` with the stats watermark. A timestamp or `null` is valid; fetch `/users/{verifiedSimklUserId}/stats` on first access or when that marker moves.
 4. Return the cached stats using the existing pretty-printed JSON result from `simkl_my_stats`.
 
 Persist settings, stats, the profile activities snapshot, check time, and the individual settings/stats activity watermarks as a bounded profile-cache JSON record in the existing `library_metadata` table. Keep the library completion metadata and item rows unchanged. Prepare and validate serialized data before a synchronous SQLite transaction; commit new profile values and markers together only after every required upstream request succeeds. If a request or storage write fails, preserve the previous profile record and activity snapshot so a later call retries. No credential is stored; the access token is an operation argument only.

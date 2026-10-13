@@ -58,6 +58,33 @@ test('first profile read fetches activities, settings, and statistics in order',
   expect(result.stats).toEqual(stats);
 });
 
+test('new accounts with null activity watermarks still fetch and cache settings and statistics', async () => {
+  const nullActivities = { all: null, settings: { all: null } };
+  const paths = upstream([nullActivities, settings, stats]);
+
+  const result = await run(undefined, checkedAt + 1);
+
+  expect(paths).toEqual(['/sync/activities', '/users/settings', '/users/42/stats']);
+  expect(result.snapshot.activities).toEqual(nullActivities);
+  expect(result.snapshot.settingsActivity).toBeNull();
+  expect(result.snapshot.statsActivity).toBeNull();
+});
+
+test('null activity watermarks are stable and do not refetch cached values on stale checks', async () => {
+  const previous = previousProfile({
+    activities: { all: null, settings: { all: null } },
+    settingsActivity: null,
+    statsActivity: null,
+  });
+  const paths = upstream([{ all: null, settings: { all: null } }]);
+
+  const result = await run(previous, checkedAt + (ttlSeconds + 1) * 1000);
+
+  expect(paths).toEqual(['/sync/activities']);
+  expect(result.stats).toEqual(stats);
+  expect(result.snapshot.settings).toEqual(settings);
+});
+
 test('unchanged activity snapshot serves the profile cache without Simkl requests inside TTL', async () => {
   const paths = upstream([]);
 

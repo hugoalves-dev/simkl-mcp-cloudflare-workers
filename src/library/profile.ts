@@ -1,17 +1,21 @@
 import type { SimklClient } from '../api/client.js';
 import { getCurrentUserSettings, getUserStats } from '../api/user.js';
-import { isRecord, jsonBytes, MAX_ROW_JSON_BYTES, type Activities, type LibrarySnapshot, type UserProfileSnapshot } from './types.js';
+import { isRecord, jsonBytes, MAX_ROW_JSON_BYTES, type LibraryActivitySnapshot, type UserProfileActivities, type UserProfileSnapshot } from './types.js';
 
 function validTimestamp(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value));
 }
 
-function validateActivities(value: unknown): Activities {
-  if (!isRecord(value) || !validTimestamp(value.all)) throw new Error('Invalid Simkl activity timestamps');
-  if (value.settings !== undefined && (!isRecord(value.settings) || (value.settings.all !== undefined && !validTimestamp(value.settings.all)))) {
+function validMarker(value: unknown): value is string | null {
+  return value === null || validTimestamp(value);
+}
+
+function validateActivities(value: unknown): UserProfileActivities {
+  if (!isRecord(value) || !validMarker(value.all)) throw new Error('Invalid Simkl activity timestamps');
+  if (value.settings !== undefined && (!isRecord(value.settings) || (value.settings.all !== undefined && !validMarker(value.settings.all)))) {
     throw new Error('Invalid Simkl settings activity timestamp');
   }
-  return value as Activities;
+  return value as UserProfileActivities;
 }
 
 function isFresh(checkedAt: number, now: number, ttlSeconds: number): boolean {
@@ -19,10 +23,10 @@ function isFresh(checkedAt: number, now: number, ttlSeconds: number): boolean {
 }
 
 function validCachedProfile(value: UserProfileSnapshot | undefined): value is UserProfileSnapshot {
-  return !!value && value.version === 1 && validTimestamp(value.activities?.all)
+  return !!value && value.version === 1 && validMarker(value.activities?.all)
     && Number.isFinite(value.checkedAt) && value.checkedAt >= 0
-    && (value.settingsActivity === undefined || validTimestamp(value.settingsActivity))
-    && (value.statsActivity === undefined || validTimestamp(value.statsActivity))
+    && (value.settingsActivity === undefined || validMarker(value.settingsActivity))
+    && (value.statsActivity === undefined || validMarker(value.statsActivity))
     && (value.settings === undefined || isRecord(value.settings))
     && (value.stats === undefined || isRecord(value.stats));
 }
@@ -32,30 +36,32 @@ export async function refreshUserProfile(
   token: string,
   simklUserId: string,
   previous: UserProfileSnapshot | undefined,
-  librarySnapshot: LibrarySnapshot | undefined,
+  librarySnapshot: LibraryActivitySnapshot | undefined,
   options: { ttlSeconds: number; now: number },
 ): Promise<{ snapshot: UserProfileSnapshot; stats: Record<string, unknown> }> {
   if (previous && !validCachedProfile(previous)) throw new Error('Invalid user profile cache record');
 
-  let activities: Activities;
+  let activities: UserProfileActivities;
   let checkedAt: number;
   if (validCachedProfile(previous) && isFresh(previous.checkedAt, options.now, options.ttlSeconds)) {
     activities = previous.activities;
     checkedAt = previous.checkedAt;
-  } else if (librarySnapshot?.version === 1 && librarySnapshot.forceCheck !== true
+  } else if (librarySnapshot && librarySnapshot.forceCheck !== true
     && isFresh(librarySnapshot.checkedAt, options.now, options.ttlSeconds)) {
     activities = validateActivities(librarySnapshot.activities);
     checkedAt = librarySnapshot.checkedAt;
   } else {
     activities = validateActivities(await client.request('/sync/activities', { method: 'GET', token }));
-    if (previous && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
     checkedAt = options.now;
   }
 
+  if (previous && activities.all !== null && previous.activities.all !== null
+    && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
+
   const settingsActivityValue = isRecord(activities.settings) ? activities.settings.all : undefined;
-  const settingsActivity = validTimestamp(settingsActivityValue) ? settingsActivityValue : undefined;
+  const settingsActivity = validMarker(settingsActivityValue) ? settingsActivityValue : undefined;
   const statsActivity = activities.all;
-  const refreshSettings = !previous?.settings || !settingsActivity || previous.settingsActivity !== settingsActivity;
+  const refreshSettings = !previous?.settings || previous.settingsActivity !== settingsActivity;
   const refreshStats = !previous?.stats || previous.statsActivity !== statsActivity;
 
   const settings = refreshSettings ? await getCurrentUserSettings(client, token) : previous!.settings!;

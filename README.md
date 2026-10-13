@@ -145,7 +145,8 @@ refreshes settings when `activities.settings.all` changes, and refreshes stats
 when top-level `activities.all` changes. Stats reads reuse an already-fresh
 library activity snapshot when available and never initialize or advance the
 watchlist cache. Profile values and their activity markers persist in the
-existing metadata table; access tokens remain operation arguments only.
+existing metadata table; Simkl's `null` activity markers are valid and cached
+like timestamps. Access tokens remain operation arguments only.
 
 Cached watchlists return the foundation's default rich summary. Type/status
 selection is supported; request-specific delta filters and enhanced/reduced
