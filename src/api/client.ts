@@ -161,6 +161,7 @@ export class SimklClient {
       }
     }
 
+    const cacheHit = Boolean(response);
     if (!response) {
       let serverRetries = 0;
       let rateLimitRetried = false;
@@ -239,7 +240,7 @@ export class SimklClient {
     try {
       const data = JSON.parse(responseText);
       // Cache only a successfully bounded, valid JSON response. Never cache an oversized body.
-      if (cache && cacheKey && cachePolicy && response.ok) {
+      if (!cacheHit && cache && cacheKey && cachePolicy && response.ok) {
         const cacheHeaders = new Headers(response.headers);
         // The body was decoded and re-serialized; original compression/length headers
         // must not describe the new response or cached reads may be corrupted.
