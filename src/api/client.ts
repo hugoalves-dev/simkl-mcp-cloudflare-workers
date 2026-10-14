@@ -152,13 +152,38 @@ export class SimklClient {
     const cache = cachePolicy && typeof caches !== 'undefined' ? caches.default : undefined;
     const cacheKey = cache && cachePolicy ? createResponseCacheKey(requestUrl) : undefined;
 
+    // Emit only allowlisted calendar metadata; never log the URL, query string,
+    // client ID, Authorization header, user token, or upstream response body.
+    const calendarParts = cachePolicy && requestUrl.origin === 'https://data.simkl.in'
+      ? /^\/calendar\/v2\/(?:(\d{4})\/([1-9]|1[0-2])\/)?(tv|anime|movie_release)\.json$/.exec(requestUrl.pathname)
+      : null;
+    const logCalendarCache = (
+      event: 'HIT' | 'MISS' | 'STORE' | 'ERROR' | 'UNAVAILABLE',
+      operation?: 'match' | 'put'
+    ): void => {
+      if (!calendarParts || !cachePolicy) return;
+      console.info('simkl.calendar.cache', {
+        event,
+        resource: 'calendar/v2',
+        media: calendarParts[3],
+        period: calendarParts[1] ? 'monthly' : 'current',
+        ...(calendarParts[1] ? { year: Number(calendarParts[1]), month: Number(calendarParts[2]) } : {}),
+        ttlSeconds: cachePolicy.ttlSeconds,
+        ...(operation ? { operation } : {}),
+      });
+    };
+
     let response: Response | undefined;
     if (cache && cacheKey) {
       try {
         response = await cache.match(cacheKey);
+        logCalendarCache(response ? 'HIT' : 'MISS');
       } catch {
+        logCalendarCache('ERROR', 'match');
         // Cache failures should not make the upstream API unavailable.
       }
+    } else {
+      logCalendarCache('UNAVAILABLE');
     }
 
     const cacheHit = Boolean(response);
@@ -253,7 +278,9 @@ export class SimklClient {
             statusText: response.statusText,
             headers: cacheHeaders,
           }));
+          logCalendarCache('STORE');
         } catch {
+          logCalendarCache('ERROR', 'put');
           // Cache writes are best-effort; return the successful upstream response.
         }
       }
