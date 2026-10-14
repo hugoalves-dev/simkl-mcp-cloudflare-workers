@@ -4261,6 +4261,20 @@
             "description": "Episode number within the season (1-based).",
             "type": "integer"
           },
+          "finale_type": {
+            "description": "Marks finale episodes so you can badge them:\n\n- `1` — mid-season finale\n- `2` — season finale\n- `3` — series finale\n- `null` — not a finale. Type 4 null — the episode isn't marked as one. See [Null and missing values](/conventions/null-values).\n\nThe same values as [`finale_type` in the calendar files](/api-reference/calendar#param-finale-type). Specials can carry one too. **TV only** — [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) doesn't return this field.",
+            "enum": [
+              1,
+              2,
+              3,
+              null
+            ],
+            "example": 2,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "ids": {
             "properties": {
               "simkl_id": {
@@ -23073,6 +23087,7 @@
                         "date": "2010-10-31T05:00:00.000Z",
                         "description": "Rick searches for his family after emerging from a coma into a world terrorized by the walking dead. Morgan and Duane, whom he meets along the way, help teach Rick the new rules for survival.",
                         "episode": 1,
+                        "finale_type": null,
                         "ids": {
                           "simkl_id": 310766
                         },
@@ -23087,6 +23102,7 @@
                         "date": "2010-11-07T05:00:00.000Z",
                         "description": "Rick unknowingly causes a group of survivors to be trapped by walkers. The group dynamic devolves from accusations to violence, as Rick must confront an enemy far more dangerous than the undead.",
                         "episode": 2,
+                        "finale_type": null,
                         "ids": {
                           "simkl_id": 310768
                         },
@@ -23094,6 +23110,27 @@
                         "runtime": 44,
                         "season": 1,
                         "title": "Guts",
+                        "type": "episode"
+                      }
+                    ]
+                  },
+                  "series_finale": {
+                    "description": "`finale_type: 3` marks the last episode of the series; `2` is a season finale and `1` a mid-season finale.",
+                    "summary": "Series finale (Game of Thrones S08E06)",
+                    "value": [
+                      {
+                        "aired": true,
+                        "date": "2019-05-19T21:00:00-04:00",
+                        "description": "The fate of the Seven Kingdoms is at stake as the final chapter of Game of Thrones is written.",
+                        "episode": 6,
+                        "finale_type": 3,
+                        "ids": {
+                          "simkl_id": 4262296
+                        },
+                        "img": "80/807142085d4db12f4",
+                        "runtime": 78,
+                        "season": 8,
+                        "title": "The Iron Throne",
                         "type": "episode"
                       }
                     ]
@@ -23106,6 +23143,7 @@
                         "aired": false,
                         "date": "2017-10-19T05:00:00.000Z",
                         "description": "Andrew Lincoln, Norman Reedus, and the rest of the cast and crew reflect on the history and celebrate reaching the 100th episode of The Walking Dead.",
+                        "finale_type": null,
                         "ids": {
                           "simkl_id": 2527432
                         },

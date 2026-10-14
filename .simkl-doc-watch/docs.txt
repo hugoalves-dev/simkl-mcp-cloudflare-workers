@@ -11696,6 +11696,23 @@ For broader Simkl product news — apps, features, releases — follow [**@Simkl
 
 Use the **filter** in the right rail to narrow this changelog by tag.
 
+<Update label="2026-10-14" description="Finale markers on TV episodes">
+  <Badge icon="sparkles">New feature</Badge>
+
+  **`finale_type` on TV episodes**
+
+  [`GET /tv/episodes/{id}`](/api-reference/simkl/get-tv-episodes) now returns `finale_type` on every episode, so you can badge finales anywhere you list episodes — not only in the calendar:
+
+  | Value | Meaning |
+  | - | - |
+  | `1` | Mid-season finale |
+  | `2` | Season finale |
+  | `3` | Series finale |
+  | `null` | Not a finale |
+
+  It's the same field, with the same values, as [`finale_type` in the calendar files](/api-reference/calendar#param-finale-type). Specials can carry it too. Anime episodes don't have it — [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) omits the key.
+</Update>
+
 <Update label="2026-10-09" description="Original language and trailer types on title pages, search sorting, scrobble threshold">
   <Badge icon="sparkles">New feature</Badge>
 
