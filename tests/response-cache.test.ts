@@ -129,6 +129,19 @@ describe('SimklClient shared cache behavior', () => {
     expect([...entries.values()].every(response => response.headers.get('Cache-Control') === 'public, max-age=3600')).toBe(true);
   });
 
+  test('rejects credential-bearing CDN URLs before requesting or caching', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+    for (const url of [
+      'https://data.simkl.in/calendar/v2/tv.json?access_token=secret',
+      'https://secret@data.simkl.in/calendar/v2/tv.json',
+    ]) {
+      await expect(client.request(url, { method: 'GET' }))
+        .rejects.toThrow('CDN requests cannot include credentials');
+    }
+    expect(fetchCount).toBe(0);
+    expect(putCount).toBe(0);
+  });
+
   test('does not populate cache for oversized CDN files', async () => {
     globalThis.fetch = (async () => {
       fetchCount++;
@@ -146,12 +159,18 @@ describe('SimklClient shared cache behavior', () => {
   test('stores explicit cache TTL and preserves Last-Modified', async () => {
     globalThis.fetch = (async () => new Response('[]', {
       status: 200,
-      headers: { 'Last-Modified': 'Tue, 13 Oct 2026 00:00:00 GMT' },
+      headers: {
+        'Last-Modified': 'Tue, 13 Oct 2026 00:00:00 GMT',
+        'Content-Encoding': 'gzip',
+        'Content-Length': '7',
+      },
     })) as typeof fetch;
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
     await client.request('https://data.simkl.in/discover/trending/tv/index.json', { method: 'GET' });
     const stored = [...entries.values()][0];
     expect(stored.headers.get('Cache-Control')).toBe('public, max-age=3600');
     expect(stored.headers.get('Last-Modified')).toBe('Tue, 13 Oct 2026 00:00:00 GMT');
+    expect(stored.headers.has('Content-Encoding')).toBe(false);
+    expect(stored.headers.has('Content-Length')).toBe(false);
   });
 });
