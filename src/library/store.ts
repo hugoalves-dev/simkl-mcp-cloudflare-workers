@@ -4,6 +4,11 @@ import {
   type LibraryActivitySnapshot, type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
 } from './types.js';
 
+/** Application events are correlated with Cloudflare's $metadata.traceId. No credentials or item details. */
+function logCacheStorageEvent(event: 'metadata_updated' | 'items_changed', details: Record<string, string | number | boolean>): void {
+  console.info(JSON.stringify({ component: 'simkl_library_cache', event, ...details }));
+}
+
 function isActivityTimestamp(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value));
 }
@@ -83,6 +88,10 @@ export class LibraryStore {
       }
       this.storage.sql.exec("INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('completion', ?)", metadata);
     });
+    logCacheStorageEvent('metadata_updated', { operation: 'initialize', forceCheck: freshness?.forceCheck ?? false });
+    if (candidate.items.length > 0) {
+      logCacheStorageEvent('items_changed', { operation: 'initialize', upserted: candidate.items.length, removed: 0, totalItems: candidate.items.length });
+    }
     return { initialized: true, itemCount: candidate.items.length };
   }
 
@@ -124,6 +133,7 @@ export class LibraryStore {
     this.storage.transactionSync(() => {
       this.storage.sql.exec("UPDATE library_metadata SET value_json = ? WHERE key = 'completion'", metadata);
     });
+    logCacheStorageEvent('metadata_updated', { operation: 'freshness', forceCheck: freshness.forceCheck });
   }
 
   /**
@@ -179,6 +189,12 @@ export class LibraryStore {
       }
       this.storage.sql.exec("INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('completion', ?)", metadata);
     });
+    logCacheStorageEvent('metadata_updated', { operation: 'snapshot', forceCheck: snapshot.forceCheck });
+    if (changes.length > 0 || removals.length > 0) {
+      logCacheStorageEvent('items_changed', {
+        operation: 'incremental', upserted: changes.length, removed: removals.length, totalItems: items.length,
+      });
+    }
   }
 
   readItems(): LibraryItemRow[] {
