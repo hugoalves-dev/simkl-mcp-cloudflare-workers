@@ -127,8 +127,15 @@ export class SimklClient {
   private async doRequest<T = unknown>(endpoint: string, options: RequestOptions, strictPagination = false): Promise<RequestResult<T>> {
     const url = this.buildUrl(endpoint, options.query);
     const requestUrl = new URL(url);
-    // Public CDN files must never receive a user's bearer token, even if supplied by a caller.
-    const authorization = requestUrl.origin === 'https://data.simkl.in' ? 'none' : options.authorization;
+    const isPublicCdn = requestUrl.origin === 'https://data.simkl.in';
+    // CDN responses are shared; never forward credentials in headers or URL parameters.
+    if (isPublicCdn && (
+      requestUrl.username || requestUrl.password ||
+      [...requestUrl.searchParams.keys()].some(key => /^(?:access_token|refresh_token|authorization|token)$/i.test(key))
+    )) {
+      throw new SimklApiError('simkl api error: CDN requests cannot include credentials', 0, null);
+    }
+    const authorization = isPublicCdn ? 'none' : options.authorization;
     const headers = this.buildHeaders(options.token, authorization);
 
     const init: RequestInit = {
@@ -234,6 +241,10 @@ export class SimklClient {
       // Cache only a successfully bounded, valid JSON response. Never cache an oversized body.
       if (cache && cacheKey && cachePolicy && response.ok) {
         const cacheHeaders = new Headers(response.headers);
+        // The body was decoded and re-serialized; original compression/length headers
+        // must not describe the new response or cached reads may be corrupted.
+        cacheHeaders.delete('Content-Encoding');
+        cacheHeaders.delete('Content-Length');
         cacheHeaders.set('Cache-Control', `public, max-age=${cachePolicy.ttlSeconds}`);
         try {
           await cache.put(cacheKey, new Response(responseText, {
