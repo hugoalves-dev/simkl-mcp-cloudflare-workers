@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 import { SimklClient } from '../src/api/client';
 import { CachedLibrary } from '../src/library/coordinator';
+import type { LibrarySnapshot } from '../src/library/types';
 const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original; });
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
 function setup(wait = async (_ms: number) => {}) {
@@ -165,4 +166,37 @@ test('successful write persists forced-refresh intent without persisting the acc
   await (s.cache as any).write('secret-write-token', '/sync/history', { method: 'POST', body: { movies: [] } });
   expect(s.saved().forceCheck).toBe(true);
   expect(JSON.stringify(s.saved())).not.toContain('secret-write-token');
+});
+
+
+test('coordinator saves only freshness for unchanged activities, invalidation and successful writes', async () => {
+  const snapshot = {
+    version: 1 as const,
+    items: { shows: [{ status: 'watching', show: { ids: { simkl: 1 } } }], movies: [], anime: [] },
+    activities,
+    checkedAt: 1,
+    forceCheck: false,
+  };
+  let saved: LibrarySnapshot = structuredClone(snapshot);
+  let itemSnapshots = 0, freshnessWrites = 0;
+  const store = {
+    async load() { return structuredClone(saved); },
+    async save(value: LibrarySnapshot) { itemSnapshots++; saved = structuredClone(value); },
+    async saveFreshness(value: { checkedAt: number; forceCheck: boolean }) {
+      freshnessWrites++;
+      saved = { ...saved, checkedAt: value.checkedAt, forceCheck: value.forceCheck };
+    },
+  };
+  const cache = new CachedLibrary(store, client, 300, () => 400_000);
+  await cache.invalidate();
+  expect(saved.forceCheck).toBe(true);
+  upstream([activities]);
+  await cache.read('token');
+  expect(saved.forceCheck).toBe(false);
+  expect(saved.checkedAt).toBe(400_000);
+  upstream([{ added: {} }]);
+  await cache.write('token', '/sync/history', { body: {} });
+  expect(saved.forceCheck).toBe(true);
+  expect(itemSnapshots).toBe(0);
+  expect(freshnessWrites).toBe(3);
 });
