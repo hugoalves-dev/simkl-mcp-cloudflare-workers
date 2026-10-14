@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { LibraryStore } from '../src/library/store';
 import { sqliteStorage } from './helpers/library-storage';
 import type { LibraryCandidate, LibraryItem } from '../src/library/types';
@@ -111,4 +111,37 @@ test('failed metadata-only update preserves previously persisted freshness', () 
   });
   expect(store.readItems()).toEqual(beforeRows);
   db.close();
+});
+
+
+test('structured cache logs report committed metadata and exact item deltas, never item contents', () => {
+  const { storage, db } = sqliteStorage();
+  const info = spyOn(console, 'info').mockImplementation(() => {});
+  try {
+    const store = new LibraryStore(storage);
+    store.commit(candidate(2), { checkedAt: 1, forceCheck: false });
+    store.saveFreshness({ checkedAt: 2, forceCheck: true });
+    const previous = store.loadSnapshot()!;
+    store.saveSnapshot({
+      ...previous,
+      checkedAt: 3,
+      forceCheck: false,
+      items: { ...previous.items, shows: [show(2, 'completed'), show(3)] },
+    });
+    const logs = info.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(logs).toEqual([
+      { component: 'simkl_library_cache', event: 'metadata_updated', operation: 'initialize', forceCheck: false },
+      { component: 'simkl_library_cache', event: 'items_changed', operation: 'initialize', upserted: 2, removed: 0, totalItems: 2 },
+      { component: 'simkl_library_cache', event: 'metadata_updated', operation: 'freshness', forceCheck: true },
+      { component: 'simkl_library_cache', event: 'metadata_updated', operation: 'snapshot', forceCheck: false },
+      { component: 'simkl_library_cache', event: 'items_changed', operation: 'incremental', upserted: 2, removed: 1, totalItems: 2 },
+    ]);
+    expect(JSON.stringify(logs)).not.toContain('Show 2');
+    db.exec("CREATE TRIGGER fail_cache_log BEFORE UPDATE ON library_metadata WHEN NEW.key = 'completion' BEGIN SELECT RAISE(ABORT, 'failed'); END");
+    expect(() => store.saveFreshness({ checkedAt: 4, forceCheck: true })).toThrow('failed');
+    expect(info.mock.calls).toHaveLength(logs.length);
+  } finally {
+    info.mockRestore();
+    db.close();
+  }
 });
