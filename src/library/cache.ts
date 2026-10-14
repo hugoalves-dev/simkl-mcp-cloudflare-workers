@@ -31,6 +31,7 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     this.library = new CachedLibrary({
       load: async () => this.store.loadSnapshot(),
       save: async snapshot => { this.store.saveSnapshot(snapshot); },
+      saveFreshness: async freshness => { this.store.saveFreshness(freshness); },
     }, this.client, parseLibraryCacheTtlSeconds(env.SIMKL_LIBRARY_CACHE_TTL_SECONDS));
   }
 
