@@ -157,6 +157,47 @@ describe('SimklClient request policy', () => {
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
     await expect(client.request('/large', { method: 'GET' })).rejects.toThrow('response too large');
   });
+
+  test('accepts known CDN JSON files larger than 2 MiB but smaller than 8 MiB', async () => {
+    const payload = { data: 'x'.repeat(3 * 1024 * 1024) };
+    globalThis.fetch = (async () => Response.json(payload)) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    for (const url of [
+      'https://data.simkl.in/calendar/v2/tv.json',
+      'https://data.simkl.in/calendar/v2/2026/8/tv.json',
+      'https://data.simkl.in/calendar/v2/2026/10/movie_release.json',
+      'https://data.simkl.in/discover/trending/tv/today_100.json',
+    ]) {
+      expect(await client.request(url, { method: 'GET' })).toEqual(payload);
+    }
+  });
+
+  test('rejects CDN JSON bodies over the 8 MiB limit', async () => {
+    globalThis.fetch = (async () => Response.json({ data: 'x'.repeat(8 * 1024 * 1024) })) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('https://data.simkl.in/calendar/v2/tv.json', { method: 'GET' }))
+      .rejects.toThrow('response too large');
+  });
+
+  test('keeps unrelated CDN and API responses at 2 MiB', async () => {
+    globalThis.fetch = (async () => Response.json({ data: 'x'.repeat(3 * 1024 * 1024) })) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    for (const url of [
+      'https://data.simkl.in/other/path.json',
+      '/search/tv',
+      'https://other.example/calendar/v2/tv.json',
+    ]) {
+      await expect(client.request(url, { method: 'GET' })).rejects.toThrow('response too large');
+    }
+  });
+
+  test('preserves the dedicated library limit above 2 MiB', async () => {
+    const payload = { data: 'x'.repeat(3 * 1024 * 1024) };
+    globalThis.fetch = (async () => Response.json(payload)) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    expect(await client.request('/sync/all-items', { method: 'GET', responseProfile: 'library' })).toEqual(payload);
+    await expect(client.request('/sync/all-items', { method: 'GET' })).rejects.toThrow('response too large');
+  });
 });
 
 describe('generated tool request policy configuration', () => {
