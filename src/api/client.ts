@@ -1,11 +1,12 @@
 // simkl api http client
 
 import { APP_NAME, APP_VERSION, USER_AGENT } from '../app-info';
-import { createResponseCacheKey, getResponseCachePolicy } from './response-cache';
+import { createResponseCacheKey, getResponseCachePolicy, isSupportedCdnFile } from './response-cache';
 
 const MAX_SERVER_RETRIES = 2;
 const SERVER_RETRY_BASE_DELAY_MS = 100;
 const RATE_LIMIT_RETRY_DELAY_MS = 1000;
+const CDN_RESPONSE_LIMIT_BYTES = 8 * 1024 * 1024;
 
 export interface SimklClientOptions {
   baseUrl: string;
@@ -125,7 +126,10 @@ export class SimklClient {
 
   private async doRequest<T = unknown>(endpoint: string, options: RequestOptions, strictPagination = false): Promise<RequestResult<T>> {
     const url = this.buildUrl(endpoint, options.query);
-    const headers = this.buildHeaders(options.token, options.authorization);
+    const requestUrl = new URL(url);
+    // Public CDN files must never receive a user's bearer token, even if supplied by a caller.
+    const authorization = requestUrl.origin === 'https://data.simkl.in' ? 'none' : options.authorization;
+    const headers = this.buildHeaders(options.token, authorization);
 
     const init: RequestInit = {
       method: options.method,
@@ -137,9 +141,9 @@ export class SimklClient {
       init.body = JSON.stringify(options.body);
     }
 
-    const cachePolicy = getResponseCachePolicy(new URL(url), options.method);
+    const cachePolicy = getResponseCachePolicy(requestUrl, options.method);
     const cache = cachePolicy && typeof caches !== 'undefined' ? caches.default : undefined;
-    const cacheKey = cache && cachePolicy ? createResponseCacheKey(new URL(url)) : undefined;
+    const cacheKey = cache && cachePolicy ? createResponseCacheKey(requestUrl) : undefined;
 
     let response: Response | undefined;
     if (cache && cacheKey) {
@@ -185,20 +189,6 @@ export class SimklClient {
         break;
       }
 
-      if (cache && cacheKey && cachePolicy && response.ok) {
-        const headers = new Headers(response.headers);
-        headers.set('Cache-Control', `public, max-age=${cachePolicy.ttlSeconds}`);
-        const cacheableResponse = new Response(response.clone().body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers,
-        });
-        try {
-          await cache.put(cacheKey, cacheableResponse);
-        } catch {
-          // Cache writes are best-effort; return the successful upstream response.
-        }
-      }
     }
     const responseHeaders = this.parseResponseHeaders(response);
 
@@ -216,7 +206,11 @@ export class SimklClient {
       const libraryResponse = response.ok && options.method === 'GET'
         && options.responseProfile === 'library'
         && /^\/sync\/(all-items|ratings)(\/(shows|movies|anime)(\/(watching|plantowatch|hold|completed|dropped))?)?$/.test(endpoint);
-      responseText = await this.readResponseBody(response, libraryResponse ? 16 * 1024 * 1024 : 2 * 1024 * 1024);
+      const responseLimit = libraryResponse ? 16 * 1024 * 1024
+        : response.ok && options.method === 'GET' && isSupportedCdnFile(requestUrl)
+          ? CDN_RESPONSE_LIMIT_BYTES
+          : 2 * 1024 * 1024;
+      responseText = await this.readResponseBody(response, responseLimit);
     } catch (error) {
       if (error instanceof SimklApiError) throw error;
       throw new SimklApiError('simkl api error: response body read failed', response.status, null, responseHeaders);
@@ -237,6 +231,20 @@ export class SimklClient {
 
     try {
       const data = JSON.parse(responseText);
+      // Cache only a successfully bounded, valid JSON response. Never cache an oversized body.
+      if (cache && cacheKey && cachePolicy && response.ok) {
+        const cacheHeaders = new Headers(response.headers);
+        cacheHeaders.set('Cache-Control', `public, max-age=${cachePolicy.ttlSeconds}`);
+        try {
+          await cache.put(cacheKey, new Response(responseText, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: cacheHeaders,
+          }));
+        } catch {
+          // Cache writes are best-effort; return the successful upstream response.
+        }
+      }
       return {
         data,
         pagination: this.parsePaginationInfo(response, strictPagination),
