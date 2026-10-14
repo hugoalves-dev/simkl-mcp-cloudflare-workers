@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, expect, spyOn, test } from 'bun:test';
 import { SimklClient } from '../src/api/client';
 import { CachedLibrary } from '../src/library/coordinator';
 import type { LibrarySnapshot } from '../src/library/types';
@@ -199,4 +199,26 @@ test('coordinator saves only freshness for unchanged activities, invalidation an
   expect(saved.forceCheck).toBe(true);
   expect(itemSnapshots).toBe(0);
   expect(freshnessWrites).toBe(3);
+});
+
+
+test('structured events distinguish TTL cache hits from unchanged upstream activities without leaking tokens', async () => {
+  const s = setup();
+  const info = spyOn(console, 'info').mockImplementation(() => {});
+  try {
+    upstream([activities, items, { movies: [] }, { anime: [] }]);
+    await s.cache.read('private-access-token');
+    await s.cache.read('private-access-token');
+    const requests = upstream([activities]);
+    await s.cache.read('private-access-token', true);
+    expect(requests()).toBe(1);
+    const events = info.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(events).toEqual([
+      { component: 'simkl_library_cache', event: 'cache_hit' },
+      { component: 'simkl_library_cache', event: 'activities_unchanged' },
+    ]);
+    expect(JSON.stringify(events)).not.toContain('private-access-token');
+  } finally {
+    info.mockRestore();
+  }
 });
