@@ -2,6 +2,11 @@ import { SimklApiError, type RequestOptions, type SimklClient } from '../api/cli
 import type { LibraryItems, LibrarySnapshot } from './types';
 import { refreshLibrary } from './refresh';
 import { LibraryWriteInvalidationError } from './errors';
+
+/** Cloudflare attaches $metadata.traceId to this console event in Workers Logs. */
+function logCacheEvent(event: 'cache_hit' | 'activities_unchanged'): void {
+  console.info(JSON.stringify({ component: 'simkl_library_cache', event }));
+}
 export interface LibraryStore {
   load(): Promise<LibrarySnapshot | undefined>;
   save(snapshot: LibrarySnapshot): Promise<void>;
@@ -36,11 +41,19 @@ export class CachedLibrary {
           else await this.store.save(previous);
         }
         const snapshot = await refreshLibrary(this.client, token, previous, { ttlSeconds: this.ttlSeconds, now: this.now(), force: forceRefresh });
-        if (snapshot !== previous) {
-          if (previous && this.store.saveFreshness
-            && JSON.stringify(snapshot.activities) === JSON.stringify(previous.activities)) {
+        if (snapshot === previous) {
+          // The TTL shortcut served the persisted snapshot without an upstream check.
+          if (previous) logCacheEvent('cache_hit');
+        } else {
+          const activitiesUnchanged = previous
+            && JSON.stringify(snapshot.activities) === JSON.stringify(previous.activities);
+          if (activitiesUnchanged && this.store.saveFreshness) {
             await this.store.saveFreshness(snapshot);
-          } else await this.store.save(snapshot);
+          } else {
+            await this.store.save(snapshot);
+          }
+          // Only log after persistence succeeds; never report a failed refresh as successful.
+          if (activitiesUnchanged) logCacheEvent('activities_unchanged');
         }
         this.retryRequired = false;
         return snapshot.items;
