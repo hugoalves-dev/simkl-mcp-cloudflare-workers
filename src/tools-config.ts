@@ -136,7 +136,7 @@ export const toolsWhitelist: ToolConfig[] = [
     description: 'Get TV episode airings from Simkl’s free v2 calendar file.',
     custom: {
       name: 'simkl_get_airing_shows',
-      schema: "z.object({ date: z.string().regex(/^(today|tomorrow|\\d{2}-\\d{2}-\\d{4})$/).optional(), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
+      schema: "z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).'), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
       imports: ["import { formatAiringTool } from '../src/api/airing.js';"],
       handler: `async (args: any) => {
         try {
@@ -153,7 +153,7 @@ export const toolsWhitelist: ToolConfig[] = [
     description: 'Get anime episode airings from Simkl’s free v2 calendar file.',
     custom: {
       name: 'simkl_get_airing_anime',
-      schema: "z.object({ date: z.string().regex(/^(today|tomorrow|\\d{2}-\\d{2}-\\d{4})$/).optional(), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
+      schema: "z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).'), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
       imports: ["import { formatAiringTool } from '../src/api/airing.js';"],
       handler: `async (args: any) => {
         try {

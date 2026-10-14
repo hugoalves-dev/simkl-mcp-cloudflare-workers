@@ -1,4 +1,5 @@
 import { describe, expect, spyOn, test } from 'bun:test';
+import { z } from 'zod';
 import { getAiringItems, formatAiringTool, SimklCalendarPayloadError } from '../src/api/airing';
 import { SimklClient } from '../src/api/client';
 import { registerTools } from '../generated/tools';
@@ -22,6 +23,11 @@ describe('simklCalendarPath', () => {
     expect(simklCalendarPath(type, date)).toBe(`https://data.simkl.in/calendar/v2/2026/8/${file}`);
   });
 
+  test.each(['tv', 'anime'] as const)('maps %s on 15-03-2026 to the March archive', type => {
+    expect(simklCalendarPath(type, '15-03-2026'))
+      .toBe(`https://data.simkl.in/calendar/v2/2026/3/${type}.json`);
+  });
+
   test('rejects impossible archive dates', () => {
     expect(() => simklCalendarPath('tv', '31-02-2026')).toThrow('Invalid calendar date');
   });
@@ -29,6 +35,31 @@ describe('simklCalendarPath', () => {
 
 
 const sample = () => structuredClone(fixture);
+
+describe('airing MCP date schema regression', () => {
+  test.each(['simkl_get_airing_shows', 'simkl_get_airing_anime'])(
+    '%s exposes arbitrary calendar dates as a plain string, not an enum',
+    toolName => {
+      const registered = new Map<string, any>();
+      registerTools({
+        registerTool(name: string, config: { inputSchema: unknown }) {
+          registered.set(name, config.inputSchema);
+        },
+      } as any, {} as any, () => undefined);
+
+      const inputSchema = registered.get(toolName);
+      expect(inputSchema).toBeDefined();
+      for (const date of [undefined, 'today', 'tomorrow', '15-03-2026', '22-08-2022']) {
+        expect(inputSchema.safeParse({ date, sort: 'time' }).success).toBe(true);
+      }
+
+      const publicSchema = z.toJSONSchema(inputSchema) as { properties?: Record<string, any> };
+      expect(publicSchema.properties?.date?.type).toBe('string');
+      expect(publicSchema.properties?.date?.enum).toBeUndefined();
+      expect(publicSchema.properties?.date?.pattern).toBeUndefined();
+    },
+  );
+});
 
 describe('Simkl calendar v2 payload regression', () => {
   test('joins entries with metadata and sorts a monthly archive by rank', async () => {
