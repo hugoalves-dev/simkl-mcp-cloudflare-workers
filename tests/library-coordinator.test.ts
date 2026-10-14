@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 import { SimklClient } from '../src/api/client';
 import { CachedLibrary } from '../src/library/coordinator';
+import type { LibrarySnapshot } from '../src/library/types';
 const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original; });
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
 function setup(wait = async (_ms: number) => {}) {
@@ -176,11 +177,11 @@ test('coordinator saves only freshness for unchanged activities, invalidation an
     checkedAt: 1,
     forceCheck: false,
   };
-  let saved = structuredClone(snapshot);
+  let saved: LibrarySnapshot = structuredClone(snapshot);
   let itemSnapshots = 0, freshnessWrites = 0;
   const store = {
     async load() { return structuredClone(saved); },
-    async save(value: typeof snapshot) { itemSnapshots++; saved = structuredClone(value); },
+    async save(value: LibrarySnapshot) { itemSnapshots++; saved = structuredClone(value); },
     async saveFreshness(value: { checkedAt: number; forceCheck: boolean }) {
       freshnessWrites++;
       saved = { ...saved, checkedAt: value.checkedAt, forceCheck: value.forceCheck };
