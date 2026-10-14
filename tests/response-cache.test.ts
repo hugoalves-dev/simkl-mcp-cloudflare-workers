@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { SimklClient, SimklApiError } from '../src/api/client';
 import { createResponseCacheKey, getResponseCachePolicy, RESPONSE_CACHE_TTL_SECONDS } from '../src/api/response-cache';
 
@@ -127,6 +127,112 @@ describe('SimklClient shared cache behavior', () => {
     expect([...entries.keys()].every(key => !key.includes('secret'))).toBe(true);
     expect(entries.size).toBe(2);
     expect([...entries.values()].every(response => response.headers.get('Cache-Control') === 'public, max-age=3600')).toBe(true);
+  });
+
+  test('records safe calendar HIT, MISS, and STORE events without logging credentials or URLs', async () => {
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'secret-client-id' });
+      const rolling = 'https://data.simkl.in/calendar/v2/tv.json?debug=query-secret';
+      const archive = 'https://data.simkl.in/calendar/v2/2026/8/anime.json';
+
+      await client.request(rolling, { method: 'GET', token: 'user-secret-one' });
+      await client.request(rolling, { method: 'GET', token: 'user-secret-two' });
+      await client.request(archive, { method: 'GET', token: 'user-secret-three' });
+      await client.request(archive, { method: 'GET', token: 'user-secret-four' });
+      await client.request('/search/tv', { method: 'GET' });
+
+      const events = logSpy.mock.calls
+        .filter(args => args[0] === 'simkl.calendar.cache')
+        .map(args => args[1] as Record<string, unknown>);
+      const current = { resource: 'calendar/v2', media: 'tv', period: 'current', ttlSeconds: 3600 };
+      const monthly = {
+        resource: 'calendar/v2', media: 'anime', period: 'monthly',
+        year: 2026, month: 8, ttlSeconds: 3600,
+      };
+      expect(events).toEqual([
+        { event: 'MISS', ...current },
+        { event: 'STORE', ...current },
+        { event: 'HIT', ...current },
+        { event: 'MISS', ...monthly },
+        { event: 'STORE', ...monthly },
+        { event: 'HIT', ...monthly },
+      ]);
+      expect(fetchCount).toBe(3); // Rolling calendar, archive, and non-calendar catalog.
+      expect(putCount).toBe(3);
+      const serializedLogs = JSON.stringify(logSpy.mock.calls);
+      for (const secret of ['query-secret', 'secret-client-id', 'user-secret-one', 'user-secret-two', 'user-secret-three', 'user-secret-four']) {
+        expect(serializedLogs).not.toContain(secret);
+      }
+      expect(serializedLogs).not.toContain('https://');
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test('reports cache errors without exposing exception details or failing the CDN response', async () => {
+    Object.defineProperty(globalThis, 'caches', {
+      configurable: true,
+      value: {
+        default: {
+          match: async () => { throw new Error('private-match-error'); },
+          put: async () => { throw new Error('private-put-error'); },
+        },
+      },
+    });
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+      expect(await client.request('https://data.simkl.in/calendar/v2/movie_release.json', { method: 'GET' }))
+        .toEqual({ count: 1 });
+      const events = logSpy.mock.calls
+        .filter(args => args[0] === 'simkl.calendar.cache')
+        .map(args => args[1] as Record<string, unknown>);
+      expect(events).toEqual([
+        { event: 'ERROR', resource: 'calendar/v2', media: 'movie_release', period: 'current', ttlSeconds: 3600, operation: 'match' },
+        { event: 'ERROR', resource: 'calendar/v2', media: 'movie_release', period: 'current', ttlSeconds: 3600, operation: 'put' },
+      ]);
+      expect(JSON.stringify(logSpy.mock.calls)).not.toContain('private-match-error');
+      expect(JSON.stringify(logSpy.mock.calls)).not.toContain('private-put-error');
+      expect(fetchCount).toBe(1);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test('reports an unavailable Cache API without claiming a cache hit or store', async () => {
+    delete (globalThis as typeof globalThis & { caches?: CacheStorage }).caches;
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+      expect(await client.request('https://data.simkl.in/calendar/v2/tv.json', { method: 'GET' }))
+        .toEqual({ count: 1 });
+      expect(logSpy.mock.calls
+        .filter(args => args[0] === 'simkl.calendar.cache')
+        .map(args => args[1])).toEqual([
+          { event: 'UNAVAILABLE', resource: 'calendar/v2', media: 'tv', period: 'current', ttlSeconds: 3600 },
+        ]);
+      expect(fetchCount).toBe(1);
+      expect(putCount).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test('does not log a STORE event for invalid calendar JSON', async () => {
+    globalThis.fetch = (async () => new Response('invalid-json')) as typeof fetch;
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+      await expect(client.request('https://data.simkl.in/calendar/v2/tv.json', { method: 'GET' }))
+        .rejects.toThrow('invalid json response');
+      expect(logSpy.mock.calls
+        .filter(args => args[0] === 'simkl.calendar.cache')
+        .map(args => (args[1] as { event: string }).event)).toEqual(['MISS']);
+      expect(putCount).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
   test('rejects credential-bearing CDN URLs before requesting or caching', async () => {
