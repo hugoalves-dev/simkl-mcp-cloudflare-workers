@@ -1,0 +1,55 @@
+{
+  "calendar": [
+    {
+      "simkl_id": 1157808,
+      "date": "2026-08-22T20:00:00Z",
+      "episode": {
+        "season": 11,
+        "episode": 4,
+        "title": "Episode 4"
+      }
+    },
+    {
+      "simkl_id": 42,
+      "date": "2026-08-22T08:00:00Z",
+      "episode": {
+        "season": 1,
+        "episode": 2,
+        "title": "Start"
+      }
+    },
+    {
+      "simkl_id": 1157808,
+      "date": "2026-08-23T06:00:00Z",
+      "episode": {
+        "season": 11,
+        "episode": 5,
+        "title": "Episode 5"
+      }
+    },
+    {
+      "simkl_id": 999,
+      "date": "2026-08-22T09:00:00Z",
+      "episode": {
+        "episode": 1
+      }
+    }
+  ],
+  "metadata": {
+    "42": {
+      "title": "Another Show",
+      "rank": 100,
+      "ids": {
+        "simkl_id": 42
+      }
+    },
+    "1157808": {
+      "title": "Over the Atlantic",
+      "rank": 36650,
+      "ids": {
+        "simkl_id": 1157808,
+        "slug": "over-the-atlantic"
+      }
+    }
+  }
+}
