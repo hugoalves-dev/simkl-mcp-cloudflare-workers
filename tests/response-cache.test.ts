@@ -24,8 +24,20 @@ describe('shared response cache policy', () => {
       .toBe(RESPONSE_CACHE_TTL_SECONDS.details);
     expect(getResponseCachePolicy(new URL('https://data.simkl.in/discover/trending/tv/index.json'), 'GET')?.ttlSeconds)
       .toBe(RESPONSE_CACHE_TTL_SECONDS.trending);
-    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/tv.json'), 'GET')).toBeNull();
-    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/2026/8/anime.json'), 'GET')).toBeNull();
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/tv.json'), 'GET')?.ttlSeconds)
+      .toBe(RESPONSE_CACHE_TTL_SECONDS.calendar);
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/2026/8/anime.json'), 'GET')?.ttlSeconds)
+      .toBe(RESPONSE_CACHE_TTL_SECONDS.calendar);
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/movie_release.json'), 'GET')?.ttlSeconds)
+      .toBe(RESPONSE_CACHE_TTL_SECONDS.calendar);
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/2026/10/movie_release.json'), 'GET')?.ttlSeconds)
+      .toBe(RESPONSE_CACHE_TTL_SECONDS.calendar);
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/tv.json'), 'POST')).toBeNull();
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/2026/13/tv.json'), 'GET')).toBeNull();
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/calendar/v2/other.json'), 'GET')).toBeNull();
+    expect(getResponseCachePolicy(new URL('https://data.simkl.in/private/data.json'), 'GET')).toBeNull();
+    expect(getResponseCachePolicy(new URL('https://other.example/calendar/v2/tv.json'), 'GET')).toBeNull();
+    expect(getResponseCachePolicy(new URL('http://data.simkl.in/calendar/v2/tv.json'), 'GET')).toBeNull();
     expect(getResponseCachePolicy(new URL('https://api.simkl.com/users/settings'), 'GET')).toBeNull();
     expect(getResponseCachePolicy(new URL('https://api.simkl.com/search/tv?q=x'), 'POST')).toBeNull();
   });
@@ -87,6 +99,48 @@ describe('SimklClient shared cache behavior', () => {
     await expect(client.request('/search/tv', { method: 'GET' })).rejects.toBeInstanceOf(SimklApiError);
     expect(putCount).toBe(0);
     expect(fetchCount).toBe(3);
+  });
+
+  test('caches rolling calendars and monthly archives by full URL without user credentials', async () => {
+    const requests: Array<{ url: string; auth: string | null }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      fetchCount++;
+      requests.push({
+        url: String(input),
+        auth: new Headers(init?.headers).get('Authorization'),
+      });
+      return Response.json({ pathname: new URL(String(input)).pathname, count: fetchCount });
+    }) as typeof fetch;
+
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+    const rolling = 'https://data.simkl.in/calendar/v2/tv.json';
+    const archive = 'https://data.simkl.in/calendar/v2/2026/8/tv.json';
+
+    const first = await client.request(rolling, { method: 'GET', token: 'secret-one' });
+    const second = await client.request(rolling, { method: 'GET', token: 'secret-two' });
+    expect(second).toEqual(first);
+    expect(await client.request(archive, { method: 'GET', token: 'secret-three' }))
+      .toEqual({ pathname: '/calendar/v2/2026/8/tv.json', count: 2 });
+    expect(fetchCount).toBe(2);
+    expect(putCount).toBe(2);
+    expect(requests.every(request => request.auth === null)).toBe(true);
+    expect([...entries.keys()].every(key => !key.includes('secret'))).toBe(true);
+    expect(entries.size).toBe(2);
+    expect([...entries.values()].every(response => response.headers.get('Cache-Control') === 'public, max-age=3600')).toBe(true);
+  });
+
+  test('does not populate cache for oversized CDN files', async () => {
+    globalThis.fetch = (async () => {
+      fetchCount++;
+      return Response.json({ payload: 'x'.repeat(8 * 1024 * 1024) });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+    const url = 'https://data.simkl.in/calendar/v2/tv.json';
+
+    await expect(client.request(url, { method: 'GET' })).rejects.toThrow('response too large');
+    await expect(client.request(url, { method: 'GET' })).rejects.toThrow('response too large');
+    expect(fetchCount).toBe(2);
+    expect(putCount).toBe(0);
   });
 
   test('stores explicit cache TTL and preserves Last-Modified', async () => {
