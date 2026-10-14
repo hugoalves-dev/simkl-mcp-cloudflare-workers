@@ -5,6 +5,7 @@ import { LibraryWriteInvalidationError } from './errors';
 export interface LibraryStore {
   load(): Promise<LibrarySnapshot | undefined>;
   save(snapshot: LibrarySnapshot): Promise<void>;
+  saveFreshness?(freshness: Pick<LibrarySnapshot, 'checkedAt' | 'forceCheck'>): Promise<void>;
 }
 /** Serializes network refresh and persistence, including cross-session invalidation. */
 export class CachedLibrary {
@@ -31,10 +32,16 @@ export class CachedLibrary {
         if (forceRefresh && previous && !previous.forceCheck) {
           if (previous.version !== 1) throw new Error('Unsupported library cache schema');
           previous = { ...previous, forceCheck: true };
-          await this.store.save(previous);
+          if (this.store.saveFreshness) await this.store.saveFreshness(previous);
+          else await this.store.save(previous);
         }
         const snapshot = await refreshLibrary(this.client, token, previous, { ttlSeconds: this.ttlSeconds, now: this.now(), force: forceRefresh });
-        if (snapshot !== previous) await this.store.save(snapshot);
+        if (snapshot !== previous) {
+          if (previous && this.store.saveFreshness
+            && JSON.stringify(snapshot.activities) === JSON.stringify(previous.activities)) {
+            await this.store.saveFreshness(snapshot);
+          } else await this.store.save(snapshot);
+        }
         this.retryRequired = false;
         return snapshot.items;
       } catch (error) {
@@ -51,7 +58,8 @@ export class CachedLibrary {
       const previous = await this.store.load();
       if (previous) {
         if (previous.version !== 1) throw new Error('Unsupported library cache schema');
-        await this.store.save({ ...previous, forceCheck: true });
+        if (this.store.saveFreshness) await this.store.saveFreshness({ ...previous, forceCheck: true });
+        else await this.store.save({ ...previous, forceCheck: true });
       }
     });
   }
@@ -80,7 +88,10 @@ export class CachedLibrary {
         const previous = await this.store.load();
         if (previous) {
           if (previous.version !== 1) throw new Error('Unsupported library cache schema');
-          if (!previous.forceCheck) await this.store.save({ ...previous, forceCheck: true });
+          if (!previous.forceCheck) {
+            if (this.store.saveFreshness) await this.store.saveFreshness({ ...previous, forceCheck: true });
+            else await this.store.save({ ...previous, forceCheck: true });
+          }
         }
       } catch {
         // The upstream mutation is already successful. Preserve retry intent in
