@@ -51,28 +51,8 @@ function validateActivities(value: unknown): Activities {
   return data;
 }
 async function fetchItems(client: SimklClient, endpoint: string, options: RequestOptions): Promise<LibraryItems> {
-  const result = empty();
-  let page = 1, pageCount = 1;
-  let advertisedTotal: number | undefined;
-  const received = new Set<string>();
-  do {
-    const response = await client.requestPaginated<unknown>(endpoint, { ...options, responseProfile: 'library', pagination: { page, limit: 100, requireComplete: true } });
-    const data = validateItems(response.data);
-    for (const type of MEDIA_TYPES) {
-      result[type].push(...data[type]);
-      for (const item of data[type]) received.add(`${type}:${libraryItemId(item)}`);
-    }
-    if (response.pagination) {
-      const pagination = response.pagination;
-      if (pagination.page !== page || !Number.isSafeInteger(pagination.pageCount) || pagination.pageCount < page || (page > 1 && pagination.pageCount !== pageCount)) throw new Error('Invalid Simkl library pagination');
-      if (advertisedTotal !== undefined && advertisedTotal !== pagination.itemCount) throw new Error('Inconsistent Simkl library item total');
-      advertisedTotal = pagination.itemCount;
-      pageCount = pagination.pageCount;
-    } else if (page > 1) throw new Error('Missing Simkl library pagination');
-    page++;
-  } while (page <= pageCount);
-  if (advertisedTotal !== undefined && received.size !== advertisedTotal) throw new Error('Incomplete Simkl library response');
-  return result;
+  const response = await client.request<unknown>(endpoint, { ...options, responseProfile: 'library' });
+  return validateItems(response);
 }
 function merge(items: LibraryItems, updates: LibraryItems): void {
   for (const type of MEDIA_TYPES) {

@@ -44,28 +44,11 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
   }
 
   async function pull(path: string, mediaType: MediaType): Promise<void> {
-    let page = 1, pageCount = 1;
-    let advertisedTotal: number | undefined;
-    const received = new Set<string>();
-    do {
-      const response = await client.requestPaginated<unknown>(path, {
-        method: 'GET', token: accessToken, responseProfile: 'library',
-        pagination: { page, limit: 100, requireComplete: true },
-      });
-      append(response.data, mediaType);
-      if (isRecord(response.data) && Array.isArray(response.data[mediaType])) {
-        const key = mediaType === 'movies' ? 'movie' : 'show';
-        for (const item of response.data[mediaType]) received.add(normalizeSimklId(item[key].ids.simkl)!);
-      }
-      if (response.pagination) {
-        if (response.pagination.page !== page || (page > 1 && response.pagination.pageCount !== pageCount)) throw new Error('Invalid Simkl library pagination');
-        if (advertisedTotal !== undefined && advertisedTotal !== response.pagination.itemCount) throw new Error('Inconsistent Simkl library item total');
-        advertisedTotal = response.pagination.itemCount;
-        pageCount = response.pagination.pageCount;
-      } else if (page > 1) throw new Error('Missing Simkl library pagination');
-      page++;
-    } while (page <= pageCount);
-    if (advertisedTotal !== undefined && received.size !== advertisedTotal) throw new Error('Incomplete Simkl library response');
+    // /sync/all-items returns the entire filtered library without pagination.
+    const response = await client.request<unknown>(path, {
+      method: 'GET', token: accessToken, responseProfile: 'library',
+    });
+    append(response, mediaType);
   }
   for (const mediaType of MEDIA_TYPES) {
     try {

@@ -79,14 +79,26 @@ for (const activities of [{}, { all: 'bad' }, { all: '2026-09-01T00:00:00Z' }]) 
 test('documented empty objects initialize an empty library', async () => {
   upstream([{ all: oldDate }, {}, {}, {}]); expect((await refreshLibrary(client, 'token', undefined, opts)).items).toEqual({ shows: [], movies: [], anime: [] });
 });
-function paged(data: unknown, page: number, count: number) { return new Response(JSON.stringify(data), { headers: { 'X-Pagination-Page': String(page), 'X-Pagination-Limit': '100', 'X-Pagination-Page-Count': String(count), 'X-Pagination-Item-Count': '2' } }); }
-test('aggregates every page', async () => {
-  const calls = upstream([{ all: newDate, tv_shows: { watching: newDate } }, paged({ shows: [item()] }, 1, 2), paged({ shows: [item(2)] }, 2, 2)]);
-  const result = await refreshLibrary(client, 'token', previous(), opts); expect(result.items.shows).toHaveLength(2); expect(calls[2].url.searchParams.get('page')).toBe('2');
+test('delta, ratings and membership each use one unpaginated request in order', async () => {
+  const updates = Array.from({ length: 101 }, (_, id) => item(id + 1, 'completed'));
+  const calls = upstream([
+    { all: newDate, tv_shows: { completed: newDate, rated_at: newDate, removed_from_list: newDate } },
+    { shows: updates },
+    { shows: [{ show: { ids: { simkl: 1 } }, user_rating: null }] },
+    { shows: updates.map(entry => ({ show: { ids: entry.show.ids } })) },
+  ]);
+  const result = await refreshLibrary(client, 'token', previous(), opts);
+  expect(result.items.shows).toHaveLength(101);
+  expect(result.items.shows[0].status).toBe('completed');
+  expect(result.items.shows[0].user_rating).toBeNull();
+  expect(calls.map(call => call.url.pathname)).toEqual(['/sync/activities', '/sync/all-items', '/sync/ratings', '/sync/all-items']);
+  expect([...calls[1].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['date_from', oldDate]]);
+  expect([...calls[2].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['date_from', oldDate]]);
+  expect([...calls[3].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['extended', 'simkl_ids_only']]);
 });
-test('malformed later page cannot change previous snapshot', async () => {
+test('malformed delta cannot change previous snapshot', async () => {
   const before = previous(), saved = structuredClone(before);
-  upstream([{ all: newDate, tv_shows: { watching: newDate } }, paged({ shows: [item(2)] }, 1, 2), paged({ shows: 'broken' }, 2, 2)]);
+  upstream([{ all: newDate, tv_shows: { watching: newDate } }, { shows: 'broken' }]);
   await expect(refreshLibrary(client, 'token', before, opts)).rejects.toThrow(); expect(before).toEqual(saved);
 });
 test('malformed membership is not empty', async () => {
@@ -100,18 +112,13 @@ test('documented empty object membership removes every cached item', async () =>
   upstream([{ all: newDate, tv_shows: { watching: oldDate, removed_from_list: newDate } }, {}]);
   expect((await refreshLibrary(client, 'token', previous(), opts)).items.shows).toEqual([]);
 });
-test('incomplete first-page pagination cannot commit a truncated library', async () => {
+test('malformed membership after a valid delta preserves the entire previous snapshot', async () => {
   const before = previous(), saved = structuredClone(before);
-  upstream([{ all: newDate, tv_shows: { watching: newDate } }, new Response(JSON.stringify({ shows: [item(2)] }), { headers: { 'X-Pagination-Page': '1', 'X-Pagination-Limit': '100', 'X-Pagination-Page-Count': '2' } })]);
-  await expect(refreshLibrary(client, 'token', before, opts)).rejects.toThrow(); expect(before).toEqual(saved);
-});
-for (const value of ['2junk', '-2', '1.5', '9007199254740992']) test('malformed advertised page count rejects '+value, async () => {
-  upstream([{ all: newDate, tv_shows: { watching: newDate } }, new Response(JSON.stringify({ shows: [item()] }), { headers: { 'X-Pagination-Page': '1', 'X-Pagination-Limit': '100', 'X-Pagination-Page-Count': value, 'X-Pagination-Item-Count': '1' } })]);
-  await expect(refreshLibrary(client, 'token', previous(), opts)).rejects.toThrow();
-});
-test('advertised membership item total must match all received pages', async () => {
-  const before = previous(); before.items.shows.push(item(2)); const saved = structuredClone(before);
-  upstream([{ all: newDate, tv_shows: { watching: oldDate, removed_from_list: newDate } }, paged({ shows: [{ show: { ids: { simkl: 1 } } }] }, 1, 2), paged({}, 2, 2)]);
+  upstream([
+    { all: newDate, tv_shows: { watching: newDate, removed_from_list: newDate } },
+    { shows: [item(2, 'completed')] },
+    { shows: [{ show: { ids: { simkl: 0 } } }] },
+  ]);
   await expect(refreshLibrary(client, 'token', before, opts)).rejects.toThrow(); expect(before).toEqual(saved);
 });
 test('mixed unknown and recognized membership keys cannot clear the cache', async () => {
