@@ -38,7 +38,7 @@ function validateItems(value: unknown): LibraryItems {
 function validateActivities(value: unknown): Activities {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid Simkl activities');
   const data = value as Activities;
-  if (typeof data.all !== 'string' || !/^\d{4}-\d\d-\d\dT/.test(data.all) || !Number.isFinite(Date.parse(data.all))) throw new Error('Invalid Simkl activity watermark');
+  if (data.all !== null && (typeof data.all !== 'string' || !/^\d{4}-\d\d-\d\dT/.test(data.all) || !Number.isFinite(Date.parse(data.all)))) throw new Error('Invalid Simkl activity watermark');
   for (const category of ['tv_shows', 'movies', 'anime'] as const) {
     const bucket = data[category];
     if (bucket === undefined) continue;
@@ -93,12 +93,13 @@ export async function refreshLibrary(client: SimklClient, token: string, previou
   if (previous && previous.version !== 1) throw new Error('Unsupported library cache schema');
   if (previous && !previous.forceCheck && !options.force && options.now >= previous.checkedAt && options.now - previous.checkedAt < options.ttlSeconds * 1000) return previous;
   const activities = validateActivities(await client.request('/sync/activities', { method: 'GET', token }));
-  if (previous && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
-  const items = previous ? structuredClone(previous.items) : empty();
-  if (!previous) {
+  if (previous && activities.all !== null && previous.activities.all !== null && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
+  const items = previous && previous.activities.all !== null && activities.all !== null ? structuredClone(previous.items) : empty();
+  // A null watermark has no date_from baseline; the first activity needs Phase 1.
+  if (!previous || previous.activities.all === null) {
     const initial = await fetchInitialLibrary(client, token, activities);
     for (const row of initial.items) items[row.mediaType].push(JSON.parse(row.itemJson));
-  } else if (activities.all !== previous.activities.all) {
+  } else if (activities.all !== null && activities.all !== previous.activities.all) {
     const changed = (fields: string[]) => (['tv_shows', 'movies', 'anime'] as const).some(category => fields.some(field => {
       const next = activities[category]?.[field];
       // Missing categories do not imply a change; Simkl may omit unused buckets.

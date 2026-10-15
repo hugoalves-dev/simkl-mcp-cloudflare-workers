@@ -99,3 +99,24 @@ test('partial failure leaves no snapshot and rejected coordination permits retry
   expect(calls).toHaveLength(7);
   adapter.db.close();
 });
+
+test('empty account reads persist null activities across object reconstruction without media pulls', async () => {
+  const adapter = sqliteStorage();
+  const calls: string[] = [];
+  globalThis.fetch = (async input => {
+    calls.push(new URL(String(input)).pathname);
+    return Response.json({ all: null });
+  }) as typeof fetch;
+  try {
+    const object = cache(adapter.storage);
+    expect(await object.read('token')).toEqual({ shows: [], movies: [], anime: [] });
+    expect(await object.ensureInitialized('token')).toEqual({ initialized: true, itemCount: 0 });
+    expect(await object.read('token')).toEqual({ shows: [], movies: [], anime: [] });
+    const reconstructed = cache(adapter.storage);
+    expect(await reconstructed.read('token')).toEqual({ shows: [], movies: [], anime: [] });
+    expect(await reconstructed.readItems()).toEqual([]);
+    expect(calls).toEqual(['/sync/activities']);
+    expect(await reconstructed.read('token', true)).toEqual({ shows: [], movies: [], anime: [] });
+    expect(calls).toEqual(['/sync/activities', '/sync/activities']);
+  } finally { adapter.db.close(); }
+});
