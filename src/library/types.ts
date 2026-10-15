@@ -44,7 +44,7 @@ export interface LibraryItem {
   [key: string]: unknown;
 }
 export type LibraryItems = Record<MediaType, LibraryItem[]>;
-export interface Activities { all: string; tv_shows?: Record<string, string | null>; movies?: Record<string, string | null>; anime?: Record<string, string | null>; [key: string]: unknown }
+export interface Activities { all: string | null; tv_shows?: Record<string, string | null>; movies?: Record<string, string | null>; anime?: Record<string, string | null>; [key: string]: unknown }
 export interface LibrarySnapshot { version: 1; items: LibraryItems; activities: Activities; checkedAt: number; forceCheck: boolean }
 export interface LibraryActivitySnapshot { activities: Activities; checkedAt: number; forceCheck: boolean }
 export interface UserProfileActivities { all: string | null; settings?: Record<string, unknown>; [key: string]: unknown }

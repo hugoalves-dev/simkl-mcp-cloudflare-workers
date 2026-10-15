@@ -7,9 +7,11 @@ import {
 
 export async function fetchInitialLibrary(client: SimklClient, accessToken: string, knownActivities?: Record<string, unknown>): Promise<LibraryCandidate> {
   const activities = knownActivities ?? await client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken });
-  if (!isRecord(activities) || typeof activities.all !== 'string' || !Number.isFinite(Date.parse(activities.all))) {
+  if (!isRecord(activities) || (activities.all !== null && (typeof activities.all !== 'string' || !Number.isFinite(Date.parse(activities.all))))) {
     throw new Error('Invalid Simkl activities snapshot');
   }
+
+  if (activities.all === null) return { activities, items: [] };
 
   const items = new Map<string, LibraryItemRow>();
   let pendingBytes = 0;

@@ -101,7 +101,7 @@ export class LibraryStore {
     const row = this.storage.sql.exec<{ value_json: string }>("SELECT value_json FROM library_metadata WHERE key = 'completion'").toArray()[0];
     if (!row) return undefined;
     const metadata = JSON.parse(row.value_json);
-    if (!isRecord(metadata.activities) || typeof metadata.activities.all !== 'string' || !Number.isFinite(Date.parse(metadata.activities.all))) throw new Error('Invalid cached library activities');
+    if (!isRecord(metadata.activities) || (metadata.activities.all !== null && (typeof metadata.activities.all !== 'string' || !Number.isFinite(Date.parse(metadata.activities.all))))) throw new Error('Invalid cached library activities');
     const checkedAt = metadata.checkedAt ?? metadata.completedAt;
     if (!Number.isFinite(checkedAt)) throw new Error('Invalid cached library check time');
     return { activities: metadata.activities, checkedAt, forceCheck: metadata.forceCheck === true };
