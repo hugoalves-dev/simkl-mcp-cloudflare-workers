@@ -1,3 +1,4 @@
+import { routes } from './http-routes';
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import type { TokenExchangeCallbackOptions, TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
 import { SimklMCP } from './mcp-agent.js';
@@ -79,21 +80,28 @@ export function createSimklTokenExchangeCallback(env: SimklOAuthEnv) {
 export function createOAuthProvider(env: Env): OAuthProvider {
   return new OAuthProvider({
     apiHandlers: {
-      '/sse': SimklMCP.serveSSE('/sse'),
-      '/mcp': SimklMCP.serve('/mcp'),
+      [routes.sse]: SimklMCP.serveSSE(routes.sse),
+      [routes.mcp]: SimklMCP.serve(routes.mcp),
     },
 
     defaultHandler: authHandler as unknown as ExportedHandler,
 
-    authorizeEndpoint: '/auth/simkl',
-    tokenEndpoint: '/token',
-    clientRegistrationEndpoint: '/register',
+    authorizeEndpoint: routes.authorize,
+    tokenEndpoint: routes.token,
+    clientRegistrationEndpoint: routes.register,
     tokenExchangeCallback: createSimklTokenExchangeCallback(env),
   });
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const path = new URL(request.url).pathname;
+    if ([routes.home, routes.index, routes.catalog].some(route => route === path)) {
+      const asset = await env.ASSETS.fetch(request);
+      const response = new Response(asset.body, asset);
+      response.headers.set('Cache-Control', 'no-cache');
+      return response;
+    }
     return createOAuthProvider(env).fetch(request, env, ctx);
   },
 };

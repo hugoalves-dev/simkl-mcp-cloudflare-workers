@@ -1,3 +1,4 @@
+import { routes } from './http-routes';
 import {
   createPkcePair,
   exchangeAuthorizationCode,
@@ -63,7 +64,7 @@ async function fetchSimklUserId(simklToken: string, env: Env): Promise<string | 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === '/auth/simkl') {
+    if (url.pathname === routes.authorize) {
       try {
         const oauthRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
         const state = crypto.randomUUID();
@@ -84,7 +85,7 @@ export default {
       }
     }
 
-    if (url.pathname === '/oauth/callback') {
+    if (url.pathname === routes.callback) {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       if (url.searchParams.has('error') || !code || !state || url.searchParams.get('iss') !== SIMKL_ISSUER) {
@@ -134,7 +135,7 @@ export default {
       }
     }
 
-    if (url.pathname === '/health') {
+    if (url.pathname === routes.health) {
       return new Response(JSON.stringify({ status: 'ok', service: APP_NAME }), {
         headers: { 'content-type': 'application/json' },
       });

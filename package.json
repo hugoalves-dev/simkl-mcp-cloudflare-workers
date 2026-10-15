@@ -12,7 +12,10 @@
     "deploy": "wrangler deploy",
     "deploy:production": "wrangler deploy --env production",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "capabilities": "bun run scripts/capabilities.ts",
+    "capabilities:check": "bun run capabilities && git diff --exit-code -- static/capabilities.json",
+    "smoke:capabilities": "bun run scripts/smoke-capabilities.ts"
   },
   "keywords": [
     "mcp",
