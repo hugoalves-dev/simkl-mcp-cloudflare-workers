@@ -80,6 +80,7 @@ jobs:
           name: generated-bindings
           path: generated/
 
+      - run: bun run capabilities:check
       - run: bun test
       - name: Test Worker RPC and persistence
         run: node tests/library-runtime/smoke.mjs
@@ -147,4 +148,14 @@ jobs:
           } >> wrangler.toml
       - name: Deploy Worker
         if: steps.current.outputs.deploy == 'true'
-        run: bun run deploy
+        run: bun run deploy 2>&1 | tee deploy.log
+      - name: Smoke test deployed public capabilities
+        if: steps.current.outputs.deploy == 'true'
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          if [ -z "$WORKER_URL" ]; then
+            WORKER_URL="$(sed -nE 's@.*(https://[a-zA-Z0-9.-]+\.workers\.dev).*@\1@p' deploy.log | tail -1)"
+          fi
+          test -n "$WORKER_URL" || { echo "::error::Set WORKER_URL for deployments without a workers.dev URL"; exit 1; }
+          bun run smoke:capabilities "$WORKER_URL"

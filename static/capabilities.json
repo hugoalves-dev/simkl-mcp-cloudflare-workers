@@ -1,0 +1,1736 @@
+{
+  "schemaVersion": 1,
+  "endpoints": [
+    {
+      "path": "/",
+      "purpose": "Landing page",
+      "authentication": "Public"
+    },
+    {
+      "path": "/capabilities.json",
+      "purpose": "Read-only capability metadata",
+      "authentication": "Public"
+    },
+    {
+      "path": "/mcp",
+      "purpose": "Streamable HTTP (preferred)",
+      "authentication": "OAuth bearer token"
+    },
+    {
+      "path": "/sse",
+      "purpose": "SSE (legacy)",
+      "authentication": "OAuth bearer token"
+    },
+    {
+      "path": "/health",
+      "purpose": "Service health",
+      "authentication": "Public"
+    },
+    {
+      "path": "/auth/simkl",
+      "purpose": "Start Simkl OAuth authorization",
+      "authentication": "OAuth request; Simkl sign-in"
+    },
+    {
+      "path": "/oauth/callback",
+      "purpose": "Complete Simkl authorization",
+      "authentication": "Validated OAuth state, issuer and code"
+    },
+    {
+      "path": "/token",
+      "purpose": "Exchange authorization code or refresh token",
+      "authentication": "Valid grant and registered client; PKCE for code exchange"
+    },
+    {
+      "path": "/register",
+      "purpose": "Dynamic OAuth client registration",
+      "authentication": "Public"
+    },
+    {
+      "path": "/.well-known/oauth-authorization-server",
+      "purpose": "OAuth authorization server discovery",
+      "authentication": "Public"
+    },
+    {
+      "path": "/.well-known/oauth-protected-resource",
+      "purpose": "OAuth protected resource discovery",
+      "authentication": "Public"
+    }
+  ],
+  "tools": [
+    {
+      "name": "simkl_get_trending_by_genre",
+      "description": "Get monthly trending titles for one genre from Simkl’s public CDN. Rankings are updated daily, contain up to 500 titles, and have no upstream pagination. The CDN request needs no user token and uses no Simkl daily quota or per-second rate. Supply an exact genre slug from the selected media type’s genre index; returns up to maxResults rich items without fetching details per title.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "tv",
+              "movies",
+              "anime"
+            ]
+          },
+          "genre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "type",
+          "genre"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_search_by_text",
+      "description": "Search by text query",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "tv",
+              "anime",
+              "movie"
+            ],
+            "description": "Search type."
+          },
+          "q": {
+            "description": "Required. The search term — matches `title` and `all_titles[]` across the chosen catalog (movies / TV / anime).  Examples: `john wick`, `john wick 2014`, `breaking bad`, `cowboy bebop`.",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page number for paginated endpoints (1-based).",
+            "type": "number"
+          },
+          "limit": {
+            "description": "Items per page. Capped at 50.",
+            "type": "number"
+          },
+          "extended": {
+            "description": "`full` adds overview, ratings, and genres to each match.",
+            "type": "string",
+            "enum": [
+              "simple",
+              "full"
+            ]
+          },
+          "sort": {
+            "description": "Result order. `relevance` (default) puts the best match first; `release-date` newest first; `last-air-date` most recently aired first — **TV and anime only**, a `400` on `movie`; `title` A–Z; `rank` m",
+            "type": "string",
+            "enum": [
+              "relevance",
+              "release-date",
+              "last-air-date",
+              "title",
+              "rank"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_search_by_id",
+      "description": "Resolve a supported media ID through Simkl’s public redirect endpoint, then return the matching cached detail record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "simkl": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "hulu": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "netflix": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "mal": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "tvdb": {
+            "type": "string"
+          },
+          "tmdb": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "imdb": {
+            "type": "string",
+            "pattern": "^tt\\d+$"
+          },
+          "anidb": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "crunchyroll": {
+            "type": "string"
+          },
+          "anilist": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "kitsu": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "livechart": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "anisearch": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "animeplanet": {
+            "type": "string"
+          },
+          "anfo": {
+            "type": "string"
+          },
+          "ann": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "tvcom": {
+            "type": "string"
+          },
+          "zap2it": {
+            "type": "string"
+          },
+          "traktslug": {
+            "type": "string"
+          },
+          "letterboxd": {
+            "type": "string"
+          },
+          "boxd": {
+            "type": "string"
+          },
+          "mdl": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "show",
+              "tv",
+              "movie",
+              "anime"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "season": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "episode": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_start_watching",
+      "description": "Start",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "allow_rewatch": {
+            "description": "Opt into rewatch tracking. When `yes` **and** the account is Simkl **PRO** or **VIP**, a `/scrobble/stop` with `progress` ≥ 80 on an already-completed item records a separate rewatch session instead o",
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ]
+          },
+          "min_progress": {
+            "description": "Progress (percent) the user's **previous** open `start` / `checkin` session must have reached to be marked watched when this call replaces it. Default `80`. This call marks nothing watched itself. Se",
+            "type": "number"
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "progress": {
+                "type": "number"
+              },
+              "movie": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              },
+              "show": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              },
+              "anime": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              },
+              "episode": {
+                "type": "object",
+                "properties": {
+                  "season": {
+                    "type": "number"
+                  },
+                  "number": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              }
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_pause_watching",
+      "description": "Pause",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "allow_rewatch": {
+            "description": "Opt into rewatch tracking. When `yes` **and** the account is Simkl **PRO** or **VIP**, a `/scrobble/stop` with `progress` ≥ 80 on an already-completed item records a separate rewatch session instead o",
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ]
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "progress": {
+                "type": "number"
+              },
+              "movie": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              },
+              "show": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              },
+              "anime": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              },
+              "episode": {
+                "type": "object",
+                "properties": {
+                  "season": {
+                    "type": "number"
+                  },
+                  "number": {
+                    "type": "number"
+                  },
+                  "ids": {}
+                },
+                "additionalProperties": {}
+              }
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_add_to_watchlist",
+      "description": "Add to Watchlist",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "properties": {
+              "to": {},
+              "movies": {
+                "type": "array",
+                "items": {}
+              },
+              "shows": {
+                "type": "array",
+                "items": {}
+              },
+              "anime": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_mark_watched",
+      "description": "Add one or more items to history in a single request using movies[], shows[], anime[], and/or episodes[]. The legacy single episode argument remains supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "allow_rewatch": {
+            "description": "Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry ",
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ]
+          },
+          "skip_auto_watching": {
+            "description": "When `yes`, suppresses the implicit episode auto-fill that happens when you POST a show without explicit `seasons`/`episodes`. Use when the client manages episode-level state itself.",
+            "type": "string",
+            "enum": [
+              "yes"
+            ]
+          },
+          "movies": {
+            "type": "array",
+            "items": {}
+          },
+          "shows": {
+            "type": "array",
+            "items": {}
+          },
+          "episodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": {}
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {}
+          },
+          "episode": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_remove_from_history",
+      "description": "Remove one or more items from history in a single request using movies[], shows[], anime[], and/or episodes[]. The legacy single episode argument remains supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "movies": {
+            "type": "array",
+            "items": {}
+          },
+          "shows": {
+            "type": "array",
+            "items": {}
+          },
+          "episodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": {}
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {}
+          },
+          "episode": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_add_rating",
+      "description": "Add Ratings",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "properties": {
+              "movies": {
+                "type": "array",
+                "items": {}
+              },
+              "shows": {
+                "type": "array",
+                "items": {}
+              },
+              "anime": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_remove_rating",
+      "description": "Remove Ratings",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "properties": {
+              "movies": {
+                "type": "array",
+                "items": {}
+              },
+              "shows": {
+                "type": "array",
+                "items": {}
+              },
+              "anime": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_trending_shows",
+      "description": "Trending — single category (movies / tv / anime)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "interval": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "interval"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_trending_movies",
+      "description": "Trending — single category (movies / tv / anime)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "interval": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "interval"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_trending_anime",
+      "description": "Trending — single category (movies / tv / anime)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "interval": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "interval"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_show_by_id",
+      "description": "TV show details",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "**Simkl ID** for the item. Simkl IDs are stable, unambiguous, and the response is Cloudflare-cached by Simkl ID, so repeat lookups are very fast.  **If you only have an external ID** (IMDb, TMDB, TVDB"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_movie_by_id",
+      "description": "Movie details",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "**Simkl ID** for the item. Simkl IDs are stable, unambiguous, and the response is Cloudflare-cached by Simkl ID, so repeat lookups are very fast.  **If you only have an external ID** (IMDb, TMDB, TVDB"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_anime_by_id",
+      "description": "Anime details",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "**Simkl ID** for the item. Simkl IDs are stable, unambiguous, and the response is Cloudflare-cached by Simkl ID, so repeat lookups are very fast.  **If you only have an external ID** (IMDb, TMDB, TVDB"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_show_episodes",
+      "description": "List episodes for a TV show",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "**Simkl ID of the TV show** — the parent show's Simkl ID (not an individual episode ID). The endpoint returns the full episode list for that show. Use a Simkl ID directly when you have one — the resp"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_anime_episodes",
+      "description": "List episodes for an anime",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "**Simkl ID of the anime** — the parent anime's Simkl ID (not an individual episode ID). The endpoint returns the full episode list for that anime. Use a Simkl ID directly when you have one — the resp"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_best_shows",
+      "description": "Top-rated TV shows",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "month",
+              "all",
+              "year",
+              "voted",
+              "watched"
+            ],
+            "description": "Which top-rated bucket to return. Unknown values fall back to `all`."
+          },
+          "type": {
+            "description": "Optional. Narrow by show type. Unknown values are ignored. Watch out: `type=documentary` can return a bare `null` body when no documentaries are in the top 60.",
+            "type": "string",
+            "enum": [
+              "series",
+              "documentary",
+              "entertainment",
+              "animation"
+            ]
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_best_anime",
+      "description": "Top-rated anime",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "month",
+              "all",
+              "year",
+              "voted",
+              "watched"
+            ],
+            "description": "Which top-rated bucket to return. Unknown values fall back to `all`."
+          },
+          "type": {
+            "description": "Optional. Narrow by anime format. Unknown values are ignored.",
+            "type": "string",
+            "enum": [
+              "all",
+              "tv",
+              "movies",
+              "ovas",
+              "onas",
+              "music"
+            ]
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_airing_shows",
+      "description": "Get TV episode airings from Simkl’s free v2 calendar file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "description": "Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).",
+            "type": "string"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "time",
+              "rank",
+              "popularity"
+            ]
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_airing_anime",
+      "description": "Get anime episode airings from Simkl’s free v2 calendar file.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "description": "Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).",
+            "type": "string"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "time",
+              "rank",
+              "popularity"
+            ]
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_shows_by_genre",
+      "description": "Live TV genre browsing supports other sorts and country, network, and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "genre": {
+            "type": "string",
+            "description": "TV genre slug, or `all`. See description for the full set."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "series",
+              "mini-series",
+              "specials"
+            ]
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code or `all`."
+          },
+          "network": {
+            "type": "string",
+            "description": "Network slug (`hbo`, `netflix`, `apple-tv`, `prime-video`, …) or `all`."
+          },
+          "year": {
+            "type": "string",
+            "description": "`all`, single year, or decade. Bogus values silently fall back to `all`."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "popular-this-week",
+              "popular-this-month",
+              "popular-all-time",
+              "rank",
+              "release-date",
+              "voted",
+              "watched"
+            ]
+          },
+          "page": {
+            "description": "Page number for paginated endpoints (1-based).",
+            "type": "number"
+          },
+          "limit": {
+            "description": "Items per page. Capped at 60.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "genre",
+          "type",
+          "country",
+          "network",
+          "year",
+          "sort"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_anime_by_genre",
+      "description": "Live anime genre browsing supports other sorts and network and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "genre": {
+            "type": "string",
+            "description": "Anime genre slug, or `all`. See description for the full set."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "tv",
+              "movies",
+              "ovas",
+              "onas",
+              "specials",
+              "music"
+            ]
+          },
+          "network": {
+            "type": "string",
+            "description": "Network slug (`tv-tokyo`, `crunchyroll`, …) or `all`."
+          },
+          "year": {
+            "type": "string",
+            "description": "`all`, single year, or decade."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "popular-this-week",
+              "popular-this-month",
+              "popular-all-time",
+              "rank",
+              "release-date",
+              "voted",
+              "watched"
+            ]
+          },
+          "page": {
+            "description": "Page number for paginated endpoints (1-based).",
+            "type": "number"
+          },
+          "limit": {
+            "description": "Items per page. Capped at 60.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "genre",
+          "type",
+          "network",
+          "year",
+          "sort"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_movies_by_genre",
+      "description": "Live movie genre browsing supports other sorts and country and year filters. Under AUTH V2 it requires the user access token and consumes the user’s daily allowance; live requests also count toward the per-second limit. Pagination is capped at page 20 and 60 items per page. Prefer simkl_get_trending_by_genre for this month’s most watched titles in one genre (daily-updated CDN file, no token or upstream quota).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "genre": {
+            "type": "string",
+            "description": "Movie genre slug, or `all`. See description for the full set."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "movies"
+            ],
+            "description": "Reserved — always pass the literal value `movies`."
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code (e.g. `us`, `gb`, `jp`) or `all`."
+          },
+          "year": {
+            "type": "string",
+            "description": "`all`, single year (`2019`), or decade (`2010s`, `2000s`). Bogus values silently fall back to `all`."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "popular-this-week",
+              "popular-this-month",
+              "popular-all-time",
+              "rank",
+              "release-date",
+              "voted",
+              "watched"
+            ]
+          },
+          "page": {
+            "description": "Page number for paginated endpoints (1-based).",
+            "type": "number"
+          },
+          "limit": {
+            "description": "Items per page. Capped at 60.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "genre",
+          "type",
+          "country",
+          "year",
+          "sort"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_user_stats",
+      "description": "Get a user's watch statistics",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "Target user's numeric Simkl id (positive integer). For the authenticated user, first call [`GET /users/settings`](/api-reference/simkl/get-user-settings) and pass back `account.id`. Passing `0` retur"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_watchlist",
+      "description": "Search the authenticated user’s cached watchlist. Filters by media type, status, and title, then returns compact matching items with progress, next episode, rating, and a Simkl link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "shows",
+              "movies",
+              "anime"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "watching",
+              "plantowatch",
+              "hold",
+              "completed",
+              "dropped"
+            ]
+          },
+          "title": {
+            "description": "Case-insensitive title substring.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results; defaults to 50.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "offset": {
+            "description": "Zero-based number of matching results to skip; defaults to 0.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_start_rewatch",
+      "description": "Explicitly start or resume a Simkl rewatch session for a movie, TV show or anime already in the user history. Requires PRO/VIP. Simkl applies a two-day gap between repeat watches. The response includes the upstream rewatch_id and status; retain the ID for later updates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "movies",
+              "shows",
+              "anime"
+            ]
+          },
+          "ids": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number"
+              ]
+            }
+          },
+          "rewatch_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "rewatch_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "completed"
+            ]
+          },
+          "watched_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "episodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "watched_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": {}
+                  }
+                }
+              },
+              "required": [
+                "number"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "mediaType",
+          "ids"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_update_rewatch",
+      "description": "Add viewing events to a specific rewatch session. Always supply the rewatch_id returned by Simkl. TV/anime completion is determined by Simkl when all aired regular episodes are covered.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "movies",
+              "shows",
+              "anime"
+            ]
+          },
+          "ids": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number"
+              ]
+            }
+          },
+          "rewatch_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "rewatch_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "completed"
+            ]
+          },
+          "watched_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "episodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "watched_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": {}
+                  }
+                }
+              },
+              "required": [
+                "number"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "mediaType",
+          "ids",
+          "rewatch_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_rewatches",
+      "description": "Read canonical items and their separate rewatch rows for all media or one type. Rewatch rows include full episode progress and timestamps. Provide date_from for incremental reads; set initial_sync=true only for the first full read.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "movies",
+              "shows",
+              "anime"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "watching",
+              "plantowatch",
+              "hold",
+              "completed",
+              "dropped"
+            ]
+          },
+          "date_from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "initial_sync": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mediaType",
+          "status"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_stop_watching",
+      "description": "Stop watching and return Simkl’s full scrobble response. Set allow_rewatch=true only when the user explicitly chose to record this playback as a rewatch; it requires PRO/VIP and progress of at least 80%.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "allow_rewatch": {
+            "description": "Explicitly record this stop as a rewatch. Defaults to false.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_refresh_library",
+      "description": "Force an incremental refresh of the authenticated Simkl library, bypassing the activities check interval",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_my_stats",
+      "description": "Get watching statistics for the current authenticated user",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    }
+  ],
+  "resources": [
+    {
+      "name": "shows watching",
+      "uri": "simkl://watchlist/shows/watching",
+      "description": "watching shows",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "shows plantowatch",
+      "uri": "simkl://watchlist/shows/plantowatch",
+      "description": "plantowatch shows",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "shows hold",
+      "uri": "simkl://watchlist/shows/hold",
+      "description": "hold shows",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "shows completed",
+      "uri": "simkl://watchlist/shows/completed",
+      "description": "completed shows",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "shows dropped",
+      "uri": "simkl://watchlist/shows/dropped",
+      "description": "dropped shows",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "movies watching",
+      "uri": "simkl://watchlist/movies/watching",
+      "description": "watching movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "movies plantowatch",
+      "uri": "simkl://watchlist/movies/plantowatch",
+      "description": "plantowatch movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "movies hold",
+      "uri": "simkl://watchlist/movies/hold",
+      "description": "hold movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "movies completed",
+      "uri": "simkl://watchlist/movies/completed",
+      "description": "completed movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "movies dropped",
+      "uri": "simkl://watchlist/movies/dropped",
+      "description": "dropped movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "anime watching",
+      "uri": "simkl://watchlist/anime/watching",
+      "description": "watching anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "anime plantowatch",
+      "uri": "simkl://watchlist/anime/plantowatch",
+      "description": "plantowatch anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "anime hold",
+      "uri": "simkl://watchlist/anime/hold",
+      "description": "hold anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "anime completed",
+      "uri": "simkl://watchlist/anime/completed",
+      "description": "completed anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "anime dropped",
+      "uri": "simkl://watchlist/anime/dropped",
+      "description": "dropped anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending tv (daily)",
+      "uri": "simkl://trending/tv/daily",
+      "description": "daily trending tv",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending tv (weekly)",
+      "uri": "simkl://trending/tv/weekly",
+      "description": "weekly trending tv",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending tv (monthly)",
+      "uri": "simkl://trending/tv/monthly",
+      "description": "monthly trending tv",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending movies (daily)",
+      "uri": "simkl://trending/movies/daily",
+      "description": "daily trending movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending movies (weekly)",
+      "uri": "simkl://trending/movies/weekly",
+      "description": "weekly trending movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending movies (monthly)",
+      "uri": "simkl://trending/movies/monthly",
+      "description": "monthly trending movies",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending anime (daily)",
+      "uri": "simkl://trending/anime/daily",
+      "description": "daily trending anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending anime (weekly)",
+      "uri": "simkl://trending/anime/weekly",
+      "description": "weekly trending anime",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending anime (monthly)",
+      "uri": "simkl://trending/anime/monthly",
+      "description": "monthly trending anime",
+      "mimeType": "text/plain"
+    }
+  ],
+  "resourceTemplates": [
+    {
+      "name": "watchlist",
+      "uriTemplate": "simkl://watchlist/{type}/{status}",
+      "description": "user watchlist by type and status",
+      "mimeType": "text/plain"
+    },
+    {
+      "name": "trending",
+      "uriTemplate": "simkl://trending/{type}/{interval}",
+      "description": "trending content by type and interval",
+      "mimeType": "text/plain"
+    }
+  ]
+}

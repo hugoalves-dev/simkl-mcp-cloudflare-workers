@@ -1,0 +1,13 @@
+import { discoverCapabilities } from './capabilities';
+const base = process.argv[2];
+if (!base) throw new Error('Usage: bun run smoke:capabilities https://YOUR-WORKER');
+const expected = await discoverCapabilities();
+const response = await fetch(new URL('/capabilities.json', base), { cache: 'no-store' });
+if (!response.ok) throw new Error(`Catalog HTTP ${response.status}`);
+if (!response.headers.get('cache-control')?.includes('no-cache')) throw new Error('Catalog must revalidate');
+const actual = await response.json();
+if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('Deployed catalog differs from this build');
+const page = await fetch(new URL('/', base), { cache: 'no-store' });
+const html = await page.text();
+if (!page.ok || !html.includes('/capabilities.json') || !html.includes('https://buymeacoffee.com/vitorhugo1207') || !html.includes('Streamable HTTP')) throw new Error('Landing page does not reflect this build');
+console.log(`Capability smoke passed: ${expected.tools.length} tools, ${expected.resources.length} resources, ${expected.resourceTemplates.length} templates`);
