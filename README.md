@@ -1,5 +1,7 @@
 # Simkl MCP for Cloudflare Workers
 
+☕ **Support this independent project:** [Buy Me a Coffee](https://buymeacoffee.com/vitorhugo1207). Your support is appreciated and entirely optional.
+
 An independently maintained [Model Context Protocol (MCP)](https://modelcontextprotocol.io/docs/getting-started/intro) server for [Simkl](https://simkl.com), built with **TypeScript, Bun, and Cloudflare Workers**. Search, discover, and track movies, TV shows, and anime from MCP-compatible clients.
 
 > [!IMPORTANT]
