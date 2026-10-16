@@ -8,6 +8,8 @@ export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
   invalidate(): Promise<void>;
   getStats(): Promise<Record<string, unknown>>;
+  getSettings(expectedToken?: string): Promise<Record<string, unknown>>;
+  invalidateSettings(expectedToken?: string): Promise<void>;
   write(path: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }, token?: string): Promise<unknown>;
 }
 export const verifiedAccountId = normalizeSimklId;
@@ -80,6 +82,18 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     async getStats() {
       const { object, token, userId } = await stub();
       try { return await object.getStats(token, userId); }
+      catch (error) { throw restoreRpcError(error); }
+    },
+    async getSettings(expectedToken) {
+      const { object, token } = await stub();
+      if (expectedToken !== undefined && token !== expectedToken) throw new Error('Simkl account token changed during rewatch authorization; retry the operation');
+      try { return await object.getSettings(token); }
+      catch (error) { throw restoreRpcError(error); }
+    },
+    async invalidateSettings(expectedToken) {
+      const { object, token } = await stub();
+      if (expectedToken !== undefined && token !== expectedToken) throw new Error('Simkl account token changed during rewatch authorization; retry the operation');
+      try { await object.invalidateSettings(token); }
       catch (error) { throw restoreRpcError(error); }
     },
     async write(path, options, expectedToken) {
