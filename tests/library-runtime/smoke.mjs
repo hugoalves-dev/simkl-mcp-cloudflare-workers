@@ -59,6 +59,16 @@ async function stats(user = '42') {
   assert.equal(response.status, 200, await response.clone().text());
   return response.json();
 }
+async function settings(user = '42') {
+  const response = await mf.dispatchFetch(`https://fixture.worker.invalid/?user=${user}&settings=1`);
+  assert.equal(response.status, 200, await response.clone().text());
+  return response.json();
+}
+async function invalidateSettings(user = '42') {
+  const response = await mf.dispatchFetch(`https://fixture.worker.invalid/?user=${user}&invalidate-settings=1`);
+  assert.equal(response.status, 200, await response.clone().text());
+  return response.json();
+}
 try {
   mf = runtime();
   const [a, b] = await Promise.all([read(), read()]);
@@ -84,7 +94,29 @@ try {
   const reconstructedProfile = await stats();
   assert.deepEqual(reconstructedProfile.stats, { total_mins: 120 });
   assert.equal(calls.length, 13, 'reconstructed object must use persisted library and profile records');
-  console.log('PASS: Worker RPC, coalescing, per-user isolation, profile caching, and SQLite persistence after runtime reconstruction');
+
+  // Different RPC sessions share the same persisted account profile, no second settings GET.
+  assert.deepEqual((await settings()).settings.account.id, 42);
+  await settings();
+  assert.equal(calls.length, 13, 'settings requests must reuse the cached profile after reconstruction');
+
+  // A Simkl pro_required response clears settings only, preserving the library and stats.
+  assert.deepEqual(await invalidateSettings(), { ok: true });
+  await settings();
+  assert.deepEqual(calls.slice(13), ['/users/settings'], 'invalidation must refresh settings without refetching activities or stats');
+  assert.deepEqual(await read(), a);
+  assert.deepEqual((await stats()).stats, { total_mins: 120 });
+  assert.equal(calls.length, 14, 'settings invalidation must preserve library and stats cache');
+
+  // An account with no library or statistics initialized needs only activities + settings.
+  assert.deepEqual((await settings('45')).settings.account.id, 42);
+  assert.deepEqual(calls.slice(14), ['/sync/activities', '/users/settings']);
+  await settings('45');
+  assert.equal(calls.length, 16);
+  await mf.dispose(); mf = runtime();
+  await settings('45');
+  assert.equal(calls.length, 16, 'new session after restart must reuse settings-only profile without fetching statistics');
+  console.log('PASS: Worker RPC, coalescing, per-user isolation, settings eligibility, and SQLite persistence after reconstruction');
 } finally {
   if (mf) await mf.dispose();
   await rm(persist, { recursive: true, force: true });
