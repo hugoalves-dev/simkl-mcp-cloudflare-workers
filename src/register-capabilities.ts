@@ -12,8 +12,10 @@ import { withRating } from './format/media';
 
 // Both the deployed agent and build-time MCP discovery use this registration path.
 export function registerCapabilities(server: McpServer, client: SimklClient, library: LibraryAdapter, getToken: () => string | undefined) {
-    const rewatchService = new RewatchService(client, getToken, Date.now, (path, options) =>
-      library.write(path, options, options.token));
+    const rewatchService = new RewatchService(client, getToken, Date.now,
+      (path, options) => library.write(path, options, options.token),
+      token => library.getSettings(token),
+      token => library.invalidateSettings(token));
     registerTools(server, client, getToken, {
       getWatchlist: async args => {
         const lines = selectWatchlist(await library.read(), args);
