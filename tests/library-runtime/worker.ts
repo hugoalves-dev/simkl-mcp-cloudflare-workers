@@ -4,6 +4,13 @@ export default {
   async fetch(request: Request, env: { SIMKL_LIBRARY_CACHE: DurableObjectNamespace<SimklLibraryCache> }) {
     const userId = new URL(request.url).searchParams.get('user') ?? '42';
     const object = env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`));
+    if (new URL(request.url).searchParams.get('settings') === '1') {
+      return Response.json({ settings: await object.getSettings('fixture-operation-token') });
+    }
+    if (new URL(request.url).searchParams.get('invalidate-settings') === '1') {
+      await object.invalidateSettings('fixture-operation-token');
+      return Response.json({ ok: true });
+    }
     if (new URL(request.url).searchParams.get('stats') === '1') {
       return Response.json({ stats: await object.getStats('fixture-operation-token', userId) });
     }

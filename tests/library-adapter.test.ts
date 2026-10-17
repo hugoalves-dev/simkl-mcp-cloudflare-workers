@@ -4,9 +4,9 @@ import { createLibraryAdapter } from '../src/library/adapter';
 const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original; });
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
 function setup(props: any) {
-  const names: string[] = [], reads: any[] = [], invalidations: string[] = [], stats: any[] = [], writes: any[] = [];
-  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async invalidate() { invalidations.push(name); }, async write(token: string, path: string, options: any) { writes.push({ name, token, path, options }); return { ok: true }; } }; } } };
-  return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations, stats, writes };
+  const names: string[] = [], reads: any[] = [], invalidations: string[] = [], stats: any[] = [], writes: any[] = [], settingsReads: any[] = [], settingsInvalidations: any[] = [];
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async getSettings(token: string) { settingsReads.push({ name, token }); return { account: { type: 'pro' } }; }, async invalidateSettings(token: string) { settingsInvalidations.push({ name, token }); }, async invalidate() { invalidations.push(name); }, async write(token: string, path: string, options: any) { writes.push({ name, token, path, options }); return { ok: true }; } }; } } };
+  return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations, stats, writes, settingsReads, settingsInvalidations };
 }
 test('verified props route without settings and force is forwarded', async () => {
   globalThis.fetch = (async () => { throw new Error('unexpected'); }) as typeof fetch;
@@ -77,4 +77,39 @@ test('restores Simkl quota errors from a queued write across Worker RPC', async 
   const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
   const error = await adapter.write('/sync/history', { method: 'POST', body: {} }).catch(error => error);
   expect(error).toBeInstanceOf(SimklApiError); expect(error.upstreamCode).toBe('user_limit_exceeded'); expect(error.headers.retryAfter).toBe('3600'); expect(error.message).not.toContain('sensitive');
+});
+
+test('settings reads and invalidations route through one verified per-account object', async () => {
+  const a = setup({ simklToken: 'token-a', simklUserId: '42' });
+  const b = setup({ simklToken: 'token-b', simklUserId: '42' });
+  expect(await a.adapter.getSettings('token-a')).toEqual({ account: { type: 'pro' } });
+  expect(await b.adapter.getSettings('token-b')).toEqual({ account: { type: 'pro' } });
+  await a.adapter.invalidateSettings('token-a');
+  expect(a.settingsReads).toEqual([{ name: 'simkl-library:v1:42', token: 'token-a' }]);
+  expect(b.settingsReads).toEqual([{ name: 'simkl-library:v1:42', token: 'token-b' }]);
+  expect(a.settingsInvalidations).toEqual([{ name: 'simkl-library:v1:42', token: 'token-a' }]);
+});
+
+test('settings eligibility rejects stale tokens before contacting another account object', async () => {
+  const props = { simklToken: 'old-token', simklUserId: '42' };
+  const s = setup(props);
+  props.simklToken = 'new-token';
+  props.simklUserId = '43';
+  await expect(s.adapter.getSettings('old-token')).rejects.toThrow(/token changed/);
+  await expect(s.adapter.invalidateSettings('old-token')).rejects.toThrow(/token changed/);
+  expect(s.settingsReads).toHaveLength(0);
+  expect(s.settingsInvalidations).toHaveLength(0);
+});
+
+test('sanitizes upstream API errors when reading shared settings over Worker RPC', async () => {
+  const rpcError = Object.assign(new Error('sensitive upstream response'), {
+    name: 'SimklApiError', statusCode: 429, upstreamCode: 'user_limit_exceeded',
+    headers: { retryAfter: '3600' },
+  });
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async getSettings() { throw rpcError; } }) } };
+  const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
+  const error = await adapter.getSettings().catch(error => error);
+  expect(error).toBeInstanceOf(SimklApiError);
+  expect(error.upstreamCode).toBe('user_limit_exceeded');
+  expect(error.message).not.toContain('sensitive');
 });

@@ -4,7 +4,7 @@ import { LibraryStore } from './store.js';
 import { CachedLibrary } from './coordinator';
 import { parseLibraryCacheTtlSeconds } from './refresh';
 import { fetchInitialLibrary } from './sync.js';
-import { refreshUserProfile } from './profile.js';
+import { refreshUserProfile, refreshUserSettings } from './profile.js';
 import { normalizeSimklId } from './identity.js';
 import type { LibraryInitialization, LibraryItemRow } from './types.js';
 import type { RequestOptions } from '../api/client.js';
@@ -106,4 +106,37 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
       return result.stats;
     }));
   }
+  
+  /** Reuses the persisted per-account profile without reading the user's statistics. */
+  getSettings(accessToken: string): Promise<Record<string, unknown>> {
+    if (!accessToken) return Promise.reject(new Error('Simkl authentication required'));
+    return this.enqueue(() => this.library.withExclusive(async () => {
+      const previous = this.store.loadProfile();
+      const result = await refreshUserSettings(this.client, accessToken, previous, this.store.loadActivitySnapshot(), {
+        ttlSeconds: parseLibraryCacheTtlSeconds(this.env.SIMKL_LIBRARY_CACHE_TTL_SECONDS),
+        now: Date.now(),
+      });
+      if (JSON.stringify(previous) !== JSON.stringify(result.snapshot)) this.store.saveProfile(result.snapshot);
+      // Cloudflare correlates these credential-free events using $metadata.traceId.
+      console.info(JSON.stringify({
+        component: 'simkl_user_profile',
+        event: result.settingsRefreshed ? 'settings_refreshed' : 'settings_cache_hit',
+        activitySource: result.activitySource,
+      }));
+      return result.settings;
+    }));
+  }
+
+  /** A pro_required upstream response invalidates settings, not the persisted session/library. */
+  invalidateSettings(accessToken: string): Promise<void> {
+    if (!accessToken) return Promise.reject(new Error('Simkl authentication required'));
+    return this.enqueue(() => this.library.withExclusive(async () => {
+      const previous = this.store.loadProfile();
+      if (!previous?.settings) return;
+      const { settings: _settings, settingsActivity: _settingsActivity, ...snapshot } = previous;
+      this.store.saveProfile(snapshot);
+      console.info(JSON.stringify({ component: 'simkl_user_profile', event: 'settings_invalidated', reason: 'pro_required' }));
+    }));
+  }
+
 }

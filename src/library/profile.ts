@@ -31,6 +31,79 @@ function validCachedProfile(value: UserProfileSnapshot | undefined): value is Us
     && (value.stats === undefined || isRecord(value.stats));
 }
 
+type ActivitySource = 'profile_ttl' | 'library_ttl' | 'upstream';
+
+interface RefreshedProfile {
+  snapshot: UserProfileSnapshot;
+  settings: Record<string, unknown>;
+  stats?: Record<string, unknown>;
+  settingsRefreshed: boolean;
+  activitySource: ActivitySource;
+}
+
+/** Profile and rewatch eligibility share the same settings watermark and persistent record.
+ * Settings-only reads must not fetch stats or advance the stats watermark.
+ */
+async function refreshProfile(
+  client: SimklClient,
+  token: string,
+  previous: UserProfileSnapshot | undefined,
+  librarySnapshot: LibraryActivitySnapshot | undefined,
+  options: { ttlSeconds: number; now: number },
+  statsUserId?: string,
+): Promise<RefreshedProfile> {
+  if (previous && !validCachedProfile(previous)) throw new Error('Invalid user profile cache record');
+
+  let activities: UserProfileActivities;
+  let checkedAt: number;
+  let activitySource: ActivitySource;
+  if (validCachedProfile(previous) && isFresh(previous.checkedAt, options.now, options.ttlSeconds)) {
+    activities = previous.activities;
+    checkedAt = previous.checkedAt;
+    activitySource = 'profile_ttl';
+  } else if (librarySnapshot && librarySnapshot.forceCheck !== true
+    && isFresh(librarySnapshot.checkedAt, options.now, options.ttlSeconds)) {
+    activities = validateActivities(librarySnapshot.activities);
+    checkedAt = librarySnapshot.checkedAt;
+    activitySource = 'library_ttl';
+  } else {
+    activities = validateActivities(await client.request('/sync/activities', { method: 'GET', token }));
+    checkedAt = options.now;
+    activitySource = 'upstream';
+  }
+
+  if (previous && activities.all !== null && previous.activities.all !== null
+    && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
+
+  const settingsActivityValue = isRecord(activities.settings) ? activities.settings.all : undefined;
+  const settingsActivity = validMarker(settingsActivityValue) ? settingsActivityValue : undefined;
+  const settingsRefreshed = !previous?.settings || previous.settingsActivity !== settingsActivity;
+  const settings = settingsRefreshed ? await getCurrentUserSettings(client, token) : previous!.settings!;
+  if (!isRecord(settings)) throw new Error('Invalid Simkl user settings response');
+
+  // A settings-only read must preserve the last *fetched* stats watermark,
+  // even when activities.all moved. The next stats request can then detect it.
+  const refreshStats = statsUserId !== undefined && (!previous?.stats || previous.statsActivity !== activities.all);
+  const stats = refreshStats ? await getUserStats(client, statsUserId!, token) : previous?.stats;
+  if (statsUserId !== undefined && !isRecord(stats)) throw new Error('Invalid Simkl user statistics response');
+
+  const snapshot: UserProfileSnapshot = {
+    version: 1,
+    activities,
+    checkedAt,
+    ...(settingsActivity === undefined ? {} : { settingsActivity }),
+    settings,
+    ...(stats === undefined ? {} : {
+      ...(statsUserId !== undefined ? { statsActivity: activities.all } : previous?.statsActivity === undefined ? {} : { statsActivity: previous.statsActivity }),
+      stats,
+    }),
+  };
+  let serialized: string;
+  try { serialized = JSON.stringify(snapshot); } catch { throw new Error('User profile cache is not serializable'); }
+  if (jsonBytes(serialized) > MAX_ROW_JSON_BYTES) throw new Error('User profile cache too large');
+  return { snapshot, settings, stats, settingsRefreshed, activitySource };
+}
+
 export async function refreshUserProfile(
   client: SimklClient,
   token: string,
@@ -39,47 +112,18 @@ export async function refreshUserProfile(
   librarySnapshot: LibraryActivitySnapshot | undefined,
   options: { ttlSeconds: number; now: number },
 ): Promise<{ snapshot: UserProfileSnapshot; stats: Record<string, unknown> }> {
-  if (previous && !validCachedProfile(previous)) throw new Error('Invalid user profile cache record');
+  const result = await refreshProfile(client, token, previous, librarySnapshot, options, simklUserId);
+  return { snapshot: result.snapshot, stats: result.stats! };
+}
 
-  let activities: UserProfileActivities;
-  let checkedAt: number;
-  if (validCachedProfile(previous) && isFresh(previous.checkedAt, options.now, options.ttlSeconds)) {
-    activities = previous.activities;
-    checkedAt = previous.checkedAt;
-  } else if (librarySnapshot && librarySnapshot.forceCheck !== true
-    && isFresh(librarySnapshot.checkedAt, options.now, options.ttlSeconds)) {
-    activities = validateActivities(librarySnapshot.activities);
-    checkedAt = librarySnapshot.checkedAt;
-  } else {
-    activities = validateActivities(await client.request('/sync/activities', { method: 'GET', token }));
-    checkedAt = options.now;
-  }
-
-  if (previous && activities.all !== null && previous.activities.all !== null
-    && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
-
-  const settingsActivityValue = isRecord(activities.settings) ? activities.settings.all : undefined;
-  const settingsActivity = validMarker(settingsActivityValue) ? settingsActivityValue : undefined;
-  const statsActivity = activities.all;
-  const refreshSettings = !previous?.settings || previous.settingsActivity !== settingsActivity;
-  const refreshStats = !previous?.stats || previous.statsActivity !== statsActivity;
-
-  const settings = refreshSettings ? await getCurrentUserSettings(client, token) : previous!.settings!;
-  if (!isRecord(settings)) throw new Error('Invalid Simkl user settings response');
-  const stats = refreshStats ? await getUserStats(client, simklUserId, token) : previous!.stats!;
-  if (!isRecord(stats)) throw new Error('Invalid Simkl user statistics response');
-
-  const snapshot: UserProfileSnapshot = {
-    version: 1,
-    activities,
-    checkedAt,
-    ...(settingsActivity === undefined ? {} : { settingsActivity }),
-    settings,
-    statsActivity,
-    stats,
-  };
-  let serialized: string;
-  try { serialized = JSON.stringify(snapshot); } catch { throw new Error('User profile cache is not serializable'); }
-  if (jsonBytes(serialized) > MAX_ROW_JSON_BYTES) throw new Error('User profile cache too large');
-  return { snapshot, stats };
+export async function refreshUserSettings(
+  client: SimklClient,
+  token: string,
+  previous: UserProfileSnapshot | undefined,
+  librarySnapshot: LibraryActivitySnapshot | undefined,
+  options: { ttlSeconds: number; now: number },
+): Promise<Pick<RefreshedProfile, 'snapshot' | 'settings' | 'settingsRefreshed' | 'activitySource'>> {
+  const { snapshot, settings, settingsRefreshed, activitySource } =
+    await refreshProfile(client, token, previous, librarySnapshot, options);
+  return { snapshot, settings, settingsRefreshed, activitySource };
 }

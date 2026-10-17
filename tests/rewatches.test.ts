@@ -103,7 +103,7 @@ describe('RewatchService', () => {
     expect(incremental.url.searchParams.get('date_from')).toBe('2026-01-01T00:00:00Z');
   });
 
-  test('gates rewatch writes on the plan and caches eligibility for five minutes per token', async () => {
+  test('gates rewatch writes using current settings without a separate token-local cache', async () => {
     const service = createService();
     accountType = 'free';
     await expect(service.start({ mediaType: 'movies', ids: { simkl: 1 } })).rejects.toBeInstanceOf(RewatchPlanError);
@@ -142,7 +142,7 @@ describe('RewatchService', () => {
     }
   });
 
-  test('invalidates the cache for the token that received pro_required', async () => {
+  test('keeps the original operation token when a scrobble finishes after account switching', async () => {
     token = 'token-a';
     let resolveStop!: (response: Response) => void;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -215,7 +215,7 @@ describe('RewatchService', () => {
     await service.stop({ body: { progress: 95 }, allow_rewatch: true });
     accountType = 'free';
     await expect(service.stop({ body: { progress: 95 }, allow_rewatch: true })).rejects.toBeInstanceOf(RewatchPlanError);
-    expect(requests.filter(request => request.url.pathname === '/users/settings')).toHaveLength(2);
+    expect(requests.filter(request => request.url.pathname === '/users/settings')).toHaveLength(3);
   });
 
   test('does not retry a history write after an ambiguous network failure', async () => {
@@ -243,6 +243,48 @@ describe('RewatchService', () => {
     await service.stop({ body: { progress: 95 } });
     expect(writes.map(write => write.path)).toEqual(['/sync/history', '/sync/history', '/scrobble/stop']);
     expect(writes.every(write => write.options.method === 'POST' && write.options.token === token)).toBe(true);
-    expect(requests.map(request => request.url.pathname)).toEqual(['/users/settings']);
+    expect(requests.map(request => request.url.pathname)).toEqual(['/users/settings', '/users/settings']);
+  });
+
+  test('shared settings provider is reused across sessions and reacts to plan changes', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    const profileByToken = new Map([['token-a', { account: { type: 'pro' } }]]);
+    const reads: string[] = [];
+    const provider = async (operationToken: string) => {
+      reads.push(operationToken);
+      return profileByToken.get(operationToken);
+    };
+    const sessionA = new RewatchService(client, () => token, () => now, undefined, provider);
+    const sessionB = new RewatchService(client, () => token, () => now, undefined, provider);
+    await sessionA.start({ mediaType: 'movies', ids: { simkl: 1 } });
+    await sessionB.start({ mediaType: 'movies', ids: { simkl: 2 } });
+    expect(requests.filter(request => request.url.pathname === '/users/settings')).toHaveLength(0);
+    expect(reads).toEqual(['token-a', 'token-a']);
+
+    profileByToken.set('token-a', { account: { type: 'free' } });
+    await expect(sessionB.start({ mediaType: 'movies', ids: { simkl: 3 } })).rejects.toBeInstanceOf(RewatchPlanError);
+    profileByToken.set('token-a', { account: { type: 'vip' } });
+    await sessionA.start({ mediaType: 'movies', ids: { simkl: 4 } });
+    expect(requests.filter(request => request.url.pathname === '/sync/history')).toHaveLength(3);
+  });
+
+  test('pro_required invalidates the shared settings snapshot without removing sessions', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    let settings = { account: { type: 'pro' } };
+    const invalidated: string[] = [];
+    const service = new RewatchService(
+      client, () => token, () => now, undefined,
+      async () => settings,
+      async oldToken => {
+        invalidated.push(oldToken);
+        settings = { account: { type: 'free' } };
+      },
+    );
+    stopStatus = 'pro_required';
+    const result = await service.stop({ body: { progress: 95 }, allow_rewatch: true });
+    expect(result.rewatch_status).toBe('pro_required');
+    expect(invalidated).toEqual(['token-a']);
+    await expect(service.start({ mediaType: 'movies', ids: { simkl: 1 } })).rejects.toBeInstanceOf(RewatchPlanError);
+    expect(requests.filter(request => request.url.pathname === '/users/settings')).toHaveLength(0);
   });
 });

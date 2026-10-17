@@ -35,7 +35,6 @@ export class RewatchPlanError extends Error {
   }
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
 const mediaKeys: Record<RewatchWriteMediaType, string> = { movies: 'movies', shows: 'shows', anime: 'anime' };
 const numericIdKeys = new Set(['simkl', 'hulu', 'netflix', 'mal', 'tvdb', 'tmdb', 'anidb', 'crunchyroll', 'anilist', 'kitsu', 'livechart', 'anisearch']);
 const stringIdKeys = new Set(['imdb', 'animeplanet', 'traktslug', 'letterboxd']);
@@ -52,15 +51,20 @@ export function hasValidMediaIds(ids: Record<string, string | number> | undefine
 }
 
 export class RewatchService {
-  private eligibility = new Map<string, { allowed: boolean; expiresAt: number }>();
   private writeRequest: (endpoint: string, options: RewatchWriteOptions) => Promise<any>;
 
   constructor(
     private readonly client: SimklClient,
     private readonly getToken: () => string | undefined,
-    private readonly now: () => number = Date.now,
+    _now: () => number = Date.now, // Retained for standalone constructor compatibility.
     writer?: (endpoint: string, options: RewatchWriteOptions) => Promise<any>,
-  ) { this.writeRequest = writer ?? ((endpoint, options) => this.client.request(endpoint, options)); }
+    private readonly readSettings: (token: string) => Promise<any> =
+      token => client.request('/users/settings', { method: 'GET', token }),
+    private readonly invalidateSharedSettings?: (token: string) => Promise<void>,
+  ) {
+    void _now;
+    this.writeRequest = writer ?? ((endpoint, options) => this.client.request(endpoint, options));
+  }
 
   async start(input: RewatchStartInput): Promise<any> {
     if (input.rewatch_id !== undefined) this.validateId(input.rewatch_id);
@@ -121,34 +125,25 @@ export class RewatchService {
       ...(useRewatch ? { query: { allow_rewatch: 'yes' } } : {}),
       body: input.body,
     });
-    if (useRewatch && hasProRequiredStatus(result)) this.clearEligibility(token);
+    if (useRewatch && hasProRequiredStatus(result) && token && this.invalidateSharedSettings) {
+      try { await this.invalidateSharedSettings(token); }
+      catch {
+        // A successful upstream write must never be retried because cache invalidation failed.
+        console.warn(JSON.stringify({ component: 'simkl_rewatch', event: 'settings_invalidation_failed' }));
+      }
+    }
     return result;
   }
 
   private async requireEligiblePlan(): Promise<string> {
     const token = this.getToken();
     if (!token) throw new RewatchPlanError('a Simkl account token is required for rewatch tracking');
-    for (const [cachedToken, value] of this.eligibility) {
-      if (value.expiresAt <= this.now()) this.eligibility.delete(cachedToken);
-    }
-    const cached = this.eligibility.get(token);
-    if (cached && cached.expiresAt > this.now()) {
-      if (cached.allowed) {
-        if (this.getToken() !== token) throw new RewatchPlanError('Simkl account token changed during rewatch authorization; retry the operation');
-        return token;
-      }
-      throw new RewatchPlanError('rewatch tracking requires a Simkl PRO or VIP account');
-    }
-    const settings = await this.client.request<any>('/users/settings', { method: 'GET', token });
+    const settings = await this.readSettings(token);
     if (this.getToken() !== token) throw new RewatchPlanError('Simkl account token changed during rewatch authorization; retry the operation');
     const allowed = ['pro', 'vip'].includes(String(settings?.account?.type ?? '').toLowerCase());
-    this.eligibility.set(token, { allowed, expiresAt: this.now() + CACHE_TTL_MS });
+    console.info(JSON.stringify({ component: 'simkl_rewatch', event: 'plan_checked', eligible: allowed }));
     if (!allowed) throw new RewatchPlanError('rewatch tracking requires a Simkl PRO or VIP account');
     return token;
-  }
-
-  private clearEligibility(token: string | undefined): void {
-    if (token) this.eligibility.delete(token);
   }
 
   private toItem(input: RewatchItemInput): RewatchItem {
