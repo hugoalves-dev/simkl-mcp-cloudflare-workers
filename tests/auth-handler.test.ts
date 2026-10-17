@@ -36,6 +36,7 @@ function setup() {
 function discoveryResponse(): Response {
   return Response.json({
     issuer: 'https://simkl.com',
+    authorization_response_iss_parameter_supported: true,
     authorization_endpoint: 'https://simkl.com/oauth2/authorize',
     token_endpoint: 'https://api.simkl.com/oauth2/token',
     response_types_supported: ['code'],
@@ -179,5 +180,51 @@ describe('AUTH V2 handler', () => {
     const headers = new Headers(settingsCall[1]?.headers);
     expect(headers.get('User-Agent')).toBe(USER_AGENT);
     expect(headers.get('Authorization')).toBe('Bearer access');
+  });
+});
+
+
+describe('OAuth failure diagnostics', () => {
+  test.each([
+    ['expired', 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG', Date.now() - 601_000],
+    ['invalid PKCE', '!'.repeat(43), Date.now()],
+  ])('rejects %s state before network access', async (_label, verifier, createdAt) => {
+    const { env, values } = setup();
+    values.set('oauth_state:s', JSON.stringify({ oauthRequest: {}, codeVerifier: verifier, createdAt }));
+    globalThis.fetch = mock(async () => { throw new Error('unexpected fetch'); }) as typeof fetch;
+    const response = await handler.fetch(new Request('https://service.example/oauth/callback?code=c&state=s&iss=https%3A%2F%2Fsimkl.com'), env);
+    expect(response.status).toBe(400);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  test.each(['token_exchange', 'complete_authorization'])('logs sanitized %s failure and correlates response', async (stage) => {
+    const { env, values, completeAuthorization } = setup();
+    values.set('oauth_state:s', JSON.stringify({ oauthRequest: {}, codeVerifier: 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG', createdAt: Date.now() }));
+    successfulFetch();
+    const upstream = globalThis.fetch;
+    if (stage === 'token_exchange') {
+      globalThis.fetch = (async (input, init) => String(input).includes('/oauth2/token')
+        ? Response.json({ error: 'invalid_grant', error_description: 'secret-code refresh secret' }, { status: 400 })
+        : upstream(input, init)) as typeof fetch;
+    } else {
+      completeAuthorization.mockImplementation(async () => { throw new Error('secret-code refresh secret'); });
+    }
+    const entries: unknown[] = [];
+    const originalError = console.error;
+    console.error = (...args) => { entries.push(...args); };
+    try {
+      const response = await handler.fetch(new Request('https://service.example/oauth/callback?code=secret-code&state=s&iss=https%3A%2F%2Fsimkl.com'), env);
+      expect(response.status).toBe(502);
+      const entry = entries.find((e: any) => e.stage === stage) as any;
+      expect(entry).toBeDefined();
+      expect(entry.traceId).toBe(response.headers.get('X-Trace-Id'));
+      expect(entry.httpStatus).toBe(502);
+      if (stage === 'token_exchange') {
+        expect(entry.upstreamStatus).toBe(400);
+        expect(entry.errorCode).toBe('invalid_grant');
+      }
+      expect(JSON.stringify(entries)).not.toMatch(/secret-code|refresh secret|do-not-leak/);
+      expect(values.has('oauth_state:s')).toBe(false);
+    } finally { console.error = originalError; }
   });
 });

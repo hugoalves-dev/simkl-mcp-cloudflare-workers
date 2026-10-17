@@ -41,3 +41,8 @@ run_worker_first = true
 SIMKL_API_BASE_URL = "https://api.simkl.com"
 # Minimum lazy activity-check interval; invalid values fall back to 300 seconds.
 SIMKL_LIBRARY_CACHE_TTL_SECONDS = "300"
+
+# OAuth callback URLs contain one-time credentials. Always redact them.
+[observability]
+enabled = false
+redact_query_string = true

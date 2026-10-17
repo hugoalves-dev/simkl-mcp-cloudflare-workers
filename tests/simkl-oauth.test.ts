@@ -16,6 +16,7 @@ afterEach(() => {
 function discoveryResponse(): Response {
   return Response.json({
     issuer: 'https://simkl.com',
+    authorization_response_iss_parameter_supported: true,
     authorization_endpoint: 'https://simkl.com/oauth2/authorize',
     token_endpoint: 'https://api.simkl.com/oauth2/token',
     response_types_supported: ['code'],
@@ -45,7 +46,7 @@ describe('Simkl OAuth utilities', () => {
       return Response.json({ access_token: 'access', token_type: 'Bearer', refresh_token: 'refresh', expires_in: 604800 });
     }) as typeof fetch;
 
-    const token = await exchangeAuthorizationCode({ code: 'one-time-code', codeVerifier: 'verifier' }, env);
+    const token = await exchangeAuthorizationCode({ code: 'one-time-code', codeVerifier: 'verifier', issuer: 'https://simkl.com' }, env);
     const captured = requests[0];
     expect(captured.url).toBe('https://api.simkl.com/oauth2/token');
     expect(captured.init.method).toBe('POST');
@@ -89,5 +90,30 @@ describe('Simkl OAuth utilities', () => {
       return new Response('rejected', { status: 401 });
     }) as typeof fetch;
     await expect(refreshSimklToken('refresh', env)).rejects.toThrow(/401/);
+  });
+});
+
+
+describe('OAuth protocol validation and safe errors', () => {
+  test('rejects a mismatching issuer before any token request', async () => {
+    globalThis.fetch = mock(async () => discoveryResponse()) as typeof fetch;
+    await expect(exchangeAuthorizationCode({ code: 'code', codeVerifier: 'verifier', issuer: 'https://wrong.example' }, env))
+      .rejects.toMatchObject({ stage: 'authorization_response', errorCode: 'OAUTH_INVALID_RESPONSE' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves discovery HTTP status without exposing response body', async () => {
+    globalThis.fetch = mock(async () => new Response('secret-discovery-body', { status: 503 })) as typeof fetch;
+    const error = await exchangeAuthorizationCode({ code: 'code', codeVerifier: 'verifier', issuer: 'https://simkl.com' }, env).catch(e => e);
+    expect(error).toMatchObject({ stage: 'discovery', upstreamStatus: 503 });
+    expect(String(error)).not.toContain('secret-discovery-body');
+  });
+
+  test('maps unknown upstream error strings to a fixed code', async () => {
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => String(input).includes('/.well-known/')
+      ? discoveryResponse() : Response.json({ error: 'secret-token-value', error_description: 'secret-code-value' }, { status: 400 })) as typeof fetch;
+    const error = await exchangeAuthorizationCode({ code: 'code', codeVerifier: 'verifier', issuer: 'https://simkl.com' }, env).catch(e => e);
+    expect(error).toMatchObject({ stage: 'token_exchange', upstreamStatus: 400, errorCode: 'OAUTH_RESPONSE_BODY_ERROR' });
+    expect(JSON.stringify(error)).not.toMatch(/secret-token-value|secret-code-value/);
   });
 });
