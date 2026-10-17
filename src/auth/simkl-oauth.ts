@@ -28,6 +28,31 @@ export interface SimklAuthProps extends Record<string, unknown> {
   simklUserId?: string;
 }
 
+export class SimklOAuthError extends Error {
+  constructor(
+    public readonly stage: 'discovery' | 'authorization_response' | 'token_exchange',
+    public readonly errorCode: string,
+    public readonly upstreamStatus?: number,
+  ) {
+    super(`Simkl OAuth ${stage} failed${upstreamStatus ? ` with status ${upstreamStatus}` : ''}`);
+  }
+}
+
+const SAFE_ERROR_CODES = new Set([
+  'invalid_request', 'invalid_client', 'invalid_grant', 'unauthorized_client',
+  'unsupported_grant_type', 'invalid_scope', 'access_denied', 'server_error',
+  'temporarily_unavailable', 'OAUTH_INVALID_RESPONSE', 'OAUTH_RESPONSE_IS_NOT_JSON',
+  'OAUTH_RESPONSE_BODY_ERROR', 'OAUTH_WWW_AUTHENTICATE_CHALLENGE',
+]);
+
+function sanitizedErrorCode(error: unknown): string {
+  const candidate = error as { error?: unknown; code?: unknown } | null;
+  for (const value of [candidate?.error, candidate?.code]) {
+    if (typeof value === 'string' && SAFE_ERROR_CODES.has(value)) return value;
+  }
+  return 'upstream_failure';
+}
+
 export async function createPkcePair(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const codeVerifier = oauth.generateRandomCodeVerifier();
   const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier);
@@ -35,18 +60,24 @@ export async function createPkcePair(): Promise<{ codeVerifier: string; codeChal
 }
 
 export async function exchangeAuthorizationCode(
-  input: { code: string; codeVerifier: string },
+  input: { code: string; codeVerifier: string; issuer: string },
   env: SimklOAuthEnv
 ): Promise<SimklTokenSet> {
   const { authorizationServer, client, clientAuth } = await getOAuthClient(env);
-  const callbackParameters = oauth.validateAuthResponse(
-    authorizationServer,
-    client,
-    new URLSearchParams({ code: input.code }),
-    oauth.expectNoState
-  );
+  let callbackParameters: URLSearchParams;
+  try {
+    callbackParameters = oauth.validateAuthResponse(
+      authorizationServer,
+      client,
+      new URLSearchParams({ code: input.code, iss: input.issuer }),
+      oauth.expectNoState
+    );
+  } catch (error) {
+    throw new SimklOAuthError('authorization_response', sanitizedErrorCode(error));
+  }
 
   let tokenResponse: oauth.TokenEndpointResponse;
+  let upstreamStatus: number | undefined;
   try {
     const response = await oauth.authorizationCodeGrantRequest(
       authorizationServer,
@@ -57,9 +88,10 @@ export async function exchangeAuthorizationCode(
       input.codeVerifier,
       { headers: { 'User-Agent': USER_AGENT } }
     );
+    upstreamStatus = response.status;
     tokenResponse = await oauth.processAuthorizationCodeResponse(authorizationServer, client, response);
   } catch (error) {
-    throwTokenError(error);
+    throwTokenError(error, upstreamStatus);
   }
   return toSimklTokenSet(tokenResponse);
 }
@@ -68,6 +100,7 @@ export async function refreshSimklToken(refreshToken: string, env: SimklOAuthEnv
   const { authorizationServer, client, clientAuth } = await getOAuthClient(env);
 
   let tokenResponse: oauth.TokenEndpointResponse;
+  let upstreamStatus: number | undefined;
   try {
     const response = await oauth.refreshTokenGrantRequest(
       authorizationServer,
@@ -76,19 +109,22 @@ export async function refreshSimklToken(refreshToken: string, env: SimklOAuthEnv
       refreshToken,
       { headers: { 'User-Agent': USER_AGENT } }
     );
+    upstreamStatus = response.status;
     tokenResponse = await oauth.processRefreshTokenResponse(authorizationServer, client, response);
   } catch (error) {
-    throwTokenError(error);
+    throwTokenError(error, upstreamStatus);
   }
   return toSimklTokenSet(tokenResponse, refreshToken);
 }
 
 async function getOAuthClient(env: SimklOAuthEnv) {
+  let upstreamStatus: number | undefined;
   try {
     const response = await oauth.discoveryRequest(SIMKL_ISSUER, {
       algorithm: 'oauth2',
       headers: { 'User-Agent': USER_AGENT },
     });
+    upstreamStatus = response.status;
     const authorizationServer = await oauth.processDiscoveryResponse(SIMKL_ISSUER, response);
     if (!authorizationServer.token_endpoint) {
       throw new Error('Missing token endpoint');
@@ -99,9 +135,9 @@ async function getOAuthClient(env: SimklOAuthEnv) {
       client: { client_id: env.SIMKL_CLIENT_ID },
       clientAuth: oauth.ClientSecretBasic(env.SIMKL_CLIENT_SECRET),
     };
-  } catch {
+  } catch (error) {
     // Discovery errors can contain response data. Keep credentials and protocol details out of errors.
-    throw new Error('Simkl authorization server discovery failed');
+    throw new SimklOAuthError('discovery', sanitizedErrorCode(error), upstreamStatus);
   }
 }
 
@@ -110,7 +146,7 @@ function toSimklTokenSet(
   priorRefreshToken?: string
 ): SimklTokenSet {
   if (!data.access_token || data.token_type.toLowerCase() !== 'bearer') {
-    throw new Error('Simkl token response was missing required token fields');
+    throw new SimklOAuthError('token_exchange', 'invalid_token_response', 200);
   }
 
   const now = Date.now();
@@ -121,7 +157,7 @@ function toSimklTokenSet(
     ? data.refresh_token
     : priorRefreshToken;
   if (!returnedRefreshToken) {
-    throw new Error('Simkl token response was missing a refresh token');
+    throw new SimklOAuthError('token_exchange', 'missing_refresh_token', 200);
   }
 
   return {
@@ -133,14 +169,6 @@ function toSimklTokenSet(
   };
 }
 
-function throwTokenError(error: unknown): never {
-  const candidate = error as { status?: unknown; code?: unknown; cause?: { status?: unknown } } | null;
-  const status = candidate?.status ?? candidate?.cause?.status;
-  if (Number.isInteger(status) && (status as number) >= 100) {
-    throw new Error(`Simkl token request failed with status ${status}`);
-  }
-  if (candidate?.code === 'OAUTH_RESPONSE_IS_NOT_JSON') {
-    throw new Error('Simkl token response was not valid JSON');
-  }
-  throw new Error('Simkl token response was missing required token fields');
+function throwTokenError(error: unknown, upstreamStatus?: number): never {
+  throw new SimklOAuthError('token_exchange', sanitizedErrorCode(error), upstreamStatus);
 }

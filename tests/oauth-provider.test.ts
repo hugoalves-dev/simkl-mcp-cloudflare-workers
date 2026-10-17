@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import authHandler from '../src/auth-handler';
 import type { SimklAuthProps } from '../src/auth/simkl-oauth.js';
 
 let createSimklTokenExchangeCallback: typeof import('../src/index.js').createSimklTokenExchangeCallback;
@@ -33,6 +34,7 @@ function tokenResponse(accessToken: string, refreshToken?: string, expiresIn = 3
 function discoveryResponse() {
   return new Response(JSON.stringify({
     issuer: 'https://simkl.com',
+    authorization_response_iss_parameter_supported: true,
     authorization_endpoint: 'https://simkl.com/oauth2/authorize',
     token_endpoint: 'https://api.simkl.com/oauth/token',
     response_types_supported: ['code'],
@@ -201,24 +203,26 @@ describe('Simkl provider token exchange callback', () => {
 });
 
 describe('OAuthProvider MCP resource audience', () => {
-  it('accepts a token whose RFC 8707 audience is the MCP endpoint path', async () => {
+  it.each([false, true])('runs callback, client PKCE, token replay and authenticated resource (invalid PKCE: %s)', async (invalidPkce) => {
     const kv = new MemoryKV();
-    const env: any = { OAUTH_KV: kv };
+    const env: any = { ...{ SIMKL_CLIENT_ID: 'simkl-client', SIMKL_CLIENT_SECRET: 'simkl-secret', OAUTH_REDIRECT_URI: 'https://worker.test/oauth/callback' }, OAUTH_KV: kv };
+    let upstreamChallenge: string;
+    globalThis.fetch = refreshFetchStub((async (input, init) => {
+      if (String(input).includes('/users/settings')) return Response.json({ account: { id: 42 } });
+      const form = new URLSearchParams(String(init?.body));
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(form.get('code_verifier')!));
+      const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+      expect(challenge).toBe(upstreamChallenge);
+      expect(form.get('redirect_uri')).toBe(env.OAUTH_REDIRECT_URI);
+      expect(form.get('code')).toBe('simkl-one-time-code');
+      return tokenResponse('simkl-access', 'simkl-refresh');
+    }) as typeof fetch);
     const provider = new OAuthProvider({
       apiHandlers: { '/mcp': { fetch: async () => new Response('handled') } },
-      defaultHandler: {
-        fetch: async (request: Request, handlerEnv: any) => {
-          const oauthRequest = await handlerEnv.OAUTH_PROVIDER.parseAuthRequest(request);
-          const { redirectTo } = await handlerEnv.OAUTH_PROVIDER.completeAuthorization({
-            request: oauthRequest,
-            userId: 'user-1',
-            scope: oauthRequest.scope,
-            props: {},
-          });
-          return Response.redirect(redirectTo, 302);
-        },
-      },
-      authorizeEndpoint: '/authorize',
+      defaultHandler: authHandler as any,
+      tokenExchangeCallback: createSimklTokenExchangeCallback(env),
+      authorizeEndpoint: '/auth/simkl',
       tokenEndpoint: '/token',
       clientRegistrationEndpoint: '/register',
     });
@@ -236,7 +240,7 @@ describe('OAuthProvider MCP resource audience', () => {
     const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
     const resource = 'https://worker.test/mcp';
-    const authorizationUrl = new URL('https://worker.test/authorize');
+    const authorizationUrl = new URL('https://worker.test/auth/simkl');
     authorizationUrl.search = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
@@ -248,9 +252,21 @@ describe('OAuthProvider MCP resource audience', () => {
       resource,
     }).toString();
     const authorizationResponse = await fetchProvider(new Request(authorizationUrl));
-    const code = new URL(authorizationResponse.headers.get('location')!).searchParams.get('code')!;
+    expect(authorizationResponse.status).toBe(302);
+    const simklRedirect = new URL(authorizationResponse.headers.get('location')!);
+    expect(simklRedirect.searchParams.get('redirect_uri')).toBe(env.OAUTH_REDIRECT_URI);
+    upstreamChallenge = simklRedirect.searchParams.get('code_challenge')!;
+    const callback = new URL(env.OAUTH_REDIRECT_URI);
+    callback.search = new URLSearchParams({ code: 'simkl-one-time-code', state: simklRedirect.searchParams.get('state')!, iss: 'https://simkl.com' }).toString();
+    const completed = await fetchProvider(new Request(callback));
+    expect(completed.status).toBe(302);
+    const chatRedirect = new URL(completed.headers.get('location')!);
+    expect(chatRedirect.origin + chatRedirect.pathname).toBe('https://chat.example/callback');
+    expect(chatRedirect.searchParams.get('state')).toBe('state');
+    const code = chatRedirect.searchParams.get('code')!;
+    expect((await fetchProvider(new Request(callback))).status).toBe(400);
 
-    const tokenResponse = await fetchProvider(new Request('https://worker.test/token', {
+    const tokenRequest = new Request('https://worker.test/token', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -258,12 +274,18 @@ describe('OAuthProvider MCP resource audience', () => {
         client_id: clientId,
         code,
         redirect_uri: 'https://chat.example/callback',
-        code_verifier: verifier,
+        code_verifier: invalidPkce ? 'incorrect-verifier-012345678901234567890123456789' : verifier,
         resource,
       }),
-    }));
-    expect(tokenResponse.status).toBe(200);
-    const { access_token: accessToken } = await tokenResponse.json() as { access_token: string };
+    });
+    const exchanged = await fetchProvider(tokenRequest.clone());
+    if (invalidPkce) {
+      expect(exchanged.status).toBe(400);
+      return;
+    }
+    expect(exchanged.status).toBe(200);
+    expect((await fetchProvider(tokenRequest.clone())).status).toBe(400);
+    const { access_token: accessToken } = await exchanged.json() as { access_token: string };
 
     const mcpResponse = await fetchProvider(new Request('https://worker.test/mcp', {
       method: 'POST',

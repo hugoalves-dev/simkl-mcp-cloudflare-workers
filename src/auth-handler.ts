@@ -1,5 +1,6 @@
 import { routes } from './http-routes';
 import {
+  SimklOAuthError,
   createPkcePair,
   exchangeAuthorizationCode,
   type SimklAuthProps,
@@ -37,7 +38,11 @@ function isPendingOAuthState(value: unknown): value is PendingOAuthState {
   return typeof pending.codeVerifier === 'string'
     && pending.codeVerifier.length >= 43
     && pending.codeVerifier.length <= 128
+    && /^[A-Za-z0-9._~-]+$/.test(pending.codeVerifier)
     && typeof pending.createdAt === 'number'
+    && Number.isFinite(pending.createdAt)
+    && pending.createdAt <= Date.now()
+    && Date.now() - pending.createdAt < 600_000
     && 'oauthRequest' in pending;
 }
 
@@ -64,12 +69,20 @@ async function fetchSimklUserId(simklToken: string, env: Env): Promise<string | 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const traceId = crypto.randomUUID();
+    const failure = (stage: string, httpStatus: number, errorCode: string, message: string, upstreamStatus?: number) => {
+      console.error({ event: 'oauth_failure', stage, httpStatus, errorCode, traceId,
+        ...(upstreamStatus === undefined ? {} : { upstreamStatus }) });
+      return new Response(message, { status: httpStatus, headers: { 'X-Trace-Id': traceId, 'Cache-Control': 'no-store' } });
+    };
     if (url.pathname === routes.authorize) {
+      let stage = 'parse_authorization';
       try {
         const oauthRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
         const state = crypto.randomUUID();
         const { codeVerifier, codeChallenge } = await createPkcePair();
         const pending: PendingOAuthState = { oauthRequest, codeVerifier, createdAt: Date.now() };
+        stage = 'store_state';
         await env.OAUTH_KV.put(`oauth_state:${state}`, JSON.stringify(pending), { expirationTtl: 600 });
         const authorizationUrl = new URL(SIMKL_AUTHORIZATION_ENDPOINT);
         authorizationUrl.searchParams.set('response_type', 'code');
@@ -81,7 +94,7 @@ export default {
         authorizationUrl.searchParams.set('code_challenge_method', 'S256');
         return Response.redirect(authorizationUrl.toString(), 302);
       } catch {
-        return new Response('Unable to start authorization', { status: 500 });
+        return failure(stage, 500, 'authorization_start_failed', 'Unable to start authorization');
       }
     }
 
@@ -89,29 +102,33 @@ export default {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state');
       if (url.searchParams.has('error') || !code || !state || url.searchParams.get('iss') !== SIMKL_ISSUER) {
-        return new Response('Invalid authorization response', { status: 400 });
+        return failure('authorization_response', 400, 'invalid_authorization_response', 'Invalid authorization response');
       }
-      const key = `oauth_state:${state}`;
-      const stored = await env.OAUTH_KV.get(key);
-      if (!stored) return new Response('Invalid or expired authorization state', { status: 400 });
-
-      let pending: unknown;
+      let stage = 'load_state';
       try {
-        pending = JSON.parse(stored);
-      } catch {
-        await env.OAUTH_KV.delete(key);
-        return new Response('Invalid or expired authorization state', { status: 400 });
-      }
-      if (!isPendingOAuthState(pending)) {
-        await env.OAUTH_KV.delete(key);
-        return new Response('Invalid or expired authorization state', { status: 400 });
-      }
+        const key = `oauth_state:${state}`;
+        const stored = await env.OAUTH_KV.get(key);
+        if (!stored) return failure('state_validation', 400, 'invalid_or_expired_state', 'Invalid or expired authorization state');
 
-      // Simkl consumes authorization codes when an exchange is attempted. Delete
-      // state first so a failed exchange cannot make a replay retry that code.
-      await env.OAUTH_KV.delete(key);
-      try {
-        const tokenSet = await exchangeAuthorizationCode({ code, codeVerifier: pending.codeVerifier }, env);
+        let pending: unknown;
+        try {
+          pending = JSON.parse(stored);
+        } catch {
+          await env.OAUTH_KV.delete(key);
+          return failure('state_validation', 400, 'invalid_or_expired_state', 'Invalid or expired authorization state');
+        }
+        if (!isPendingOAuthState(pending)) {
+          await env.OAUTH_KV.delete(key);
+          return failure('state_validation', 400, 'invalid_or_expired_state', 'Invalid or expired authorization state');
+        }
+
+        // Simkl consumes authorization codes when an exchange is attempted. Delete
+        // state first so a later sequential callback cannot retry that code. KV
+        // is eventually consistent; Simkl also enforces single-use codes upstream.
+        stage = 'consume_state';
+        await env.OAUTH_KV.delete(key);
+        stage = 'token_exchange';
+        const tokenSet = await exchangeAuthorizationCode({ code, codeVerifier: pending.codeVerifier, issuer: url.searchParams.get('iss')! }, env);
         const props: SimklAuthProps = {
           simklToken: tokenSet.accessToken,
           simklRefreshToken: tokenSet.refreshToken,
@@ -121,17 +138,23 @@ export default {
         };
         const requestedScopes = normalizeScopes((pending.oauthRequest as { scope?: unknown } | null)?.scope);
         const grantedScopes = requestedScopes.length ? requestedScopes : ['public'];
+        stage = 'user_settings';
         const simklUserId = await fetchSimklUserId(tokenSet.accessToken, env);
         if (simklUserId) props.simklUserId = simklUserId;
         const userId = `simkl_user_${simklUserId || crypto.randomUUID()}`;
+        stage = 'complete_authorization';
         const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
           request: pending.oauthRequest, userId, scope: grantedScopes, props,
         });
-        return Response.redirect(redirectTo, 302);
-      } catch {
-        return new Response('Authorization failed. Please start again.', { status: 502 });
-      } finally {
-        await env.OAUTH_KV.delete(key);
+        stage = 'redirect';
+        console.log({ event: 'oauth_success', stage, httpStatus: 302, traceId });
+        const response = new Response(null, { status: 302, headers: { Location: redirectTo, 'Cache-Control': 'no-store', 'X-Trace-Id': traceId } });
+        return response;
+      } catch (error) {
+        return failure(error instanceof SimklOAuthError ? error.stage : stage, 502,
+          error instanceof SimklOAuthError ? error.errorCode : 'authorization_failed',
+          'Authorization failed. Please start again.',
+          error instanceof SimklOAuthError ? error.upstreamStatus : undefined);
       }
     }
 
