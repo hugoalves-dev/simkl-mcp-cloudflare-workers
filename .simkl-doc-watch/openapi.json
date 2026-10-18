@@ -15772,11 +15772,11 @@
     },
     "/search/{type}": {
       "get": {
-        "description": "<Danger>\n**Never call search before scrobbling or marking something watched.**\n\nThis is the most common wasted request we see. Apps look the title up here first to get a Simkl ID, then send that ID to the write endpoint. **The lookup is unnecessary.** Every write endpoint resolves the item itself, from whatever you already have:\n\n```json\n{\n  \"movie\": {\n    \"title\": \"Dune: Part Two\",\n    \"year\": 2024,\n    \"ids\": { \"imdb\": \"tt15239678\", \"tmdb\": \"693134\" }\n  }\n}\n```\n\nPass any combination of IDs, plus `title` and `year` as fallbacks, in the **same request** that records the watch. Simkl matches it server-side. A Simkl ID is never required.\n\nThat applies to [`/scrobble/*`](/api-reference/scrobble), [`POST /sync/history`](/api-reference/simkl/add-to-history), [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) and [`POST /sync/ratings`](/api-reference/simkl/add-ratings) alike.\n\nSearching first doubles your request count for no benefit, burns rate limit you'll want later, and picks the wrong title whenever the search ranking disagrees with the IDs you already hold. **One call, not two.**\n\nUse search only when you have **no usable IDs at all**: a title the user typed, a file name, or a random pick.\n</Danger>\n\nFull-text search over the Simkl catalog. Pick a type (`movie`, `tv`, or `anime`) and pass a search term like `john wick` or `john wick 2014`.\n\n<Note>\n**Heads up: `movie` becomes `\"movies\"` in the response.**\n\nYou call `/search/movie` (no `s`) but each item in the response has `endpoint_type: \"movies\"` (with an `s`). TV and anime don't change.\n\n| You call | Each item's `endpoint_type` is |\n|---|---|\n| `/search/movie` | `\"movies\"` ← note the extra `s` |\n| `/search/tv` | `\"tv\"` |\n| `/search/anime` | `\"anime\"` |\n\nEvery item in a single response has the same `endpoint_type` — you never get a mixed list back.\n</Note>\n\n#### Path parameter\n\n| Param | Values |\n|---|---|\n| `type` | `movie`, `tv`, `anime` |\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `q` | — | **Required.** Text query (matches `title` and `all_titles[]`). For external-ID lookups (IMDb / TMDB / TVDB / etc.), use [`/redirect`](/api-reference/redirect) or [`/search/id`](/api-reference/simkl/search-by-id) instead. |\n| `page` | `1` | Hard-capped server-side at `20`. Higher values silently clamp. |\n| `limit` | `10` | Hard-capped server-side at `50`. Higher values silently clamp. |\n| `extended` | `simple` | `full` adds `all_titles[]`, `url`, `ep_count` (TV/anime), `rank` (nullable), `status` (TV/anime), and a `ratings` block. |\n| `sort` | `relevance` | Result order: `relevance`, `release-date`, `last-air-date` (TV and anime only), `title` or `rank` — see **Sorting** below. Any other value is a `400`. |\n\nReturns paginated results with `X-Pagination-*` headers — see [Pagination](/conventions/pagination) for the standard paginator pattern.\n\n#### Sorting\n\n`sort` changes the order of the matches, not which titles match, and paging keeps it — page 2 continues where page 1 stopped.\n\n| `sort` | Order |\n|---|---|\n| `relevance` *(default)* | Best match first, then the more popular title. |\n| `release-date` | Newest release first. Upcoming titles come before released ones. |\n| `last-air-date` | Most recently aired first. **TV and anime only** — on `/search/movie` it returns `400`. |\n| `title` | A–Z. Titles that start with punctuation or a number come before `A`. |\n| `rank` | Simkl rank, most popular first. |\n\nValues are case-insensitive, and an empty `sort=` means `relevance`. Any other value returns `400 wrong_parameter`, with the accepted values listed in `message`.\n\n#### Per-item fields by mode\n\n| Field | `simple` | `extended=full` | Notes |\n|---|---|---|---|\n| `title` | ✓ | ✓ | Display title in the user's locale. |\n| `title_en` | — | — | **Anime only**, optional even on anime — only when an English-localized title is on file. |\n| `title_romaji` | anime only | anime only | **Anime only**, always present on anime items. Currently mirrors `title` for the romaji slot. |\n| `year` | ✓ | ✓ | Premiere year. |\n| `endpoint_type` | ✓ | ✓ | `\"movies\"` / `\"tv\"` / `\"anime\"`. Same value on every item in one response. |\n| `type` | anime only | anime only | **Anime only**: `tv`, `movie`, `ova`, `ona`, `special`, `music`. |\n| `poster` | ✓ | ✓ | Image path fragment — see [Image conventions](/conventions/images) for the full URL pattern (`https://wsrv.nl/?url=https://simkl.in/posters/{poster}_m.webp&q=90`). |\n| `ids` | ✓ | ✓ | `{ simkl_id, slug, tmdb? }`. `tmdb` only present when a TMDB link is on file. |\n| `all_titles` | — | movies/anime | Aliases / localized variants. Anime sees the most entries. TV items typically don't carry this even on `extended=full`. |\n| `url` | — | ✓ | Relative simkl.com URL (with slug). |\n| `ep_count` | — | TV/anime | Total episode count when known. |\n| `rank` | — | ✓ | Simkl popularity rank. **Nullable** — see below. |\n| `status` | — | TV/anime | Closed enum: `tba`, `ended`, `airing`. |\n| `ratings.simkl` | — | ✓ | `{ rating, votes }` — only present when votes > 0. |\n| `ratings.imdb` | — | ✓ | `{ rating, votes }` — only present when an IMDb rating record exists. |\n| `ratings.mal` | — | anime only | `{ rating, votes, rank }` — anime only, only when a MAL record exists. |\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `rank` | Item not yet ranked, or rank value ≥ 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n| `ep_count` | TV/anime item with no episode count on file yet | [Type 4](/conventions/null-values#type-4) |\n| `poster` | No poster image on file | [Type 4](/conventions/null-values#type-4) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `400 wrong_parameter` | `sort` is not one of the values above, or `last-air-date` on `/search/movie` |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nInvalid `page` / `limit` never return `400` — they silently clamp to the server caps. No `404` — empty result is `[]` with status `200`.\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
+        "description": "<Danger>\n**Never call search before scrobbling or marking something watched.**\n\nThis is the most common wasted request we see. Apps look the title up here first to get a Simkl ID, then send that ID to the write endpoint. **The lookup is unnecessary.** Every write endpoint resolves the item itself, from whatever you already have:\n\n```json\n{\n  \"movie\": {\n    \"title\": \"Dune: Part Two\",\n    \"year\": 2024,\n    \"ids\": { \"imdb\": \"tt15239678\", \"tmdb\": \"693134\" }\n  }\n}\n```\n\nPass any combination of IDs, plus `title` and `year` as fallbacks, in the **same request** that records the watch. Simkl matches it server-side. A Simkl ID is never required.\n\nThat applies to [`/scrobble/*`](/api-reference/scrobble), [`POST /sync/history`](/api-reference/simkl/add-to-history), [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) and [`POST /sync/ratings`](/api-reference/simkl/add-ratings) alike.\n\nSearching first doubles your request count for no benefit, burns rate limit you'll want later, and picks the wrong title whenever the search ranking disagrees with the IDs you already hold. **One call, not two.**\n\nUse search only when you have **no usable IDs at all**: a title the user typed, a file name, or a random pick.\n</Danger>\n\nFull-text search over the Simkl catalog. Pick a type — `movie`, `tv`, `anime`, or `all` for all three at once — and pass a search term like `john wick` or `john wick 2014`.\n\n<Note>\n**Heads up: `movie` becomes `\"movies\"` in the response.**\n\nYou call `/search/movie` (no `s`) but each item in the response has `endpoint_type: \"movies\"` (with an `s`). TV and anime don't change.\n\n| You call | Each item's `endpoint_type` is |\n|---|---|\n| `/search/movie` | `\"movies\"` ← note the extra `s` |\n| `/search/tv` | `\"tv\"` |\n| `/search/anime` | `\"anime\"` |\n| `/search/all` | each item's own type: `\"movies\"`, `\"tv\"` or `\"anime\"` |\n\nWith `movie`, `tv` or `anime`, every item in the response has that `endpoint_type`. `all` mixes them — see **Searching all types** below.\n</Note>\n\n#### Path parameter\n\n| Param | Values |\n|---|---|\n| `type` | `movie`, `tv`, `anime`, or `all` for all three at once (see **Searching all types** below) |\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `q` | — | **Required.** Text query (matches `title` and `all_titles[]`). For external-ID lookups (IMDb / TMDB / TVDB / etc.), use [`/redirect`](/api-reference/redirect) or [`/search/id`](/api-reference/simkl/search-by-id) instead. |\n| `page` | `1` | Hard-capped server-side at `20`. Higher values silently clamp. |\n| `limit` | `10` | Hard-capped server-side at `50`. Higher values silently clamp. |\n| `extended` | `simple` | `full` adds `all_titles[]`, `url`, `ep_count` (TV/anime), `rank` (nullable), `status` (TV/anime), and a `ratings` block. |\n| `sort` | `relevance` | Result order: `relevance`, `release-date`, `last-air-date` (TV and anime only), `title` or `rank` — see **Sorting** below. Any other value is a `400`. |\n\nReturns paginated results with `X-Pagination-*` headers — see [Pagination](/conventions/pagination) for the standard paginator pattern.\n\n#### Sorting\n\n`sort` changes the order of the matches, not which titles match, and paging keeps it — page 2 continues where page 1 stopped.\n\n| `sort` | Order |\n|---|---|\n| `relevance` *(default)* | Best match first, then the more popular title. |\n| `release-date` | Newest release first. Upcoming titles come before released ones. |\n| `last-air-date` | Most recently aired first. **TV and anime only** — on `/search/movie` it returns `400`. |\n| `title` | A–Z. Titles that start with punctuation or a number come before `A`. |\n| `rank` | Simkl rank, most popular first. |\n\nValues are case-insensitive, and an empty `sort=` means `relevance`. Any other value returns `400 wrong_parameter`, with the accepted values listed in `message`.\n\n#### Searching all types\n\nUse `all` as the type to search movies, TV shows and anime in one request:\n\n```text\nGET /search/all?q=batman\n```\n\n`all` is lower-case only (`/search/ALL` returns `null`), and the path always needs a type — `/search` on its own returns `404`.\n\n- **Results mix types.** Each item carries its own `endpoint_type` — `movies`, `tv` or `anime` — so branch on it per item, not per response. Every item has the fields it would have in a search of its own type.\n- **The query parameters work the same** — `q`, `page`, `limit`, `extended`, `sort`. All five sorts are accepted, `last-air-date` included, but movies have no air dates, so their place in that order isn't meaningful; prefer `release-date` when the results include movies.\n- **If your app shows only one kind of title, use that type instead of `all`.** You get only that type, and the `X-Pagination-*` counts cover only those matches.\n\n#### Per-item fields by mode\n\n| Field | `simple` | `extended=full` | Notes |\n|---|---|---|---|\n| `title` | ✓ | ✓ | Display title in the user's locale. |\n| `title_en` | — | — | **Anime only**, optional even on anime — only when an English-localized title is on file. |\n| `title_romaji` | anime only | anime only | **Anime only**, always present on anime items. Currently mirrors `title` for the romaji slot. |\n| `year` | ✓ | ✓ | Premiere year. |\n| `endpoint_type` | ✓ | ✓ | `\"movies\"` / `\"tv\"` / `\"anime\"`. Same value on every item in one response. |\n| `type` | anime only | anime only | **Anime only**: `tv`, `movie`, `ova`, `ona`, `special`, `music`. |\n| `poster` | ✓ | ✓ | Image path fragment — see [Image conventions](/conventions/images) for the full URL pattern (`https://wsrv.nl/?url=https://simkl.in/posters/{poster}_m.webp&q=90`). |\n| `ids` | ✓ | ✓ | `{ simkl_id, slug, tmdb? }`. `tmdb` only present when a TMDB link is on file. |\n| `all_titles` | — | movies/anime | Aliases / localized variants. Anime sees the most entries. TV items typically don't carry this even on `extended=full`. |\n| `url` | — | ✓ | Relative simkl.com URL (with slug). |\n| `ep_count` | — | TV/anime | Total episode count when known. |\n| `rank` | — | ✓ | Simkl popularity rank. **Nullable** — see below. |\n| `status` | — | TV/anime | Closed enum: `tba`, `ended`, `airing`. |\n| `ratings.simkl` | — | ✓ | `{ rating, votes }` — only present when votes > 0. |\n| `ratings.imdb` | — | ✓ | `{ rating, votes }` — only present when an IMDb rating record exists. |\n| `ratings.mal` | — | anime only | `{ rating, votes, rank }` — anime only, only when a MAL record exists. |\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `rank` | Item not yet ranked, or rank value ≥ 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n| `ep_count` | TV/anime item with no episode count on file yet | [Type 4](/conventions/null-values#type-4) |\n| `poster` | No poster image on file | [Type 4](/conventions/null-values#type-4) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `400 wrong_parameter` | `sort` is not one of the values above, or `last-air-date` on `/search/movie` |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nInvalid `page` / `limit` never return `400` — they silently clamp to the server caps. No `404` — empty result is `[]` with status `200`.\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
         "operationId": "get-search-type",
         "parameters": [
           {
-            "description": "Search type.",
+            "description": "Search type. `all` searches movies, TV and anime at once and mixes them in one list.",
             "example": "movie",
             "in": "path",
             "name": "type",
@@ -15785,7 +15785,8 @@
               "enum": [
                 "tv",
                 "anime",
-                "movie"
+                "movie",
+                "all"
               ],
               "type": "string"
             }
@@ -15829,7 +15830,7 @@
             }
           },
           {
-            "description": "Result order. `relevance` (default) puts the best match first; `release-date` newest first; `last-air-date` most recently aired first — **TV and anime only**, a `400` on `movie`; `title` A–Z; `rank` most popular first. Case is ignored, and an empty value means `relevance`. Any other value returns `400 wrong_parameter`.",
+            "description": "Result order. `relevance` (default) puts the best match first; `release-date` newest first; `last-air-date` most recently aired first — **TV and anime only**: a `400` on `movie`, and accepted with `all` but not meaningful for the movies in those results; `title` A–Z; `rank` most popular first. Case is ignored, and an empty value means `relevance`. Any other value returns `400 wrong_parameter`.",
             "example": "relevance",
             "in": "query",
             "name": "sort",
@@ -15864,6 +15865,473 @@
             "content": {
               "application/json": {
                 "examples": {
+                  "all_types_extended": {
+                    "summary": "All types (`/search/all`) with extended=full — q=batman",
+                    "value": [
+                      {
+                        "all_titles": [
+                          "The Batman",
+                          "Бэтмен",
+                          "배트맨",
+                          "Yarasa Adam",
+                          "蝙蝠侠",
+                          "Batman",
+                          "더 배트맨",
+                          "新蝙蝠侠",
+                          "The BATMAN－ザ・バットマン－",
+                          "蝙蝠俠",
+                          "Le Batman",
+                          "蝙蝠俠 2022",
+                          "O Batman",
+                          "Бетмен",
+                          "באטמן",
+                          "重启版蝙蝠侠",
+                          "द बैटमैन",
+                          "バットマン",
+                          "Batman, The",
+                          "ザ・バットマン",
+                          "The BATMAN－ザ・バットマン－：2022",
+                          "The Batman: 1",
+                          "蝙蝠侠9：新蝙蝠侠",
+                          "蝙蝠侠8：新蝙蝠侠",
+                          "The Batman 1",
+                          "The Batman - Part 1",
+                          "Batman 4 - The Batman"
+                        ],
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 615446,
+                          "slug": "the-batman",
+                          "tmdb": "414906"
+                        },
+                        "poster": "12/12217805ebd2008beb",
+                        "rank": 1146,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 7.8,
+                            "votes": 953776
+                          },
+                          "simkl": {
+                            "rating": 7.8,
+                            "votes": 8547
+                          }
+                        },
+                        "title": "The Batman",
+                        "url": "/movies/615446/the-batman",
+                        "year": 2022
+                      },
+                      {
+                        "endpoint_type": "tv",
+                        "ep_count": 85,
+                        "ids": {
+                          "simkl_id": 5756,
+                          "slug": "batman-the-animated-series",
+                          "tmdb": "2098"
+                        },
+                        "poster": "18/187418d274b04c4",
+                        "rank": 64,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 9,
+                            "votes": 140694
+                          },
+                          "simkl": {
+                            "rating": 8.6,
+                            "votes": 1024
+                          }
+                        },
+                        "status": "ended",
+                        "title": "Batman: The Animated Series",
+                        "url": "/tv/5756/batman-the-animated-series",
+                        "year": 1992
+                      },
+                      {
+                        "all_titles": [
+                          "Batman",
+                          "Бэтмен",
+                          "バットマン",
+                          "बैटमैन",
+                          "배트맨",
+                          "Yarasa Adam",
+                          "蝙蝠侠",
+                          "蝙蝠俠",
+                          "Batman – A Denevérember",
+                          "באטמן",
+                          "Μπάτμαν",
+                          "Бетмен",
+                          "Batman - A denevérember",
+                          "Tim Burton’s Batman",
+                          "Batman 1",
+                          "Batman ‘89",
+                          "［1989］バットマン",
+                          "バットマン：1989",
+                          "Netopierí muž",
+                          "蝙蝠侠1",
+                          "Betmen"
+                        ],
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 53486,
+                          "slug": "batman",
+                          "tmdb": "268"
+                        },
+                        "poster": "10/102784308f7643770b",
+                        "rank": 2537,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 7.5,
+                            "votes": 437365
+                          },
+                          "simkl": {
+                            "rating": 7.3,
+                            "votes": 3235
+                          }
+                        },
+                        "title": "Batman",
+                        "url": "/movies/53486/batman",
+                        "year": 1989
+                      },
+                      {
+                        "all_titles": [
+                          "Batman Begins",
+                          "Бэтмен: Начало",
+                          "バットマン ビギンズ",
+                          "Batman inicia",
+                          "Batman : Le commencement",
+                          "배트맨 비긴즈",
+                          "Batman - O Início",
+                          "Batman Başlıyor",
+                          "蝙蝠侠：侠影之谜",
+                          "蝙蝠俠—俠影之謎",
+                          "蝙蝠俠：開戰時刻",
+                          "蝙蝠侠1：侠影之谜",
+                          "Batman 5: Batman Başlıyor",
+                          "Batman 5 : Batman Başlıyor",
+                          "Batman: Başlıyor",
+                          "Kara Şövalye Batman Başlıyor",
+                          "Batman: Kezdődik",
+                          "באטמן מתחיל",
+                          "Batman začíná",
+                          "Μπάτμαν: Η αρχή",
+                          "Batman začína",
+                          "Бетмен: Початок",
+                          "Batman - Początek",
+                          "बैटमैन बिगॅन्स",
+                          "Бетмен почиње",
+                          "Batman: Kezdődik!",
+                          "The Dark Knight 1 - Batman Begins",
+                          "蝙蝠侠.侠影之谜",
+                          "Batman 1 - Batman Begins",
+                          "Kara Şövalye: Batman Başlıyor",
+                          "Batman 5",
+                          "Batman Dark Knight 1 - Batman Begins",
+                          "Batman 5 - Batman Begins",
+                          "蝙蝠俠：俠影之謎",
+                          "［2005］バットマン ビギンズ",
+                          "Batman I: Batman Begins",
+                          "The Dark Knight 1: Batman Begins",
+                          "バットマン ビギンズ：2005",
+                          "蝙蝠侠前传：侠影之谜",
+                          "The Dark Knight: Batman Begins",
+                          "Batman (El caballero oscuro) - 1. Batman Begins",
+                          "Batman 5 Początek",
+                          "Batman I - Batman Begins",
+                          "Batman DK 1",
+                          "Batman Dark Knight 1",
+                          "Batman DK 1 - Batman Begins",
+                          "蝙蝠侠5：侠影之谜",
+                          "The Intimidation Game",
+                          "Betmen počinje"
+                        ],
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 53494,
+                          "slug": "batman-begins",
+                          "tmdb": "272"
+                        },
+                        "poster": "13/13811455ee24844ab8",
+                        "rank": 273,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 8.2,
+                            "votes": 1749935
+                          },
+                          "simkl": {
+                            "rating": 8,
+                            "votes": 9783
+                          }
+                        },
+                        "title": "Batman Begins",
+                        "url": "/movies/53494/batman-begins",
+                        "year": 2005
+                      },
+                      {
+                        "endpoint_type": "tv",
+                        "ep_count": 65,
+                        "ids": {
+                          "simkl_id": 2691,
+                          "slug": "the-batman",
+                          "tmdb": "2022"
+                        },
+                        "poster": "29/292616df4165296",
+                        "rank": 4896,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 7.4,
+                            "votes": 15600
+                          },
+                          "simkl": {
+                            "rating": 7.5,
+                            "votes": 181
+                          }
+                        },
+                        "status": "ended",
+                        "title": "The Batman",
+                        "url": "/tv/2691/the-batman",
+                        "year": 2004
+                      },
+                      {
+                        "endpoint_type": "tv",
+                        "ep_count": 120,
+                        "ids": {
+                          "simkl_id": 7590,
+                          "slug": "batman",
+                          "tmdb": "2287"
+                        },
+                        "poster": "78/781922682527cde8",
+                        "rank": 4176,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 7.5,
+                            "votes": 29773
+                          },
+                          "simkl": {
+                            "rating": 7,
+                            "votes": 186
+                          }
+                        },
+                        "status": "ended",
+                        "title": "Batman",
+                        "url": "/tv/7590/batman",
+                        "year": 1966
+                      },
+                      {
+                        "all_titles": [
+                          "Batman v Superman: Dawn of Justice",
+                          "Бэтмен против Супермена: На заре справедливости",
+                          "배트맨 대 슈퍼맨: 저스티스의 시작",
+                          "Batman v. Superman: El amanecer de la Justicia",
+                          "Batman vs Superman: El Origen de la Justicia",
+                          "Batman vs Superman : L'aube de la justice",
+                          "Batman v Superman : L’Aube de la Justice",
+                          "バットマン vs スーパーマン ジャスティスの誕生",
+                          "Batman vs Superman: A Origem da Justiça",
+                          "Batman v Super-Homem: O Despertar da Justiça",
+                          "Batman ve Superman: Adaletin Şafağı",
+                          "蝙蝠侠大战超人：正义黎明",
+                          "蝙蝠俠對超人：正義曙光",
+                          "Batman v Superman, L’Aube de la justice",
+                          "Batman v Superman : L'Aube de la Justice",
+                          "Batman vs Superman: El amanecer de la justicia",
+                          "Betmen ve Süpermen: Adaletin Şafağı",
+                          "बैटमैन और सुपरमैन: इंसाफ़ की लड़ाई",
+                          "Batman versus Superman: El Origen de la Justicia",
+                          "Batman Superman ellen: Az igazság hajnala",
+                          "Batman vs Superman: Úsvit spravedlnosti",
+                          "באטמן נגד סופרמן: שחר הצדק",
+                          "Batman v Superman: Η Αυγή της Δικαιοσύνης",
+                          "Бетмен проти Супермена: На зорі справедливості",
+                          "Batman vs. Superman: Úsvit spravodlivosti",
+                          "蝙蝠侠对超人：正义曙光",
+                          "Batman v Superman: Świt sprawiedliwości",
+                          "Batman v Superman: Adaletin Şafağı",
+                          "Бетмен против Супермена: Зора праведника",
+                          "Batman vs Superman. El amanecer de la justicia",
+                          "Batman v Superman - Dawn of Justice",
+                          "Batman vs Superman: A Origem da Justiça (Edição Definitiva)",
+                          "バットマンＶＳスーパーマン　ジャスティスの誕生",
+                          "バットマンVSスーパーマン 「ジャスティスの誕生」",
+                          "Man of Steel 2 - Batman v Superman Dawn of Justice",
+                          "Batman v Superman. El Amanecer de la Justicia (Ultimate Edition)",
+                          "Man Of Steel 2 - Batman v Superman l'Aube de la Justice",
+                          "Batman v Superman: Dawn of Justice - Ultimate Edition",
+                          "Batman versus Superman - Dawn of Justice",
+                          "Batman versus Superman: Dawn of Justice",
+                          "Batman vs Superman - Dawn of Justice",
+                          "Batman vs. Superman - Dawn of Justice",
+                          "Batman vs Superman El amanecer de la Justicia",
+                          "DC Comics Film 02 - Batman v Superman - L'Aube de la justice",
+                          "Batman v Superman Dawn of Justice 2016",
+                          "バットマン vs スーパーマン ジャスティスの誕生：2016",
+                          "Batman v Superman：Dawn Of Justice",
+                          "Man of Steel 2: Batman v Superman - Dawn of Justice",
+                          "El hombre de acero: 1 - Batman vs Superman - El amanecer de la Justicia",
+                          "Batman kontra Superman: Świt sprawiedliwości",
+                          "Batman v Superman : L'Aube de la Justice (ultimate edition)",
+                          "Batman v Superman : L'Aube de la Justice - Ultimate Edition",
+                          "蝙蝠侠8：蝙蝠侠大战超人：正义黎明",
+                          "超人7：蝙蝠侠大战超人：正义黎明",
+                          "Batman v Superman",
+                          "Batman v Superman։ Dawn of Justice",
+                          "BVS"
+                        ],
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 304478,
+                          "slug": "batman-v-superman-dawn-of-justice",
+                          "tmdb": "209112"
+                        },
+                        "poster": "94/9439310dae416ef9d",
+                        "rank": 15664,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 6.4,
+                            "votes": 800887
+                          },
+                          "simkl": {
+                            "rating": 6.3,
+                            "votes": 7068
+                          }
+                        },
+                        "title": "Batman v Superman: Dawn of Justice",
+                        "url": "/movies/304478/batman-v-superman-dawn-of-justice",
+                        "year": 2016
+                      },
+                      {
+                        "all_titles": [
+                          "Batman: Gotham Knight",
+                          "バットマン ゴッサムナイト",
+                          "蝙蝠侠：哥谭骑士",
+                          "Batman"
+                        ],
+                        "endpoint_type": "anime",
+                        "ep_count": 6,
+                        "ids": {
+                          "simkl_id": 40823,
+                          "slug": "batman-gotham-knight",
+                          "tmdbm": "13851"
+                        },
+                        "poster": "95/9507008ff209c249f",
+                        "rank": 4218,
+                        "ratings": {
+                          "imdb": {
+                            "rating": 6.7,
+                            "votes": 14253
+                          },
+                          "mal": {
+                            "rank": 5295,
+                            "rating": 6.9,
+                            "votes": 18676
+                          },
+                          "simkl": {
+                            "rating": 6.7,
+                            "votes": 545
+                          }
+                        },
+                        "status": "ended",
+                        "title": "Batman: Gotham Knight",
+                        "title_romaji": "Batman: Gotham Knight",
+                        "type": "ova",
+                        "url": "/anime/40823/batman-gotham-knight",
+                        "year": 2008
+                      }
+                    ]
+                  },
+                  "all_types_simple": {
+                    "summary": "All types (`/search/all`) — movies, TV and anime mixed for q=batman",
+                    "value": [
+                      {
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 615446,
+                          "slug": "the-batman",
+                          "tmdb": "414906"
+                        },
+                        "poster": "12/12217805ebd2008beb",
+                        "title": "The Batman",
+                        "year": 2022
+                      },
+                      {
+                        "endpoint_type": "tv",
+                        "ids": {
+                          "simkl_id": 5756,
+                          "slug": "batman-the-animated-series",
+                          "tmdb": "2098"
+                        },
+                        "poster": "18/187418d274b04c4",
+                        "title": "Batman: The Animated Series",
+                        "year": 1992
+                      },
+                      {
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 53486,
+                          "slug": "batman",
+                          "tmdb": "268"
+                        },
+                        "poster": "10/102784308f7643770b",
+                        "title": "Batman",
+                        "year": 1989
+                      },
+                      {
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 53494,
+                          "slug": "batman-begins",
+                          "tmdb": "272"
+                        },
+                        "poster": "13/13811455ee24844ab8",
+                        "title": "Batman Begins",
+                        "year": 2005
+                      },
+                      {
+                        "endpoint_type": "tv",
+                        "ids": {
+                          "simkl_id": 2691,
+                          "slug": "the-batman",
+                          "tmdb": "2022"
+                        },
+                        "poster": "29/292616df4165296",
+                        "title": "The Batman",
+                        "year": 2004
+                      },
+                      {
+                        "endpoint_type": "tv",
+                        "ids": {
+                          "simkl_id": 7590,
+                          "slug": "batman",
+                          "tmdb": "2287"
+                        },
+                        "poster": "78/781922682527cde8",
+                        "title": "Batman",
+                        "year": 1966
+                      },
+                      {
+                        "endpoint_type": "movies",
+                        "ids": {
+                          "simkl_id": 304478,
+                          "slug": "batman-v-superman-dawn-of-justice",
+                          "tmdb": "209112"
+                        },
+                        "poster": "94/9439310dae416ef9d",
+                        "title": "Batman v Superman: Dawn of Justice",
+                        "year": 2016
+                      },
+                      {
+                        "endpoint_type": "anime",
+                        "ids": {
+                          "simkl_id": 40823,
+                          "slug": "batman-gotham-knight",
+                          "tmdbm": "13851"
+                        },
+                        "poster": "95/9507008ff209c249f",
+                        "title": "Batman: Gotham Knight",
+                        "title_romaji": "Batman: Gotham Knight",
+                        "type": "ova",
+                        "year": 2008
+                      }
+                    ]
+                  },
                   "anime_extended": {
                     "summary": "Anime (extended=full) — q=cowboy bebop, limit=1 (ratings.mal carries rank)",
                     "value": [
@@ -16078,7 +16546,7 @@
                   }
                 },
                 "schema": {
-                  "description": "Search results — always a single array. The `endpoint_type` on each item mirrors the path's `:type` (in its plural form) and is constant within one response, so use it as the discriminator.",
+                  "description": "Search results — always a single array. With `movie`, `tv` or `anime`, every item's `endpoint_type` is that type (in its plural form); with `all`, items can be of different types — read `endpoint_type` on each item.",
                   "items": {
                     "discriminator": {
                       "mapping": {
@@ -16189,6 +16657,16 @@
             "label": "anime_extended",
             "lang": "Shell",
             "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://api.simkl.com/search/anime?q=cowboy+bebop&extended=full&limit=1&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          },
+          {
+            "label": "all_types_simple",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://api.simkl.com/search/all?q=batman&limit=8&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          },
+          {
+            "label": "all_types_extended",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://api.simkl.com/search/all?q=batman&limit=8&extended=full&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
           },
           {
             "label": "empty_no_results",
@@ -17644,7 +18122,7 @@
     },
     "/sync/all-items/{type}/{status}": {
       "get": {
-        "description": "> ## ⚠️ For continuous sync, do NOT call `/sync/all-items` on a timer\n>\n> The correct loop, every time you want to check for changes:\n>\n> 1. **Call [`GET /sync/activities`](/api-reference/simkl/get-activities) first.** It returns a tiny JSON of `last-modified` timestamps per category — costs almost nothing.\n> 2. **Compare them with the snapshot you saved last time** — the whole `/sync/activities` response. If the top-level `all` is unchanged, stop here. Do **not** call `/sync/all-items`.\n> 3. **Only if a watchlist timestamp changed**, call `/sync/all-items?date_from=<the top-level all from your saved snapshot>`, passed exactly as returned. The `date_from` makes the server return only the small delta of items that changed strictly after that moment, not the user's entire library.\n> 4. **Save the new `/sync/activities` response as your snapshot** — only after every fetch has succeeded.\n>\n> Polling `/sync/all-items` directly on a timer (without checking `/sync/activities` and without `date_from`) downloads the user's whole library every call. It overloads the API server and hurts every other client.\n>\n> **Apps that do this will have their `client_id` suspended.** No warning, no appeal — we see the traffic pattern and turn the key off.\n>\n> Read the [**Sync guide**](/guides/sync) end-to-end before shipping anything that calls this endpoint. The full two-phase model (initial full sync → activities-checked delta loop) is documented there with reference implementations in Node and Python.\n\n<CardGroup cols={2}>\n <Card title=\"Sync guide\" icon=\"arrows-rotate\" href=\"/guides/sync\">\n The two-phase model (initial pull → activities-checked delta loop), `date_from` semantics, deletion reconciliation, edge cases, and reference implementations in Node and Python. **Required reading** before shipping anything that polls this endpoint.\n </Card>\n <Card title=\"Rewatches guide\" icon=\"rotate\" href=\"/guides/rewatches\">\n Session lifecycle (`active` / `completed` / `closed`), per-item rewatch fields, episode-level tracking, flag combinations for reading sessions back, and ready-made code for the UI patterns simkl.com uses on every detail page. Required if you set `?allow_rewatch=yes`.\n </Card>\n</CardGroup>\n\nThe single endpoint that powers watchlist reads. Both `{type}` and `{status}` are optional path segments, and any combination is valid:\n\n| Path | Returns |\n| --- | --- |\n| `/sync/all-items` | Every type, every status. The full library. |\n| `/sync/all-items/{type}` | A single type (`shows`, `movies`, or `anime`), every status. |\n| `/sync/all-items/{type}/{status}` | One type, one status bucket. |\n\nThe response shape is the same across all three forms: a top-level object keyed by `shows`, `movies`, and `anime`. Filtered calls just include fewer top-level keys; an empty result returns `{}`. See [Per-endpoint shape matrix](/conventions/null-values#per-endpoint-shape-matrix).\n\nPair this endpoint with [`GET /sync/activities`](/api-reference/simkl/get-activities) and the `date_from` query parameter for incremental sync — see the [Sync guide](/guides/sync) for the two-phase model.\n\n**Watchlist statuses by type:**\n\n| Type | `watching` | `plantowatch` | `hold` | `dropped` | `completed` |\n|------|:-:|:-:|:-:|:-:|:-:|\n| `shows` | ✅ | ✅ | ✅ | ✅ | ✅ |\n| `anime` | ✅ | ✅ | ✅ | ✅ | ✅ |\n| `movies` | — | ✅ | — | ✅ | ✅ |\n\nMovies skip `watching` and `hold` — see [Watchlist statuses](/conventions/list-statuses).\n\n#### Useful query parameters\n\nA quick map of the params below — see each parameter's full schema later on this page.\n\n| Param | What it does |\n|---|---|\n| `date_from` | Required on every continuous-sync call. Returns only items whose watchlist entry changed **strictly after** this ISO-8601 timestamp — pass the top-level `all` from your saved `/sync/activities` snapshot, exactly as returned. Every row carries the item's current `user_rating`, so no separate ratings request is needed — except for a rating-only change, which does not count here: read those from [`GET /sync/ratings`](/api-reference/simkl/get-user-ratings), and only when `rated_at` moved. |\n| `extended=simkl_ids_only` / `=ids_only` / `=full` / `=full_anime_seasons` | Controls response richness — from just `ids.simkl` (smallest) up to per-episode breakdowns. `=full` is **required** for `seasons[].episodes[]` and is the only value that adds `runtime`; it does **not** add `overview` / `fanart` / `genres` / `ratings` (use the detail endpoints for catalog metadata). Pair `=full` and `=full_anime_seasons` with `date_from` — they're significantly larger payloads. |\n| `include_all_episodes=yes` / `=original` | **Requires `extended=full`** (no effect on its own). Loads `seasons[].episodes[]` for items in `completed` and `dropped` too (which skip episode load by default). `yes` fills in virtual episode rows — stamped with the show's last-watched time — where per-episode data is missing; `original` returns only the episodes the user actually recorded, which can be fewer than `watched_episodes_count` for a show marked complete in one action. If a large library returns `400 max_items`, `original` is the lighter of the two. |\n| `episode_watched_at=yes` | Adds per-episode `watched_at` timestamps to every loaded episode. **Requires `extended=full`** — episodes must be loaded first, so on its own it does nothing. |\n| `episode_tvdb_id=yes` | Adds `ids.tvdb_id` per episode. |\n| `next_watch_info=yes` | On `watching` items with a next episode, attaches `next_to_watch_info` (`title`, `season`, `episode`, `date`). |\n| `memos=yes` | Includes the user's per-item `memo` object (`text` capped at 140 chars). |\n| `anime_type=movies` | Restrict the `anime` results to the anime-movie subtype. `movies` is the only accepted value — it's a subtype filter, not a full type selector. (The per-item `anime_type` **response** field still carries the full vocabulary: `tv`, `movie`, `ova`, `ona`, `special`, `music video`.) |\n| `language=en` | Force English titles instead of the user's profile language. |\n| `allow_rewatch=yes` | Synthesize one extra entry per rewatch session alongside the canonical row. **Simkl PRO / VIP only** — gate the flag on `account.type` from [`GET /users/settings`](/api-reference/simkl/get-user-settings) (cache it; refetch only when `activities.settings.all` bumps — see [Rewatches guide → PRO / VIP gate](/guides/rewatches)). Free-tier callers get a silent no-op that still consumes a rate-limit slot. See the [Rewatches guide](/guides/rewatches) for the full pattern. |\n\n**Rewatches** (Simkl PRO / VIP). Without the flag, each item — movie, show, or anime — appears once in the response, reflecting the user's current watch state. Set `?allow_rewatch=yes` and any item with saved rewatch sessions appears multiple times: the normal entry, plus one extra entry per rewatch session. The extra entries carry `is_rewatch: true`, `rewatch_id`, `rewatch_status` (`active` / `completed` / `closed`), `last_watched_at`, and `watched_episodes_count`, so you can tell them apart from the main entry and from each other.\n\n#### `400 max_items` — the response would be too large\n\nThis endpoint builds its whole response before sending it, and refuses a request whose response would be too large to build — in practice a very large library requested with `extended=full`, especially with `include_all_episodes=yes`:\n\n```json\n{ \"error\": \"max_items\", \"code\": 400, \"message\": \"Too many episodes: ...\" }\n```\n\nRetrying the same request gets the same `400`. Split it into one status per call (`/sync/all-items/{type}/{status}`), or use `include_all_episodes=original` instead of `=yes` — it adds only the episodes the user actually watched, not every episode of every completed show. See [If a pull returns 400 max_items](/guides/sync#max-items).\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
+        "description": "> ## ⚠️ For continuous sync, do NOT call `/sync/all-items` on a timer\n>\n> The correct loop, every time you want to check for changes:\n>\n> 1. **Call [`GET /sync/activities`](/api-reference/simkl/get-activities) first.** It returns a tiny JSON of `last-modified` timestamps per category — costs almost nothing.\n> 2. **Compare them with the snapshot you saved last time** — the whole `/sync/activities` response. If the top-level `all` is unchanged, stop here. Do **not** call `/sync/all-items`.\n> 3. **Only if a watchlist timestamp changed**, call `/sync/all-items?date_from=<the top-level all from your saved snapshot>`, passed exactly as returned. The `date_from` makes the server return only the small delta of items that changed strictly after that moment, not the user's entire library.\n> 4. **Save the new `/sync/activities` response as your snapshot** — only after every fetch has succeeded.\n>\n> Polling `/sync/all-items` directly on a timer (without checking `/sync/activities` and without `date_from`) downloads the user's whole library every call. It overloads the API server and hurts every other client.\n>\n> **Apps that do this will have their `client_id` suspended.** No warning, no appeal — we see the traffic pattern and turn the key off.\n>\n> Read the [**Sync guide**](/guides/sync) end-to-end before shipping anything that calls this endpoint. The full two-phase model (initial full sync → activities-checked delta loop) is documented there with reference implementations in Node and Python.\n\n<CardGroup cols={2}>\n <Card title=\"Sync guide\" icon=\"arrows-rotate\" href=\"/guides/sync\">\n The two-phase model (initial pull → activities-checked delta loop), `date_from` semantics, deletion reconciliation, edge cases, and reference implementations in Node and Python. **Required reading** before shipping anything that polls this endpoint.\n </Card>\n <Card title=\"Rewatches guide\" icon=\"rotate\" href=\"/guides/rewatches\">\n Session lifecycle (`active` / `completed` / `closed`), per-item rewatch fields, episode-level tracking, flag combinations for reading sessions back, and ready-made code for the UI patterns simkl.com uses on every detail page. Required if you set `?allow_rewatch=yes`.\n </Card>\n</CardGroup>\n\nThe single endpoint that powers watchlist reads. Both `{type}` and `{status}` are optional path segments, and any combination is valid:\n\n| Path | Returns |\n| --- | --- |\n| `/sync/all-items` | Every type, every status. The full library. |\n| `/sync/all-items/{type}` | A single type (`shows`, `movies`, or `anime`), every status. |\n| `/sync/all-items/{type}/{status}` | One type, one status bucket. |\n\nThe response shape is the same across all three forms: a top-level object keyed by `shows`, `movies`, and `anime`. Filtered calls just include fewer top-level keys; an empty result returns `{}`. See [Per-endpoint shape matrix](/conventions/null-values#per-endpoint-shape-matrix).\n\nPair this endpoint with [`GET /sync/activities`](/api-reference/simkl/get-activities) and the `date_from` query parameter for incremental sync — see the [Sync guide](/guides/sync) for the two-phase model.\n\n**Watchlist statuses by type:**\n\n| Type | `watching` | `plantowatch` | `hold` | `dropped` | `completed` |\n|------|:-:|:-:|:-:|:-:|:-:|\n| `shows` | ✅ | ✅ | ✅ | ✅ | ✅ |\n| `anime` | ✅ | ✅ | ✅ | ✅ | ✅ |\n| `movies` | — | ✅ | — | ✅ | ✅ |\n\nMovies skip `watching` and `hold` — see [Watchlist statuses](/conventions/list-statuses).\n\n#### Useful query parameters\n\nA quick map of the params below — see each parameter's full schema later on this page.\n\n| Param | What it does |\n|---|---|\n| `date_from` | Required on every continuous-sync call. Returns only items whose watchlist entry changed **strictly after** this ISO-8601 timestamp — pass the top-level `all` from your saved `/sync/activities` snapshot, exactly as returned. Every row carries the item's current `user_rating`, so no separate ratings request is needed — except for a rating-only change, which does not count here: read those from [`GET /sync/ratings`](/api-reference/simkl/get-user-ratings), and only when `rated_at` moved. |\n| `extended=simkl_ids_only` / `=ids_only` / `=full` / `=full_anime_seasons` | Controls response richness — from just `ids.simkl` (smallest) up to per-episode breakdowns. `=full` is **required** for `seasons[].episodes[]` and is the only value that adds `runtime`; it does **not** add `overview` / `fanart` / `genres` / `ratings` (use the detail endpoints for catalog metadata). Pair `=full` and `=full_anime_seasons` with `date_from` — they're significantly larger payloads. |\n| `include_all_episodes=yes` / `=original` | **Requires `extended=full`** (no effect on its own). Loads `seasons[].episodes[]` for items in `completed` and `dropped` too (which skip episode load by default). `yes` fills in virtual episode rows — stamped with the show's last-watched time — where per-episode data is missing; `original` returns only the episodes the user actually recorded, which can be fewer than `watched_episodes_count` for a show marked complete in one action. If a large library returns `400 max_items`, `original` is the lighter of the two. |\n| `episode_watched_at=yes` | Adds per-episode `watched_at` timestamps to every loaded episode. **Requires `extended=full`** — episodes must be loaded first, so on its own it does nothing. |\n| `episode_tvdb_id=yes` | Adds `ids.tvdb_id` per episode. |\n| `next_watch_info=yes` | On `watching` items with a next episode, attaches `next_to_watch_info` (`title`, `season`, `episode`, `date`). |\n| `memos=yes` | Includes the user's per-item `memo` object (`text` capped at 140 chars). |\n| `anime_type=movies` | Restrict the `anime` results to the anime-movie subtype. `movies` is the only accepted value — it's a subtype filter, not a full type selector. (The per-item `anime_type` **response** field still carries the full vocabulary: `tv`, `movie`, `ova`, `ona`, `special`, `music video`.) |\n| `language=en` | Force English titles instead of the user's profile language. |\n| `allow_rewatch=yes` | Synthesize one extra entry per rewatch session alongside the canonical row. **Simkl PRO / VIP only** — gate the flag on `account.type` from [`GET /users/settings`](/api-reference/simkl/get-user-settings) (cache it; refetch only when `activities.settings.all` bumps — see [Rewatches guide → PRO / VIP gate](/guides/rewatches)). Free-tier callers get a silent no-op that still consumes a rate-limit slot. See the [Rewatches guide](/guides/rewatches) for the full pattern. |\n\n**Rewatches** (Simkl PRO / VIP). Without the flag, each item — movie, show, or anime — appears once in the response, reflecting the user's current watch state. Set `?allow_rewatch=yes` and any item with saved rewatch sessions appears multiple times: the normal entry, plus one extra entry per rewatch session. The extra entries carry `is_rewatch: true`, `rewatch_id`, `rewatch_status` (`active` / `completed` / `closed`), `last_watched_at`, and `watched_episodes_count`, so you can tell them apart from the main entry and from each other.\n\n#### `400 max_items` — too much for one call\n\nThis endpoint builds its whole response before sending it, so each call has two limits:\n\n- **20,000 items per call** — **60,000** with `extended=simkl_ids_only`. `message` starts `Too many items`.\n- **Total episodes in one response** (only with `extended=full`) — `extended=full` adds each show's episode list, and one response can only hold so many episodes in total. A library with many long or completed shows can reach this well before 20,000 items, most often with `include_all_episodes=yes`. `message` starts `Too many episodes`.\n\n```json\n{ \"error\": \"max_items\", \"code\": 400, \"message\": \"Too many items: ...\" }\n```\n\nRetrying the same request gets the same `400`. Split it — one type per call (`/sync/all-items/{type}`), then one status per call (`/sync/all-items/{type}/{status}`) if a type is still too big — and for the episode limit use `include_all_episodes=original` instead of `=yes`. See [If a pull returns 400 max_items](/guides/sync#max-items).\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
         "operationId": "get-sync-all-items-type-status",
         "parameters": [
           {
@@ -19137,14 +19615,14 @@
                 "example": {
                   "code": 400,
                   "error": "max_items",
-                  "message": "Too many episodes: … Use date_from, request one type/status per call, or drop extended/include_all_episodes"
+                  "message": "Too many items: … Use date_from, or request one type/status per call"
                 },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "`max_items` — the response would be too large to build. In practice a very large library requested with `extended=full`, especially with `include_all_episodes=yes`. Retrying unchanged returns the same error: split the request into one status per call, or use `include_all_episodes=original`. See [If a pull returns 400 max_items](/guides/sync#max-items)."
+            "description": "`max_items` — too much for one call: more than **20,000 items** (60,000 with `extended=simkl_ids_only`), or, with `extended=full`, more episodes in total than one response can hold. Retrying unchanged returns the same error: request one type, or one type and status, per call, and for the episode limit use `include_all_episodes=original`. See [If a pull returns 400 max_items](/guides/sync#max-items)."
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -22281,6 +22759,21 @@
         "responses": {
           "200": {
             "$ref": "#/components/responses/UserRatingsListResponse"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "max_items",
+                  "message": "Too many items: … Use date_from, or request one type/status per call"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`max_items` — more than **20,000 items** in one call. Without `date_from` and without a rating segment this endpoint returns the user's whole library for the type, so a very large library can reach it. Send `date_from` (the ratings delta), or a rating segment, to narrow the call. See [If a pull returns 400 max_items](/guides/sync#max-items)."
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

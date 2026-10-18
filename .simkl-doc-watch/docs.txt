@@ -112,7 +112,7 @@ Every endpoint Simkl exposes, grouped by category. Use this page as a skim/grep 
 | `POST` | [`/search/file`](/api-reference/simkl/search-by-file) | Identify a **single** video file the user just opened (desktop scrobblers, player overlays). **Not for library scraping** — use the media server's own metadata for that. |
 | `GET` | [`/search/id`](/api-reference/simkl/search-by-id) | Legacy external-ID lookup. **Use [`/redirect`](/api-reference/redirect) instead** — header-only, Cloudflare-cached, and the canonical resolver. |
 | `POST` | [`/search/random`](/api-reference/simkl/search-random) | Random pick with filters (genre, year, country, service). Optional bearer skips already-watched titles. |
-| `GET` | [`/search/{type}`](/api-reference/simkl/search-by-text) | Free-text search across movies, TV, or anime. Paginated. |
+| `GET` | [`/search/{type}`](/api-reference/simkl/search-by-text) | Free-text search across movies, TV, or anime — or all three at once with `all` (`/search/all`). Paginated. |
 
 ## TV
 
@@ -5305,13 +5305,13 @@ The Search API lets you find items in Simkl's catalog. All endpoints accept a `c
 
 | Endpoint | What it does |
 | - | - |
-| `GET /search/{type}` | Free-text search across `movie`, `tv`, or `anime`. |
+| `GET /search/{type}` | Free-text search across `movie`, `tv`, or `anime` — or `all` (`GET /search/all`) to search all three at once. |
 | `POST /search/file` | Identify a movie or episode from a file name (great for media servers). |
 | `POST /search/random` | Pick a random item, optionally filtered by genre, year, rating, etc. |
 
 <CardGroup>
   <Card title="By text" icon="font" href="/api-reference/simkl/search-by-text">
-    `GET /search/{type}` — search by title.
+    `GET /search/{type}` — search by title, in one type or all three.
   </Card>
 
   <Card title="By file" icon="file" href="/api-reference/simkl/search-by-file">
@@ -6000,15 +6000,18 @@ A quick map of the params below — see each parameter's full schema later on th
 
 **Rewatches** (Simkl PRO / VIP). Without the flag, each item — movie, show, or anime — appears once in the response, reflecting the user's current watch state. Set `?allow_rewatch=yes` and any item with saved rewatch sessions appears multiple times: the normal entry, plus one extra entry per rewatch session. The extra entries carry `is_rewatch: true`, `rewatch_id`, `rewatch_status` (`active` / `completed` / `closed`), `last_watched_at`, and `watched_episodes_count`, so you can tell them apart from the main entry and from each other.
 
-#### `400 max_items` — the response would be too large
+#### `400 max_items` — too much for one call
 
-This endpoint builds its whole response before sending it, and refuses a request whose response would be too large to build — in practice a very large library requested with `extended=full`, especially with `include_all_episodes=yes`:
+This endpoint builds its whole response before sending it, so each call has two limits:
+
+- **20,000 items per call** — **60,000** with `extended=simkl_ids_only`. `message` starts `Too many items`.
+- **Total episodes in one response** (only with `extended=full`) — `extended=full` adds each show's episode list, and one response can only hold so many episodes in total. A library with many long or completed shows can reach this well before 20,000 items, most often with `include_all_episodes=yes`. `message` starts `Too many episodes`.
 
 ```json
-{ "error": "max_items", "code": 400, "message": "Too many episodes: ..." }
+{ "error": "max_items", "code": 400, "message": "Too many items: ..." }
 ```
 
-Retrying the same request gets the same `400`. Split it into one status per call (`/sync/all-items/{type}/{status}`), or use `include_all_episodes=original` instead of `=yes` — it adds only the episodes the user actually watched, not every episode of every completed show. See [If a pull returns 400 max_items](/guides/sync#max-items).
+Retrying the same request gets the same `400`. Split it — one type per call (`/sync/all-items/{type}`), then one status per call (`/sync/all-items/{type}/{status}`) if a type is still too big — and for the episode limit use `include_all_episodes=original` instead of `=yes`. See [If a pull returns 400 max_items](/guides/sync#max-items).
 
 <Tip>
 **Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).
@@ -7957,7 +7960,7 @@ Searching first doubles your request count for no benefit, burns rate limit you'
 Use search only when you have **no usable IDs at all**: a title the user typed, a file name, or a random pick.
 </Danger>
 
-Full-text search over the Simkl catalog. Pick a type (`movie`, `tv`, or `anime`) and pass a search term like `john wick` or `john wick 2014`.
+Full-text search over the Simkl catalog. Pick a type — `movie`, `tv`, `anime`, or `all` for all three at once — and pass a search term like `john wick` or `john wick 2014`.
 
 <Note>
 **Heads up: `movie` becomes `"movies"` in the response.**
@@ -7969,15 +7972,16 @@ You call `/search/movie` (no `s`) but each item in the response has `endpoint_ty
 | `/search/movie` | `"movies"` ← note the extra `s` |
 | `/search/tv` | `"tv"` |
 | `/search/anime` | `"anime"` |
+| `/search/all` | each item's own type: `"movies"`, `"tv"` or `"anime"` |
 
-Every item in a single response has the same `endpoint_type` — you never get a mixed list back.
+With `movie`, `tv` or `anime`, every item in the response has that `endpoint_type`. `all` mixes them — see **Searching all types** below.
 </Note>
 
 #### Path parameter
 
 | Param | Values |
 |---|---|
-| `type` | `movie`, `tv`, `anime` |
+| `type` | `movie`, `tv`, `anime`, or `all` for all three at once (see **Searching all types** below) |
 
 #### Query parameters
 
@@ -8004,6 +8008,20 @@ Returns paginated results with `X-Pagination-*` headers — see [Pagination](/co
 | `rank` | Simkl rank, most popular first. |
 
 Values are case-insensitive, and an empty `sort=` means `relevance`. Any other value returns `400 wrong_parameter`, with the accepted values listed in `message`.
+
+#### Searching all types
+
+Use `all` as the type to search movies, TV shows and anime in one request:
+
+```text
+GET /search/all?q=batman
+```
+
+`all` is lower-case only (`/search/ALL` returns `null`), and the path always needs a type — `/search` on its own returns `404`.
+
+- **Results mix types.** Each item carries its own `endpoint_type` — `movies`, `tv` or `anime` — so branch on it per item, not per response. Every item has the fields it would have in a search of its own type.
+- **The query parameters work the same** — `q`, `page`, `limit`, `extended`, `sort`. All five sorts are accepted, `last-air-date` included, but movies have no air dates, so their place in that order isn't meaningful; prefer `release-date` when the results include movies.
+- **If your app shows only one kind of title, use that type instead of `all`.** You get only that type, and the `X-Pagination-*` counts cover only those matches.
 
 #### Per-item fields by mode
 
@@ -11695,6 +11713,20 @@ What's new across the Simkl API and these docs.
 For broader Simkl product news — apps, features, releases — follow [**@Simkl**](https://twitter.com/Simkl) on X.
 
 Use the **filter** in the right rail to narrow this changelog by tag.
+
+<Update label="2026-10-18" description="Search all types at once">
+  <Badge icon="sparkles">New feature</Badge>
+
+  **Search movies, TV and anime in one request**
+
+  [Text search](/api-reference/simkl/search-by-text) has a new type, `all`:
+
+  ```text theme={"theme":{"light":"github-light","dark":"vesper"}}
+  GET /search/all?q=batman
+  ```
+
+  Results mix movies, TV shows and anime in one list, so read `endpoint_type` on each item (`movies`, `tv` or `anime`). Paging, `extended=full` and every `sort` work the same as with the other types. If your app shows only one kind of title, keep using `movie`, `tv` or `anime` — you get only that type, and the paging counts cover only those matches.
+</Update>
 
 <Update label="2026-10-14" description="Finale markers on TV episodes">
   <Badge icon="sparkles">New feature</Badge>
@@ -17892,7 +17924,7 @@ Pick the right entry point for your situation — searching by user-typed text, 
   </Card>
 
   <Card title="By text" icon="magnifying-glass" href="/api-reference/simkl/search-by-text">
-    `GET /search/{type}` — full-text search over titles. `type` is `movie`, `tv`, or `anime`.
+    `GET /search/{type}` — full-text search over titles. `type` is `movie`, `tv`, or `anime` — or `all` to search all three at once.
   </Card>
 
   <Card title="By file name" icon="file" href="/api-reference/simkl/search-by-file">
@@ -18016,7 +18048,7 @@ The flags below shape what `/sync/all-items` returns and what `/sync/history` do
 
 | Param | On | What it does |
 | - | - | - |
-| `extended=simkl_ids_only` | `GET /sync/all-items` | Returns just `ids.simkl` per item — perfect for the deletion-reconciliation diff in Phase 2. |
+| `extended=simkl_ids_only` | `GET /sync/all-items` | Returns just `ids.simkl` per item — perfect for the deletion-reconciliation diff in Phase 2. Up to 60,000 items per call, against 20,000 for every other shape ([`max_items`](#max-items)). |
 | `extended=ids_only` | `GET /sync/all-items` | Same, plus external IDs (`imdb`, `tmdb`, `tvdb`, `mal`, …). |
 | `extended=full` | `GET /sync/all-items` | **Required to get per-episode `seasons[].episodes[]` arrays** — without it, `episode_watched_at` and `include_all_episodes` do nothing. Necessary but not always sufficient: on its own it loads episodes for `watching` / `hold` / `plantowatch` only; `completed` and `dropped` also need `include_all_episodes`. The only *metadata* it adds is `runtime` — `title`, `poster`, `year`, and `ids` come back regardless, and this endpoint never returns `overview` / `fanart` / `genres` / `ratings` (use the detail endpoints for those). Large payload: pair with `date_from` on Phase 2 deltas. The one expected full-library use is the episode baseline on first sync (see [Phase 1](#phase-1-initial-sync)). |
 | `extended=full_anime_seasons` | `GET /sync/all-items` (anime) | At the **show** level, adds `mapped_tvdb_seasons: [n,…]` mapping each Simkl/AniDB season to a TVDB season. At the **episode** level, adds a `tvdb: \{ season, episode \}` block on every anime episode. Anime apps that index against TVDB don't need a second lookup. |
@@ -18100,22 +18132,27 @@ The first time a user signs in, you don't have a saved timestamp, so you can't a
 
 ### If a pull returns `400 max_items`
 
-`GET /sync/all-items` builds its whole response before sending it, so it refuses a request whose response would be too large to build:
+`GET /sync/all-items` and `GET /sync/ratings` build their whole response before sending it, so each call has two limits. Going over either returns:
 
 ```json theme={"theme":{"light":"github-light","dark":"vesper"}}
 {
   "error": "max_items",
   "code": 400,
-  "message": "Too many episodes: ..."
+  "message": "Too many items: ..."
 }
 ```
 
-In practice it is the **episode rows** that hit the limit: a very large library requested with `extended=full`, especially with `include_all_episodes=yes`. The `message` says which limit was reached. Retrying the same request gets the same `400`, so change the request instead:
+| Limit | When you hit it | `message` starts |
+| - | - | - |
+| **20,000 items per call** — **60,000** with `extended=simkl_ids_only` | A very large library requested in one call, whatever else you ask for | `Too many items` |
+| **Total episodes in one response** (only with `extended=full`) | `extended=full` adds each show's episode list, and one response can only hold so many episodes in total. A library with many long or completed shows can reach this well before 20,000 items — most often with `include_all_episodes=yes` | `Too many episodes` |
 
-* **Split it — one status per call.** Use `/sync/all-items/{type}/{status}` for each of `watching`, `plantowatch`, `hold`, `completed` and `dropped` instead of one call per type. Each response is a fraction of the whole.
-* **Use `include_all_episodes=original` instead of `=yes`.** `yes` adds a row for **every episode** of every completed show; `original` adds only the episodes the user actually watched — far fewer on a library of shows marked complete in one action. The trade-off is the one in the table above: real dates, but a bulk-completed show can return fewer rows than its `watched_episodes_count`.
+Retrying the same request gets the same `400`, so change the request instead:
 
-Don't save the snapshot until every split request has succeeded — the same rule as any other Phase 1 pull.
+* **Split it — one type, or one status, per call.** Use `/sync/all-items/{type}`, and if one type is still too big, `/sync/all-items/{type}/{status}` for each of `watching`, `plantowatch`, `hold`, `completed` and `dropped`. Each response is a fraction of the whole.
+* **Use `include_all_episodes=original` instead of `=yes`** for the episode limit. `yes` adds a row for **every episode** of every completed show; `original` adds only the episodes the user actually watched — far fewer on a library of shows marked complete in one action. The trade-off is the one in the table above: real dates, but a bulk-completed show can return fewer rows than its `watched_episodes_count`.
+
+`date_from` deltas only return what changed, so they are usually small; the full pulls in Phase 1 and the ID list in [Detecting deletions](#detecting-deletions) are where large libraries meet these limits. Don't save the snapshot until every split request has succeeded — the same rule as any other Phase 1 pull.
 
 ## Phase 2: Continuous sync
 
@@ -18215,6 +18252,8 @@ Every subsequent poll runs this loop:
 ### Detecting deletions
 
 `date_from` only surfaces items that were *added* or *modified* — not removed. When `removed_from_list` moved in any type you sync, fetch the full library with `extended=simkl_ids_only` (or `ids_only` if you also want external IDs) and diff against your local cache. Items missing from the new ID-only response have been removed from the user's library — also clear any local rating you stored for them, since Simkl wipes the rating when an item is removed.
+
+One ID-only call returns up to **60,000** items. For a bigger library, fetch the IDs one type at a time (`/sync/all-items/{type}?extended=simkl_ids_only`) — see [`400 max_items`](#max-items).
 
 <Note>
   **Why you have to diff, in plain terms.** Simkl keeps no record of a removal. When an item leaves a list it is simply gone from that list — there is no "deleted" entry anywhere to fetch, and nothing that names which item it was.
