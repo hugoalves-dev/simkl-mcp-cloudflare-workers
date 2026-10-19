@@ -35,3 +35,23 @@ test('deployed agent tool and resource registrations match the public catalog', 
     expect((await client.listResourceTemplates()).resourceTemplates).toEqual(catalog.resourceTemplates);
   } finally { await client.close(); await server.close(); }
 });
+
+test('stats metadata prefers the cached own-account tool and restricts the direct tool to other users', async () => {
+  const { discoverCapabilities } = await import('../scripts/capabilities');
+  const { tools } = await discoverCapabilities();
+  const mine = tools.find(tool => tool.name === 'simkl_my_stats');
+  const other = tools.find(tool => tool.name === 'simkl_get_user_stats');
+
+  expect(mine).toBeDefined();
+  expect(mine!.description).toContain('cached');
+  expect(mine!.description).toContain('current authenticated');
+  expect(Object.keys(mine!.inputSchema.properties ?? {})).toEqual([]);
+
+  expect(other).toBeDefined();
+  expect(other!.description).toContain('another explicitly identified Simkl user');
+  expect(other!.description).toContain('simkl_my_stats');
+  const idDescription = other!.inputSchema.properties?.user_id?.description;
+  expect(idDescription).toContain('simkl_my_stats');
+  expect(idDescription).toContain('do not fetch /users/settings');
+  expect(idDescription).not.toContain('first call');
+});
