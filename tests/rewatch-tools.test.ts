@@ -24,6 +24,7 @@ describe('rewatch MCP tools', () => {
       expect(registered.has('simkl_start_rewatch')).toBe(true);
       expect(registered.has('simkl_update_rewatch')).toBe(true);
       expect(registered.has('simkl_get_rewatches')).toBe(true);
+      expect(Object.keys(registered.get('simkl_get_rewatches')!.definition.inputSchema).sort()).toEqual(['mediaType', 'status']);
       expect(registered.get('simkl_start_rewatch')!.definition.inputSchema.ids.safeParse({}).success).toBe(false);
       expect(registered.get('simkl_start_rewatch')!.definition.inputSchema.ids.safeParse({ unsupported: 'anything' }).success).toBe(false);
       expect(registered.get('simkl_start_rewatch')!.definition.inputSchema.ids.safeParse({ simkl: 1.5 }).success).toBe(false);
@@ -59,7 +60,7 @@ describe('rewatch MCP tools', () => {
     const completedShow = await registered.get('simkl_update_rewatch')!({ mediaType: 'shows', ids: { simkl: 2 }, rewatch_id: 1, rewatch_status: 'completed' });
     expect(completedShow.content[0].text).toContain('can only be set for movies');
     const missingDate = await registered.get('simkl_get_rewatches')!({ mediaType: 'all', status: 'completed' });
-    expect(missingDate.content[0].text).toContain('date_from is required');
+    expect(missingDate.content[0].text).toContain('Cached rewatch sessions are unavailable');
     client.request = async (endpoint: string) => {
       if (endpoint === '/users/settings') return { account: { type: 'pro' } } as any;
       throw new SimklApiError('simkl api request failed', 0, null);
