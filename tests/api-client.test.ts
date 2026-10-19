@@ -43,6 +43,101 @@ describe('SimklClient request policy', () => {
     expect(attempts).toBe(1);
   });
 
+  // Live Cloudflare telemetry (2026-10-19 19:47/19:49 UTC) classified the
+  // upstream 409 as wrong_error. The duplicate window itself is independent
+  // evidence, provided *both* verified dates delimit the active one-hour period.
+  test.each([
+    ['nonstandard error code', 'conflict'],
+    ['missing error code', undefined],
+    ['alternative duplicate code', 'already_scrobbled'],
+  ])('accepts a live one-hour duplicate signature with %s', async (_name, code) => {
+    const info = spyOn(console, 'info').mockImplementation(() => {});
+    const watchedAt = new Date(Date.now() - 10 * 60_000).toISOString();
+    const expiresAt = new Date(Date.parse(watchedAt) + 60 * 60_000).toISOString();
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return Response.json({
+        ...(code === undefined ? {} : { error: code }),
+        watched_at: watchedAt,
+        expires_at: expiresAt,
+      }, { status: 409, headers: { 'X-RateLimit-Remaining': '19' } });
+    }) as typeof fetch;
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+      expect(await client.requestWithMetadata('/scrobble/stop', {
+        method: 'POST', token: 'private-token', body: { movie: { ids: { simkl: 100838 } } },
+      })).toEqual({
+        data: { already_recorded: true, watched_at: watchedAt, expires_at: expiresAt },
+        headers: { rateLimitRemaining: '19' },
+      });
+      expect(calls).toBe(1);
+      expect(info).toHaveBeenCalledTimes(1);
+      const log = String(info.mock.calls[0][0]);
+      expect(JSON.parse(log)).toEqual({
+        component: 'simkl_scrobble',
+        event: 'stop_conflict',
+        classification: 'already_recorded_window',
+      });
+      expect(log).not.toContain(watchedAt);
+      expect(log).not.toContain('private-token');
+      expect(log).not.toContain('100838');
+    } finally {
+      info.mockRestore();
+    }
+  });
+
+  test.each([
+    ['no expiry', (w: string, _e: string) => ({ error: 'conflict', watched_at: w })],
+    ['missing watch time', (_w: string, e: string) => ({ error: 'conflict', expires_at: e })],
+    ['invalid watch date', (_w: string, e: string) => ({ error: 'conflict', watched_at: 'tomorrow', expires_at: e })],
+    ['invalid expiry date', (w: string, _e: string) => ({ error: 'conflict', watched_at: w, expires_at: 'nope' })],
+    ['expiry before now', (_w: string, _e: string) => {
+      const w = new Date(Date.now() - 90 * 60_000).toISOString();
+      return { error: 'conflict', watched_at: w, expires_at: new Date(Date.parse(w) + 60 * 60_000).toISOString() };
+    }],
+    ['watch time in future', (_w: string, _e: string) => {
+      const w = new Date(Date.now() + 5 * 60_000).toISOString();
+      return { error: 'conflict', watched_at: w, expires_at: new Date(Date.parse(w) + 60 * 60_000).toISOString() };
+    }],
+    ['non-hour expiry', (w: string, _e: string) =>
+      ({ error: 'conflict', watched_at: w, expires_at: new Date(Date.parse(w) + 30 * 60_000).toISOString() })],
+    ['explicit write lock', (w: string, e: string) => ({ error: 'write_lock', watched_at: w, expires_at: e })],
+    ['explicit quota error', (w: string, e: string) => ({ error: 'user_limit_exceeded', watched_at: w, expires_at: e })],
+  ] as const)('rejects %s with a nonstandard error code without retry', async (_name, payload) => {
+    const watch = new Date(Date.now() - 8 * 60_000).toISOString();
+    const expiry = new Date(Date.parse(watch) + 60 * 60_000).toISOString();
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return Response.json(payload(watch, expiry), { status: 409 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/scrobble/stop', { method: 'POST' }))
+      .rejects.toMatchObject({ statusCode: 409 });
+    expect(calls).toBe(1);
+  });
+
+  test.each([
+    ['/scrobble/pause', 'POST' as const, 409],
+    ['/scrobble/stop', 'GET' as const, 409],
+    ['/scrobble/stop', 'POST' as const, 400],
+  ])('does not normalize a timed 409 signature on %s %s %s', async (endpoint, method, status) => {
+    const watch = new Date(Date.now() - 8 * 60_000).toISOString();
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return Response.json({
+        error: 'conflict',
+        watched_at: watch,
+        expires_at: new Date(Date.parse(watch) + 60 * 60_000).toISOString(),
+      }, { status });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request(endpoint, { method })).rejects.toMatchObject({ statusCode: status });
+    expect(calls).toBe(1);
+  });
+
   test('preserves an upstream ISO timestamp with an explicit offset and supports an absent expiry', async () => {
     globalThis.fetch = (async () => Response.json({
       error: 'already_watched', watched_at: '2026-05-08T11:00:00-03:00',
