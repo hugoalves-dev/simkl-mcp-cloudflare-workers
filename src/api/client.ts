@@ -430,10 +430,11 @@ export class SimklClient {
   }
 }
 
-/** Accept only the documented scrobble-stop duplicate; preserve upstream timestamps verbatim. */
+/** Accept only a proven stop-duplicate signature; preserve upstream timestamps verbatim. */
 type StopConflictClassification =
   | 'already_recorded' | 'invalid_json' | 'invalid_body' | 'wrong_error'
-  | 'missing_watched_at' | 'invalid_watched_at' | 'invalid_expires_at';
+  | 'missing_watched_at' | 'invalid_watched_at' | 'invalid_expires_at'
+  | 'already_recorded_window' | 'wrong_error_untrusted_window';
 
 interface AlreadyRecordedStop {
   already_recorded: true;
@@ -453,7 +454,27 @@ function parseAlreadyRecordedStopConflict(body: string): {
     return { classification: 'invalid_body', result: null };
   }
   const { error, watched_at, expires_at } = value as Record<string, unknown>;
-  if (error !== 'already_watched') return { classification: 'wrong_error', result: null };
+  if (error !== 'already_watched') {
+    // Some live 409s do not carry the documented error code. A real
+    // duplicate also provides an original watch time and the expiry of the
+    // *same* one-hour duplicate window. Requiring both and a live bounded
+    // window avoids treating arbitrary HTTP 409 responses as successes.
+    // Deliberately exclude any explicit auth, quota, and write-lock errors.
+    if (isSimklTimestamp(watched_at) && isSimklTimestamp(expires_at)) {
+      const knownFailure = typeof error === 'string' && [
+        'write_lock', 'RATE_LIMIT', 'rate_limit', 'user_limit_exceeded',
+        'app_limit_exceeded', 'user_token_required', 'max_items',
+      ].includes(error);
+      if (!knownFailure && isActiveDuplicateWatchWindow(watched_at, expires_at)) {
+        return {
+          classification: 'already_recorded_window',
+          result: { already_recorded: true, watched_at, expires_at },
+        };
+      }
+      return { classification: 'wrong_error_untrusted_window', result: null };
+    }
+    return { classification: 'wrong_error', result: null };
+  }
   if (watched_at === undefined) return { classification: 'missing_watched_at', result: null };
   if (!isSimklTimestamp(watched_at)) return { classification: 'invalid_watched_at', result: null };
   if (expires_at !== undefined && !isSimklTimestamp(expires_at)) {
@@ -465,6 +486,18 @@ function parseAlreadyRecordedStopConflict(body: string): {
       ? { already_recorded: true, watched_at }
       : { already_recorded: true, watched_at, expires_at: expires_at as string },
   };
+}
+
+/** The documented stop deduplication period is one hour, not an arbitrary conflict. */
+function isActiveDuplicateWatchWindow(watchedAt: string, expiresAt: string): boolean {
+  const watched = Date.parse(watchedAt);
+  const expires = Date.parse(expiresAt);
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  const clockTolerance = 2 * 60 * 1000;
+  return watched <= now && now < expires
+    && watched >= now - oneHour - clockTolerance
+    && Math.abs(expires - watched - oneHour) <= clockTolerance;
 }
 
 function isSimklTimestamp(value: unknown): value is string {

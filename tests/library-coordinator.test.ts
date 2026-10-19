@@ -113,6 +113,31 @@ test('409 already_watched stop marks cache stale without a duplicate request', a
   expect(s.saved().forceCheck).toBe(false);
 });
 
+test('live nonstandard 409 duplicate window invalidates cache once, without a replay', async () => {
+  const s = setup();
+  upstream([activities, items, { movies: [] }, { anime: [] }]);
+  await s.cache.read('token');
+  expect(s.saved().forceCheck).toBe(false);
+
+  const watchedAt = new Date(Date.now() - 6 * 60_000).toISOString();
+  const expiresAt = new Date(Date.parse(watchedAt) + 60 * 60_000).toISOString();
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts++;
+    return Response.json({ error: 'conflict', watched_at: watchedAt, expires_at: expiresAt }, { status: 409 });
+  }) as typeof fetch;
+
+  const result = await s.cache.write('token', '/scrobble/stop', { body: { progress: 100 } });
+  expect(result).toEqual({ already_recorded: true, watched_at: watchedAt, expires_at: expiresAt });
+  expect(attempts).toBe(1);
+  expect(s.saved().forceCheck).toBe(true);
+
+  const check = upstream([activities]);
+  await s.cache.read('token');
+  expect(check()).toBe(1);
+  expect(s.saved().forceCheck).toBe(false);
+});
+
 test('unrelated 409 stop does not mark the library as refreshed or retry', async () => {
   const s = setup();
   upstream([activities, items, { movies: [] }, { anime: [] }]);
