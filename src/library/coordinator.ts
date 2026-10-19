@@ -91,7 +91,8 @@ export class CachedLibrary {
       try {
         result = await request();
       } catch (error) {
-        if (!(error instanceof SimklApiError) || error.upstreamCode !== 'rate_limit') throw error;
+        if (!(error instanceof SimklApiError)
+          || (error.upstreamCode !== 'rate_limit' && error.upstreamCode !== 'write_lock')) throw error;
         await this.wait(1000);
         result = await request();
       }

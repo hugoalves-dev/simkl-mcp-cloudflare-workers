@@ -92,6 +92,30 @@ test('write retries only exact per-second rate_limit once after one second', asy
   expect(attempts).toBe(2); expect(waits).toEqual([1000]); expect(s.saved()).toBeUndefined();
 });
 
+
+// issue #42 regression: the dedicated write coordinator owns the lock retry.
+test('serialized writes retry 400 RATE_LIMIT only once without retrying server errors', async () => {
+  const waits: number[] = [], s = setup(async ms => { waits.push(ms); });
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts++;
+    return attempts === 1 ? Response.json({ error: 'RATE_LIMIT' }, { status: 400 }) : Response.json({ added: {} });
+  }) as typeof fetch;
+  await s.cache.write('token', '/sync/history', { body: {} });
+  expect(attempts).toBe(2);
+  expect(waits).toEqual([1000]);
+
+  attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts++;
+    return Response.json({ error: 'internal_error' }, { status: 502 });
+  }) as typeof fetch;
+  await expect(s.cache.write('token', '/sync/history', { body: {} })).rejects.toMatchObject({ statusCode: 502 });
+  expect(attempts).toBe(1);
+  expect(waits).toEqual([1000]);
+});
+
+
 test('a second rate_limit ends the write after exactly two attempts', async () => {
   const waits: number[] = [], s = setup(async ms => { waits.push(ms); }); let attempts = 0;
   globalThis.fetch = (async () => { attempts++; return Response.json({ error: 'rate_limit' }, { status: 429 }); }) as typeof fetch;

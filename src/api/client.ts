@@ -195,10 +195,11 @@ export class SimklClient {
           response = await fetch(url, init);
         } catch {
           // A failed connection does not tell us whether a write reached Simkl.
-          throw new SimklApiError('simkl api request failed', 0, null);
+          throw new SimklApiError('simkl api request failed', 0, null, {}, options.method !== 'GET');
         }
 
-        if (response.status === 429) {
+        // Burst limits and the short per-user write lock are different from daily quotas.
+        if (response.status === 429 || (response.status === 400 && options.method !== 'GET')) {
           const responseText = await this.readResponseBody(response);
           const error = new SimklApiError(
             `simkl api error: ${response.status} ${response.statusText}`,
@@ -206,7 +207,8 @@ export class SimklClient {
             responseText,
             this.parseResponseHeaders(response)
           );
-          if (options.rateLimitRetry !== false && error.upstreamCode === 'rate_limit' && !rateLimitRetried) {
+          if (options.rateLimitRetry !== false && !rateLimitRetried
+            && (error.upstreamCode === 'rate_limit' || error.upstreamCode === 'write_lock')) {
             rateLimitRetried = true;
             await this.delay(RATE_LIMIT_RETRY_DELAY_MS);
             continue;
@@ -214,7 +216,8 @@ export class SimklClient {
           throw error;
         }
 
-        if (response.status >= 500 && serverRetries < MAX_SERVER_RETRIES) {
+        // A 5xx may arrive after Simkl applied a mutation; GET is the only safe retry.
+        if (options.method === 'GET' && response.status >= 500 && serverRetries < MAX_SERVER_RETRIES) {
           await this.delay(SERVER_RETRY_BASE_DELAY_MS * (2 ** serverRetries));
           serverRetries++;
           continue;
@@ -254,7 +257,8 @@ export class SimklClient {
         `simkl api error: ${response.status} ${response.statusText}`,
         response.status,
         responseText,
-        responseHeaders
+        responseHeaders,
+        options.method !== 'GET' && response.status >= 500
       );
     }
 
@@ -418,14 +422,18 @@ export class SimklApiError extends Error {
     message: string,
     public statusCode: number,
     responseBody: string | null,
-    public headers: SimklResponseHeaders = {}
+    public headers: SimklResponseHeaders = {},
+    public writeMayHaveSucceeded = false
   ) {
     super(message);
     this.name = 'SimklApiError';
     let code = '';
     try {
       const parsed = JSON.parse(responseBody || '') as { error?: unknown };
-      if (typeof parsed.error === 'string' && ['rate_limit', 'user_limit_exceeded', 'app_limit_exceeded', 'user_token_required', 'max_items'].includes(parsed.error)) {
+      if (statusCode === 400 && (parsed.error === 'RATE_LIMIT' || parsed.error === 'write_lock')) {
+        // Simkl's uppercase 400 code is a temporary write lock, not a quota signal.
+        code = 'write_lock';
+      } else if (typeof parsed.error === 'string' && ['rate_limit', 'user_limit_exceeded', 'app_limit_exceeded', 'user_token_required', 'max_items'].includes(parsed.error)) {
         code = parsed.error;
       }
     } catch {
