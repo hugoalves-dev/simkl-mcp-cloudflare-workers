@@ -31,12 +31,15 @@ export function registerCapabilities(server: McpServer, client: SimklClient, lib
 
 function registerCustomTools(server: McpServer, library: LibraryAdapter) {
     server.registerTool('simkl_refresh_library', {
-      description: 'Force an incremental refresh of the authenticated Simkl library, bypassing the activities check interval',
+      description: 'Request a manual Simkl library refresh, limited to once every 60 seconds per account. Normal reads use the five-minute interval; post-write checks remain mandatory.',
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     }, async () => {
       try {
-        await library.read(true);
+        const result = await library.refresh();
+        if (result.status === 'suppressed') {
+          return { content: [{ type: 'text' as const, text: `Manual Simkl library refresh skipped: only one forced refresh is allowed per 60 seconds per account. Retry in ${result.retryAfterSeconds} seconds. Normal cache freshness checks, including post-write checks, still apply.` }] };
+        }
         return { content: [{ type: 'text' as const, text: 'Simkl library refreshed' }] };
       } catch (error) { return { ...toMcpErrorResult(error) }; }
     });
