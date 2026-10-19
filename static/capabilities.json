@@ -1539,7 +1539,7 @@
     },
     {
       "name": "simkl_refresh_library",
-      "description": "Force an incremental refresh of the authenticated Simkl library, bypassing the activities check interval",
+      "description": "Request a manual Simkl library refresh, limited to once every 60 seconds per account. Normal reads use the five-minute interval; post-write checks remain mandatory.",
       "inputSchema": {
         "type": "object",
         "properties": {},
