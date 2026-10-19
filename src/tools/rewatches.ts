@@ -83,22 +83,18 @@ export function registerRewatchTools(server: McpServer, service: RewatchService,
   });
 
   server.registerTool('simkl_get_rewatches', {
-    description: 'Read canonical items and their separate rewatch rows for all media or one type. Rewatch rows include full episode progress and timestamps. Provide date_from for incremental reads; set initial_sync=true only for the first full read.',
+    description: 'Read compact rewatch sessions from the per-user activities-gated cache, separate from the canonical watchlist. No incremental sync parameters are accepted.',
     inputSchema: {
       mediaType: listMediaType,
       status: z.enum(['watching', 'plantowatch', 'hold', 'completed', 'dropped']),
-      date_from: date.optional(),
-      initial_sync: z.boolean().optional(),
     },
     annotations: { readOnlyHint: true, idempotentHint: true },
   }, async args => {
     try {
-      return jsonResult(await service.list({
+      return { content: [{ type: 'text' as const, text: await service.list({
         mediaType: args.mediaType as RewatchMediaType,
         status: args.status,
-        ...(args.date_from ? { date_from: args.date_from } : {}),
-        ...(args.initial_sync ? { initial_sync: true } : {}),
-      }));
+      }) }] };
     } catch (error) { return rewatchErrorResult(error); }
   });
 
