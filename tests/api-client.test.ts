@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { SimklApiError, SimklClient } from '../src/api/client';
 import { toolsWhitelist } from '../src/tools-config';
 
@@ -71,6 +71,67 @@ describe('SimklClient request policy', () => {
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
     await expect(client.request(endpoint, { method, rateLimitRetry: false })).rejects.toMatchObject({ statusCode: status });
     expect(attempts).toBe(1);
+  });
+
+  test.each([
+    ['valid duplicate', { error: 'already_watched', watched_at: '2026-10-19T18:00:00Z', expires_at: '2026-10-19T19:00:00Z' }, 'already_recorded', false],
+    ['missing watch time', { error: 'already_watched' }, 'missing_watched_at', true],
+    ['invalid watch time', { error: 'already_watched', watched_at: 'untrusted-timestamp' }, 'invalid_watched_at', true],
+    ['invalid expiry', { error: 'already_watched', watched_at: '2026-10-19T18:00:00Z', expires_at: 'nope' }, 'invalid_expires_at', true],
+    ['unrelated conflict', { error: 'other_conflict' }, 'wrong_error', true],
+    ['non-object', ['already_watched'], 'invalid_body', true],
+  ] as const)('logs only a safe classification for %s', async (_label, payload, classification, rejected) => {
+    const info = spyOn(console, 'info').mockImplementation(() => {});
+    const secret = 'sensitive-token-that-must-not-leak';
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return Response.json(payload, { status: 409 });
+    }) as typeof fetch;
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+      if (rejected) {
+        await expect(client.request('/scrobble/stop', {
+          method: 'POST', token: secret, body: { movie: { ids: { simkl: 100838 } } },
+        })).rejects.toMatchObject({ statusCode: 409 });
+      } else {
+        expect(await client.request('/scrobble/stop', { method: 'POST', token: secret })).toEqual({
+          already_recorded: true,
+          watched_at: '2026-10-19T18:00:00Z',
+          expires_at: '2026-10-19T19:00:00Z',
+        });
+      }
+      expect(calls).toBe(1);
+      expect(info).toHaveBeenCalledTimes(1);
+      const line = String(info.mock.calls[0][0]);
+      expect(JSON.parse(line)).toEqual({ component: 'simkl_scrobble', event: 'stop_conflict', classification });
+      expect(line).not.toContain(secret);
+      expect(line).not.toContain('100838');
+      expect(line).not.toContain('2026-10-19');
+      expect(line).not.toContain('other_conflict');
+    } finally {
+      info.mockRestore();
+    }
+  });
+
+  test('classifies a malformed duplicate response without retry or sensitive logs', async () => {
+    const info = spyOn(console, 'info').mockImplementation(() => {});
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response('invalid json - confidential', { status: 409 });
+    }) as typeof fetch;
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+      await expect(client.request('/scrobble/stop', { method: 'POST' })).rejects.toMatchObject({ statusCode: 409 });
+      expect(calls).toBe(1);
+      expect(JSON.parse(String(info.mock.calls[0][0]))).toEqual({
+        component: 'simkl_scrobble', event: 'stop_conflict', classification: 'invalid_json',
+      });
+      expect(String(info.mock.calls[0][0])).not.toContain('confidential');
+    } finally {
+      info.mockRestore();
+    }
   });
 
   test('adds Simkl identification to relative API requests', async () => {
