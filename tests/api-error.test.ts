@@ -26,6 +26,30 @@ describe('Simkl quota errors', () => {
     expect(result.content[0].text).not.toContain('rate limit');
   });
 
+
+  // issue #42 regression: surface actionable ambiguity without exposing upstream bodies.
+  test.each([0, 500, 503])('warns that a POST may have succeeded after ambiguous status %i', status => {
+    const error = new SimklApiError('failed', status, null, {}, true);
+    const text = toMcpErrorResult(error).content[0].text;
+    expect(text).toContain('may have succeeded');
+    expect(text).toContain('history');
+    expect(text).toContain('rewatch sessions');
+    expect(text).toContain('before retrying');
+  });
+
+  test('does not warn about an ambiguous write on GET 5xx', () => {
+    const error = new SimklApiError('failed', 503, null);
+    expect(toMcpErrorResult(error).content[0].text).not.toContain('may have succeeded');
+  });
+
+  test('distinguishes 400 write lock from daily quota errors', () => {
+    const lock = new SimklApiError('failed', 400, '{"error":"RATE_LIMIT"}');
+    expect(lock.upstreamCode).toBe('write_lock');
+    const message = toMcpErrorResult(lock).content[0].text;
+    expect(message).toContain('write is still running');
+    expect(message).not.toContain('daily allowance');
+  });
+
   test('does not invent zero values when quota headers are absent', () => {
     const result = toMcpErrorResult(new SimklApiError('upstream failed', 429, '{"error":"user_limit_exceeded"}'));
     expect(result.content[0].text).toContain('daily allowance');
