@@ -1,5 +1,6 @@
 import { afterEach, expect, mock, test } from 'bun:test';
 import { sqliteStorage } from './helpers/library-storage';
+import { LibraryStore } from '../src/library/store';
 
 mock.module('cloudflare:workers', () => ({ DurableObject: class {}, WorkerEntrypoint: class {}, RpcTarget: class {}, exports: {}, env: {} }));
 const { SimklLibraryCache } = await import('../src/library/cache');
@@ -119,4 +120,71 @@ test('empty account reads persist null activities across object reconstruction w
     expect(await reconstructed.read('token', true)).toEqual({ shows: [], movies: [], anime: [] });
     expect(calls).toEqual(['/sync/activities', '/sync/activities']);
   } finally { adapter.db.close(); }
+});
+
+test('issue #44: simultaneous and restarted manual refreshes obey a per-account minute window', async () => {
+  const firstStorage = sqliteStorage(), secondStorage = sqliteStorage();
+  try {
+    const first = cache(firstStorage.storage), second = cache(secondStorage.storage);
+    const calls = upstream();
+    await first.ensureInitialized('account-a');
+    await second.ensureInitialized('account-b');
+    expect(calls.filter(path => path === '/sync/activities')).toHaveLength(2);
+
+    const results = await Promise.all([
+      first.refreshLibrary('account-a'),
+      first.refreshLibrary('another-session-same-account'),
+      first.refreshLibrary('yet-another-session'),
+    ]);
+    expect(results[0]).toEqual({ status: 'refreshed' });
+    expect(results[1].status).toBe('suppressed');
+    expect(results[2].status).toBe('suppressed');
+    expect(results[1].retryAfterSeconds).toBeGreaterThan(0);
+    expect(calls.filter(path => path === '/sync/activities')).toHaveLength(3);
+
+    const afterRestart = cache(firstStorage.storage);
+    expect((await afterRestart.refreshLibrary('account-a')).status).toBe('suppressed');
+    expect(calls.filter(path => path === '/sync/activities')).toHaveLength(3);
+    expect(await second.refreshLibrary('account-b')).toEqual({ status: 'refreshed' });
+    expect(calls.filter(path => path === '/sync/activities')).toHaveLength(4);
+
+    // Manual cooldown cannot swallow mandatory freshness after an upstream write.
+    await afterRestart.write('account-a', '/sync/history', { method: 'POST', body: {} });
+    const beforeCheck = calls.filter(path => path === '/sync/activities').length;
+    expect((await afterRestart.refreshLibrary('account-a')).status).toBe('suppressed');
+    expect(calls.filter(path => path === '/sync/activities')).toHaveLength(beforeCheck + 1);
+    expect(new LibraryStore(firstStorage.storage).loadSnapshot()?.forceCheck).toBe(false);
+
+    // 60 seconds is a hard boundary, but only one metadata row is updated.
+    firstStorage.db.query("UPDATE library_metadata SET value_json=? WHERE key='manual-refresh-at'")
+      .run(JSON.stringify(Date.now() - 60_001));
+    const rowsBefore = new LibraryStore(firstStorage.storage).readItems();
+    expect(await afterRestart.refreshLibrary('account-a')).toEqual({ status: 'refreshed' });
+    expect(new LibraryStore(firstStorage.storage).readItems()).toEqual(rowsBefore);
+    const persisted = JSON.stringify(firstStorage.db.query('SELECT * FROM library_metadata').all());
+    expect(persisted).not.toContain('account-a');
+    expect(persisted).not.toContain('another-session');
+  } finally {
+    firstStorage.db.close(); secondStorage.db.close();
+  }
+});
+
+test('issue #44: failed manual refresh occupies its slot but does not force repeated upstream retries', async () => {
+  const data = sqliteStorage();
+  try {
+    const object = cache(data.storage);
+    upstream();
+    await object.ensureInitialized('token');
+    let checks = 0;
+    globalThis.fetch = (async () => {
+      checks++;
+      throw new Error('upstream unavailable');
+    }) as typeof fetch;
+    await expect(object.refreshLibrary('token')).rejects.toThrow('upstream unavailable');
+    expect(checks).toBe(1);
+    expect(new LibraryStore(data.storage).loadSnapshot()?.forceCheck).toBe(false);
+    expect((await cache(data.storage).refreshLibrary('token')).status).toBe('suppressed');
+    await cache(data.storage).read('token');
+    expect(checks).toBe(1);
+  } finally { data.db.close(); }
 });
