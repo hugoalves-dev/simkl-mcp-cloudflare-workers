@@ -140,6 +140,80 @@ describe('SimklClient request policy', () => {
     expect(attempts).toBe(1);
   });
 
+
+  // issue #42 regression: an upstream 5xx can occur after a mutation was applied.
+  test.each(['POST', 'DELETE'] as const)('never automatically retries %s after 5xx', async method => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return Response.json({ error: 'internal_error' }, { status: 503 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/sync/history', { method, body: { movies: [] } }))
+      .rejects.toMatchObject({ statusCode: 503, writeMayHaveSucceeded: true });
+    expect(attempts).toBe(1);
+  });
+
+  test('GET recovers after two transient server failures', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return attempts < 3 ? Response.json({ error: 'internal_error' }, { status: 502 }) : Response.json({ ok: true });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/sync/activities', { method: 'GET' })).resolves.toEqual({ ok: true });
+    expect(attempts).toBe(3);
+  });
+
+  test('retries a 400 uppercase RATE_LIMIT write lock once', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return attempts === 1
+        ? Response.json({ error: 'RATE_LIMIT' }, { status: 400 })
+        : Response.json({ added: {} });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/sync/history', { method: 'POST', body: {} })).resolves.toEqual({ added: {} });
+    expect(attempts).toBe(2);
+  });
+
+  test('write-lock retry can be disabled for serialized writes', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return Response.json({ error: 'RATE_LIMIT' }, { status: 400 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/sync/history', { method: 'POST', body: {}, rateLimitRetry: false }))
+      .rejects.toMatchObject({ statusCode: 400, upstreamCode: 'write_lock' });
+    expect(attempts).toBe(1);
+  });
+
+  test('never retries a 400 write-lock response on GET', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return Response.json({ error: 'RATE_LIMIT' }, { status: 400 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/sync/activities', { method: 'GET' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+    expect(attempts).toBe(1);
+  });
+
+  test('does not retry an exhausted POST daily quota', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return Response.json({ error: 'app_limit_exceeded' }, { status: 429 });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request('/sync/history', { method: 'POST', body: {} }))
+      .rejects.toMatchObject({ statusCode: 429, upstreamCode: 'app_limit_exceeded' });
+    expect(attempts).toBe(1);
+  });
+
   test('retries server errors with a bounded count', async () => {
     let attempts = 0;
     globalThis.fetch = (async () => {
