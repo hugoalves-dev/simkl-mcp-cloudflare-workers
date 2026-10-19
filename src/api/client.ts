@@ -433,13 +433,10 @@ function parseAlreadyRecordedStopConflict(body: string): {
     const value: unknown = JSON.parse(body);
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const { error, watched_at, expires_at } = value as Record<string, unknown>;
-    if (error !== 'already_watched' || !isSimklTimestamp(watched_at)
-      || (expires_at !== undefined && !isSimklTimestamp(expires_at))) return null;
-    return {
-      already_recorded: true,
-      watched_at,
-      ...(expires_at === undefined ? {} : { expires_at }),
-    };
+    if (error !== 'already_watched' || !isSimklTimestamp(watched_at)) return null;
+    if (expires_at === undefined) return { already_recorded: true, watched_at };
+    if (!isSimklTimestamp(expires_at)) return null;
+    return { already_recorded: true, watched_at, expires_at };
   } catch {
     return null;
   }
@@ -447,7 +444,7 @@ function parseAlreadyRecordedStopConflict(body: string): {
 
 function isSimklTimestamp(value: unknown): value is string {
   return typeof value === 'string'
-    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
     && Number.isFinite(Date.parse(value));
 }
 
