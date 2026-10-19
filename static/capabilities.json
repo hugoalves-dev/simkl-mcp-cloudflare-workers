@@ -1198,13 +1198,13 @@
     },
     {
       "name": "simkl_get_user_stats",
-      "description": "Get a user's watch statistics",
+      "description": "Get watch statistics for another explicitly identified Simkl user. For your own authenticated account, use simkl_my_stats instead: it reads the per-account cache without a settings lookup.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "user_id": {
             "type": "string",
-            "description": "Target user's numeric Simkl id (positive integer). For the authenticated user, first call [`GET /users/settings`](/api-reference/simkl/get-user-settings) and pass back `account.id`. Passing `0` retur"
+            "description": "Numeric Simkl ID of another explicitly identified user. For your own account, use simkl_my_stats with no arguments; do not fetch /users/settings."
           }
         },
         "required": [
@@ -1554,7 +1554,7 @@
     },
     {
       "name": "simkl_my_stats",
-      "description": "Get watching statistics for the current authenticated user",
+      "description": "Get cached watching statistics for the current authenticated Simkl account. Use for own-account stats; no user ID or /users/settings request is needed.",
       "inputSchema": {
         "type": "object",
         "properties": {},
