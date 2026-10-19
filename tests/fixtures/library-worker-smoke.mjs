@@ -23,8 +23,12 @@ export default { async fetch(request, env) {
    return Response.json(await callbacks.get('simkl_get_watchlist')({ type: 'shows', status: 'completed' }));
  }
  if (url.pathname === '/quota-refresh') {
-   try { await adapter.read(true); return Response.json({ content: [] }); }
+   try { await adapter.refresh(); return Response.json({ content: [] }); }
    catch (error) { return Response.json(toMcpErrorResult(error)); }
+ }
+ if (url.pathname === '/manual-refresh') {
+   try { return Response.json(await adapter.refresh()); }
+   catch { return new Response('refresh failed', { status: 502 }); }
  }
  if (url.pathname === '/write') {
    try {
@@ -38,7 +42,7 @@ export default { async fetch(request, env) {
    try { return Response.json(await cache.readRewatches('synthetic-token')); }
    catch { return new Response('rewatch refresh failed', { status: 502 }); }
  }
- try { return Response.json(await cache.read('synthetic-token', url.searchParams.has('force'))); }
+ try { return Response.json(await cache.read('synthetic-token')); }
  catch { return new Response('refresh failed', { status: 502 }); }
 } };`;
 const result = await build({ stdin: { contents: entry, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'browser', external: ['cloudflare:workers'], write: false });
@@ -81,15 +85,18 @@ try {
  const read = async (query = '') => { const response = await mf.dispatchFetch('http://cache.test/read' + query); assert.equal(response.status, 200); return response.json(); };
  assert.equal((await read()).shows[0].status, 'watching'); assert.deepEqual(calls, ['/sync/activities', '/sync/all-items/shows', '/sync/all-items/movies', '/sync/all-items/anime']);
  await read(); assert.equal(calls.length, 4);
- mode = 'fail'; assert.equal((await mf.dispatchFetch('http://cache.test/read?force')).status, 502);
- assert.equal((await mf.dispatchFetch('http://cache.test/read')).status, 502); // ordinary read retries even inside TTL
- mode = 'initial';
- assert.equal((await read()).shows[0].status, 'watching'); // old snapshot survived failed staged delta
- mode = 'fail'; assert.equal((await mf.dispatchFetch('http://cache.test/read?force')).status, 502);
+ mode = 'fail'; assert.equal((await mf.dispatchFetch('http://cache.test/manual-refresh')).status, 502);
+ const manualFailureCalls = calls.length;
+ assert.equal((await read()).shows[0].status, 'watching'); // manual failure does not force ordinary retries
+ assert.equal(calls.length, manualFailureCalls);
+ // Mutation invalidation is still retryable and durable, unlike a manual force.
+ await mf.dispatchFetch('http://cache.test/invalidate');
+ assert.equal((await mf.dispatchFetch('http://cache.test/read')).status, 502);
+ assert.equal((await mf.dispatchFetch('http://cache.test/read')).status, 502);
  const beforeRestart = calls.length; mode = 'initial';
  await mf.dispose(); mf = new Miniflare({ ...convertV4MiniflareOptions(config), resourcePersistencePath: directory });
  assert.equal((await read()).shows[0].status, 'watching'); // real SQLite persisted across runtime reconstruction
- assert.equal(calls.length, beforeRestart + 1); // persisted force flag required activities check after restart
+ assert.equal(calls.length, beforeRestart + 1); // mutation invalidation survives restart
  mode = 'changed'; await mf.dispatchFetch('http://cache.test/invalidate');
  assert.equal((await read()).shows[0].status, 'completed');
  const count = calls.length; await read(); assert.equal(calls.length, count);
@@ -114,7 +121,7 @@ try {
  assert.equal(JSON.parse(updatedRewatch[0].itemJson).watched_episodes_count, 2);
  assert.equal(rewatchCalls, 2); // A write invalidates rewatch freshness.
  mode = 'quota'; await mf.dispatchFetch('http://cache.test/invalidate');
- for (const path of ['/quota-watchlist', '/quota-refresh']) {
+ for (const path of ['/quota-watchlist', '/quota-refresh?user=99']) {
    const response = await mf.dispatchFetch('http://cache.test' + path); const result = await response.json();
    assert.equal(result.isError, true); assert.match(result.content[0].text, /AUTH V2 daily allowance/); assert.match(result.content[0].text, /Retry-After: 3600/); assert.equal(JSON.stringify(result).includes('sensitive-upstream-body'), false);
  }
