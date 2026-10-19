@@ -30,7 +30,7 @@ function restoreRpcError(error: unknown): unknown {
     }
   }
   const code = typeof remote.upstreamCode === 'string' ? remote.upstreamCode : '';
-  return new SimklApiError('Simkl request failed', status, JSON.stringify({ error: code }), headers);
+  return new SimklApiError('Simkl request failed', status, JSON.stringify({ error: code }), headers, remote.writeMayHaveSucceeded === true);
 }
 export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNamespace<SimklLibraryCache> }, client: SimklClient, getProps: () => SimklAuthProps | undefined): LibraryAdapter {
   let memo: { token: string; promise: Promise<string> } | undefined;
@@ -69,7 +69,7 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
           }
         }
         const code = typeof remote.upstreamCode === 'string' ? remote.upstreamCode : '';
-        throw new SimklApiError('Simkl request failed', status, JSON.stringify({ error: code }), headers);
+        throw new SimklApiError('Simkl request failed', status, JSON.stringify({ error: code }), headers, remote.writeMayHaveSucceeded === true);
       }
     }
     throw error;
