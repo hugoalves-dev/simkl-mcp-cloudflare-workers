@@ -128,12 +128,15 @@ export async function refreshRewatches(
   }
   if (previous && !previous.stale && previous.activities.all === activities.all) return previous;
 
-  const needsBaseline = !previous || previous.stale || previous.activities.all === null;
+  const needsBaseline = !previous || previous.activities.all === null;
   const removed = previous && bucketChanged(previous.activities, activities, 'removed_from_list');
   const changed = previous && LIBRARY_STATUSES.some(status => bucketChanged(previous.activities, activities, status));
+  // An in-app write invalidates cached sessions. Prefer the delta when the
+  // activity bucket moved; reconcile fully only if there is no safe cursor.
+  const staleWithoutDelta = previous?.stale && !changed;
 
   let rows: RewatchRow[];
-  if (needsBaseline || removed) {
+  if (needsBaseline || removed || staleWithoutDelta) {
     // Deletions have no tombstones. Full replacement also removes stale sessions.
     rows = await fetchSessions(client, token);
   } else if (changed) {
