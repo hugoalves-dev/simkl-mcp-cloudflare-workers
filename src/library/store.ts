@@ -99,6 +99,31 @@ export class LibraryStore {
     return { initialized: true, itemCount: candidate.items.length };
   }
 
+  /**
+   * Atomically reserves a manual refresh slot per account. Stored separately
+   * from the library snapshot so incremental saves and object restarts cannot
+   * reset the cooldown. Returns seconds left, or zero when reserved.
+   */
+  tryReserveManualRefresh(now: number): number {
+    if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid manual refresh time');
+    return this.storage.transactionSync(() => {
+      const row = this.storage.sql.exec<{ value_json: string }>(
+        "SELECT value_json FROM library_metadata WHERE key = 'manual-refresh-at'",
+      ).toArray()[0];
+      if (row) {
+        const previous: unknown = JSON.parse(row.value_json);
+        if (!Number.isSafeInteger(previous) || (previous as number) < 0) throw new Error('Invalid manual refresh metadata');
+        const remaining = (previous as number) + 60_000 - now;
+        if (remaining > 0) return Math.ceil(remaining / 1000);
+      }
+      this.storage.sql.exec(
+        "INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('manual-refresh-at', ?)",
+        JSON.stringify(now),
+      );
+      return 0;
+    });
+  }
+
   loadActivitySnapshot(): LibraryActivitySnapshot | undefined {
     const version = this.storage.sql.exec<{ value_json: string }>("SELECT value_json FROM library_metadata WHERE key = 'schema-version'").toArray()[0];
     if (version?.value_json !== '1') throw new Error('Unsupported library cache schema');
