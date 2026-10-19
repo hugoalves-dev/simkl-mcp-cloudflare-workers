@@ -50,7 +50,7 @@ test('stats metadata prefers the cached own-account tool and restricts the direc
   expect(other).toBeDefined();
   expect(other!.description).toContain('another explicitly identified Simkl user');
   expect(other!.description).toContain('simkl_my_stats');
-  const idDescription = other!.inputSchema.properties?.user_id?.description;
+  const idDescription = JSON.stringify(other!.inputSchema.properties?.user_id);
   expect(idDescription).toContain('simkl_my_stats');
   expect(idDescription).toContain('do not fetch /users/settings');
   expect(idDescription).not.toContain('first call');
