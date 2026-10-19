@@ -430,7 +430,7 @@ export class SimklApiError extends Error {
     let code = '';
     try {
       const parsed = JSON.parse(responseBody || '') as { error?: unknown };
-      if (statusCode === 400 && parsed.error === 'RATE_LIMIT') {
+      if (statusCode === 400 && (parsed.error === 'RATE_LIMIT' || parsed.error === 'write_lock')) {
         // Simkl's uppercase 400 code is a temporary write lock, not a quota signal.
         code = 'write_lock';
       } else if (typeof parsed.error === 'string' && ['rate_limit', 'user_limit_exceeded', 'app_limit_exceeded', 'user_token_required', 'max_items'].includes(parsed.error)) {
