@@ -48,18 +48,18 @@ test('invalidation before initialization remains a safe no-op', async () => {
   const s = setup(); await s.cache.invalidate(); expect(s.saved()).toBeUndefined();
   const count = upstream([activities, {}, {}, {}]); await s.cache.read('token'); expect(count()).toBe(4);
 });
-test('failed forced refresh inside TTL persists retry flag for ordinary reads and restart', async () => {
+test('failed manual refresh inside TTL leaves mutation invalidation unset after reconstruction', async () => {
   const s = setup(); upstream([activities, items, { movies: [] }, { anime: [] }]); await s.cache.read('token');
   upstream([new Error('failed forced refresh')]); await expect(s.cache.read('token', true)).rejects.toThrow();
   expect(s.saved().activities).toEqual(activities); expect(s.saved().items.shows).toEqual(items.shows);
-  expect(s.saved().forceCheck).toBe(true);
+  expect(s.saved().forceCheck).toBe(false);
   const reconstructed = new CachedLibrary(s.store, client, 300, () => 300_001);
-  const count = upstream([activities]); await reconstructed.read('token'); expect(count()).toBe(1); expect(s.saved().forceCheck).toBe(false);
+  const count = upstream([]); await reconstructed.read('token'); expect(count()).toBe(0);
 });
-test('storage failure while persisting force intent does not throttle the next ordinary read', async () => {
+test('manual snapshot save failure does not create retry intent', async () => {
   const s = setup(); upstream([activities, items, { movies: [] }, { anime: [] }]); await s.cache.read('token');
-  s.fail(true); await expect(s.cache.read('token', true)).rejects.toThrow('storage failure');
-  s.fail(false); const count = upstream([activities]); await s.cache.read('token'); expect(count()).toBe(1);
+  s.fail(true); upstream([activities]); await expect(s.cache.read('token', true)).rejects.toThrow('storage failure');
+  s.fail(false); const count = upstream([]); await s.cache.read('token'); expect(count()).toBe(0);
 });
 test('failed post-write invalidation still forces the next read in the current object', async () => {
   const s = setup(); upstream([activities, items, { movies: [] }, { anime: [] }]); await s.cache.read('token');
