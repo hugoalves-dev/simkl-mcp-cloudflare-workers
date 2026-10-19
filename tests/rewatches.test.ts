@@ -87,20 +87,23 @@ describe('RewatchService', () => {
     expect(body.shows[0]).toEqual({ ids: { simkl: 9 }, is_rewatch: true, rewatch_id: 42, rewatch_status: 'active' });
   });
 
-  test('requires date_from except during an explicit initial sync and preserves rewatch rows', async () => {
-    const service = createService();
-    await expect(service.list({ mediaType: 'all', status: 'completed' })).rejects.toThrow(/date_from/);
-    const result = await service.list({ mediaType: 'all', status: 'completed', initial_sync: true });
-    const read = requests.find(request => request.url.pathname.includes('/sync/all-items'))!;
-    expect(read.url.pathname).toBe('/sync/all-items/all/completed');
-    expect(read.url.searchParams.get('allow_rewatch')).toBe('yes');
-    expect(read.url.searchParams.get('extended')).toBe('full');
-    expect(read.url.searchParams.get('episode_watched_at')).toBe('yes');
-    expect(result.shows[0].rewatch_id).toBe(42);
-    await service.list({ mediaType: 'anime', status: 'watching', date_from: '2026-01-01T00:00:00Z' });
-    const incremental = requests.filter(request => request.url.pathname.includes('/sync/all-items'))[1];
-    expect(incremental.url.pathname).toBe('/sync/all-items/anime/watching');
-    expect(incremental.url.searchParams.get('date_from')).toBe('2026-01-01T00:00:00Z');
+  test('reads only from the shared per-user cache and returns compact session lines', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    const rows = [{
+      mediaType: 'shows' as const, simklId: '42', rewatchId: 7,
+      itemJson: JSON.stringify({
+        status: 'watching', is_rewatch: true, rewatch_id: 7, rewatch_status: 'active',
+        watched_episodes_count: 4, total_episodes_count: 20,
+        show: { title: 'Example', year: 2020, ids: { simkl: 42 } },
+      }),
+    }];
+    const service = new RewatchService(client, () => token, () => now, undefined, undefined, undefined, async () => rows);
+    const result = await service.list({ mediaType: 'all', status: 'watching' });
+    expect(result).toContain('Example (2020) | rewatch_id: 7 | status: active | list: watching | progress: 4/20');
+    expect(result).toContain('https://simkl.com/tv/42');
+    expect(await service.list({ mediaType: 'movies', status: 'watching' })).toBe('no rewatch sessions matched');
+    expect(requests.some(request => request.url.pathname.startsWith('/sync/all-items'))).toBe(false);
+    await expect(createService().list({ mediaType: 'all', status: 'watching' })).rejects.toThrow(/cached rewatch/i);
   });
 
   test('gates rewatch writes using current settings without a separate token-local cache', async () => {

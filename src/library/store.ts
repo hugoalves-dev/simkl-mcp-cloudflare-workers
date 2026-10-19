@@ -1,4 +1,5 @@
 import { normalizeSimklId } from './identity';
+import type { RewatchRow, RewatchSnapshot } from './rewatches.js';
 import {
   isRecord, jsonBytes, MAX_ROW_JSON_BYTES, MAX_PENDING_ITEM_BYTES,
   type LibraryActivitySnapshot, type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
@@ -32,6 +33,9 @@ export class LibraryStore {
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS library_items (
       media_type TEXT NOT NULL, simkl_id TEXT NOT NULL, item_json TEXT NOT NULL,
       PRIMARY KEY (media_type, simkl_id))`);
+    storage.sql.exec(`CREATE TABLE IF NOT EXISTS rewatch_sessions (
+      media_type TEXT NOT NULL, simkl_id TEXT NOT NULL, rewatch_id INTEGER NOT NULL,
+      item_json TEXT NOT NULL, PRIMARY KEY (media_type, simkl_id, rewatch_id))`);
     storage.sql.exec('CREATE TABLE IF NOT EXISTS library_metadata (key TEXT PRIMARY KEY, value_json TEXT NOT NULL)');
     storage.sql.exec("INSERT OR IGNORE INTO library_metadata (key, value_json) VALUES ('schema-version', '1')");
   }
@@ -202,4 +206,80 @@ export class LibraryStore {
       'SELECT media_type AS mediaType, simkl_id AS simklId, item_json AS itemJson FROM library_items ORDER BY media_type, simkl_id',
     ).toArray();
   }
+  /** Separate identity model: canonical (type, id), rewatch (type, id, session). */
+  loadRewatches(): RewatchSnapshot | undefined {
+    const row = this.storage.sql.exec<{ value_json: string }>(
+      "SELECT value_json FROM library_metadata WHERE key = 'rewatch-snapshot'",
+    ).toArray()[0];
+    if (!row) return undefined;
+    const metadata: unknown = JSON.parse(row.value_json);
+    if (!isRecord(metadata) || !isRecord(metadata.activities)
+      || !(metadata.activities.all === null || isActivityTimestamp(metadata.activities.all))
+      || typeof metadata.stale !== 'boolean') throw new Error('Invalid cached rewatch metadata');
+    const rows = this.storage.sql.exec<{ mediaType: RewatchRow['mediaType']; simklId: string; rewatchId: number; itemJson: string }>(
+      'SELECT media_type AS mediaType, simkl_id AS simklId, rewatch_id AS rewatchId, item_json AS itemJson FROM rewatch_sessions ORDER BY media_type, simkl_id, rewatch_id',
+    ).toArray();
+    return { activities: metadata.activities as RewatchSnapshot['activities'], stale: metadata.stale, rows };
+  }
+
+  saveRewatches(snapshot: RewatchSnapshot): void {
+    if (!isRecord(snapshot.activities) || !(snapshot.activities.all === null || isActivityTimestamp(snapshot.activities.all))
+      || typeof snapshot.stale !== 'boolean') throw new Error('Invalid rewatch snapshot');
+    const metadata = JSON.stringify({ activities: snapshot.activities, stale: snapshot.stale });
+    if (jsonBytes(metadata) > MAX_ROW_JSON_BYTES) throw new Error('Rewatch metadata too large');
+    const newRows = new Map<string, RewatchRow>();
+    let totalBytes = 0;
+    for (const row of snapshot.rows) {
+      if (!MEDIA_TYPES.includes(row.mediaType) || !normalizeSimklId(row.simklId)
+        || !Number.isSafeInteger(row.rewatchId) || row.rewatchId <= 0) throw new Error('Invalid rewatch identity');
+      const key = JSON.stringify([row.mediaType, row.simklId, row.rewatchId]);
+      if (newRows.has(key)) throw new Error('Duplicate rewatch identity');
+      const value: unknown = JSON.parse(row.itemJson);
+      if (!isRecord(value) || value.is_rewatch !== true || value.rewatch_id !== row.rewatchId) {
+        throw new Error('Invalid rewatch session body');
+      }
+      const size = jsonBytes(row.itemJson);
+      if (size > MAX_ROW_JSON_BYTES) throw new Error('Rewatch session too large');
+      totalBytes += size;
+      if (totalBytes > MAX_PENDING_ITEM_BYTES) throw new Error('Rewatch cache too large');
+      newRows.set(key, row);
+    }
+    const oldRows = this.loadRewatches()?.rows ?? [];
+    const existing = new Map(oldRows.map(row => [JSON.stringify([row.mediaType, row.simklId, row.rewatchId]), row.itemJson]));
+    const deletes = [...existing.keys()].filter(key => !newRows.has(key));
+    const changes = [...newRows].filter(([key, row]) => existing.get(key) !== row.itemJson).map(([, row]) => row);
+    // Rows, removals, and the cursor advance atomically; a failed delta can never
+    // leave a newer watermark pointing at an incomplete set of sessions.
+    this.storage.transactionSync(() => {
+      for (const key of deletes) {
+        const [type, id, session] = JSON.parse(key) as [string, string, number];
+        this.storage.sql.exec('DELETE FROM rewatch_sessions WHERE media_type=? AND simkl_id=? AND rewatch_id=?', type, id, session);
+      }
+      for (const row of changes) {
+        this.storage.sql.exec(
+          'INSERT INTO rewatch_sessions (media_type, simkl_id, rewatch_id, item_json) VALUES (?, ?, ?, ?) ON CONFLICT(media_type, simkl_id, rewatch_id) DO UPDATE SET item_json=excluded.item_json',
+          row.mediaType, row.simklId, row.rewatchId, row.itemJson,
+        );
+      }
+      this.storage.sql.exec("INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('rewatch-snapshot', ?)", metadata);
+    });
+    console.info(JSON.stringify({ component: 'simkl_rewatch_cache', event: 'snapshot_saved', upserted: changes.length, removed: deletes.length }));
+  }
+
+  invalidateRewatches(): void {
+    const row = this.storage.sql.exec<{ value_json: string }>(
+      "SELECT value_json FROM library_metadata WHERE key = 'rewatch-snapshot'",
+    ).toArray()[0];
+    if (!row) return; // First read always fetches a baseline.
+    const metadata: unknown = JSON.parse(row.value_json);
+    if (!isRecord(metadata) || !isRecord(metadata.activities)) throw new Error('Invalid cached rewatch metadata');
+    if (metadata.stale === true) return;
+    this.storage.transactionSync(() => {
+      this.storage.sql.exec(
+        "UPDATE library_metadata SET value_json = ? WHERE key = 'rewatch-snapshot'",
+        JSON.stringify({ ...metadata, stale: true }),
+      );
+    });
+  }
+
 }

@@ -3,9 +3,11 @@ import { normalizeSimklId } from './identity';
 type SimklAuthProps = { simklToken: string; simklUserId?: string };
 import type { SimklLibraryCache } from './cache';
 import type { LibraryItems } from './types';
+import type { RewatchRow } from './rewatches.js';
 import { LibraryWriteInvalidationError } from './errors';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
+  readRewatches(): Promise<RewatchRow[]>;
   invalidate(): Promise<void>;
   getStats(): Promise<Record<string, unknown>>;
   getSettings(expectedToken?: string): Promise<Record<string, unknown>>;
@@ -76,6 +78,11 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     async read(force = false) {
       const { object, token } = await stub();
       try { return await object.read(token, force); }
+      catch (error) { throw restoreRpcError(error); }
+    },
+    async readRewatches() {
+      const { object, token } = await stub();
+      try { return await object.readRewatches(token); }
       catch (error) { throw restoreRpcError(error); }
     },
     async invalidate() { const { object } = await stub(); await object.invalidate(); },

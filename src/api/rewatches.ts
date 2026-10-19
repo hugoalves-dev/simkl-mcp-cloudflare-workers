@@ -1,4 +1,5 @@
 import type { RequestOptions, SimklClient } from './client.js';
+import { selectRewatches, type RewatchRow } from '../library/rewatches.js';
 
 export type RewatchMediaType = 'all' | 'movies' | 'shows' | 'anime';
 export type RewatchWriteMediaType = Exclude<RewatchMediaType, 'all'>;
@@ -61,6 +62,7 @@ export class RewatchService {
     private readonly readSettings: (token: string) => Promise<any> =
       token => client.request('/users/settings', { method: 'GET', token }),
     private readonly invalidateSharedSettings?: (token: string) => Promise<void>,
+    private readonly readCachedRewatches?: () => Promise<RewatchRow[]>,
   ) {
     void _now;
     this.writeRequest = writer ?? ((endpoint, options) => this.client.request(endpoint, options));
@@ -97,18 +99,10 @@ export class RewatchService {
     });
   }
 
-  async list(input: { mediaType: RewatchMediaType; status: string; date_from?: string; initial_sync?: boolean }): Promise<any> {
-    if (!input.date_from && !input.initial_sync) throw new Error('date_from is required unless initial_sync is explicitly true');
-    if (input.date_from && !Number.isFinite(Date.parse(input.date_from))) throw new Error('date_from must be a valid date');
-    const allowedStatuses = ['watching', 'plantowatch', 'hold', 'completed', 'dropped'];
-    if (!allowedStatuses.includes(input.status)) throw new Error('invalid watch status');
-    return this.client.request(`/sync/all-items/${input.mediaType}/${input.status}`, {
-      method: 'GET', token: this.getToken(),
-      query: {
-        allow_rewatch: 'yes', extended: 'full', episode_watched_at: 'yes',
-        date_from: input.date_from,
-      },
-    });
+  async list(input: { mediaType: RewatchMediaType; status: string }): Promise<string> {
+    if (!this.readCachedRewatches) throw new Error('Cached rewatch sessions are unavailable');
+    const lines = selectRewatches(await this.readCachedRewatches(), input);
+    return lines.length ? lines.join('\n') : 'no rewatch sessions matched';
   }
 
   async stop(input: { body: Record<string, unknown>; allow_rewatch?: boolean }): Promise<any> {
