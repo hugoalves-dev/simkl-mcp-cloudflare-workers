@@ -108,6 +108,17 @@ export function registerRewatchTools(server: McpServer, service: RewatchService,
   }, async args => {
     try {
       return await mutationResult(await service.stop({ body: args.body, allow_rewatch: args.allow_rewatch }));
-    } catch (error) { return rewatchErrorResult(error, true); }
+    } catch (error) {
+      if (error instanceof SimklApiError && error.statusCode === 409) {
+        return {
+          isError: true,
+          content: [{
+            type: 'text' as const,
+            text: 'Simkl returned an unrecognized scrobble stop conflict (HTTP 409). The server could not validate an already-recorded response. Check the watch history before any manual retry; no automatic retry was performed.',
+          }],
+        };
+      }
+      return rewatchErrorResult(error, true);
+    }
   });
 }
