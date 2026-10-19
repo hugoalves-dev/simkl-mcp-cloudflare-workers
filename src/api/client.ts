@@ -253,6 +253,14 @@ export class SimklClient {
     }
 
     if (!response.ok) {
+      // Simkl records the watch before returning this specific duplicate-stop conflict.
+      // Treat only a validated 409 already_watched response as a no-op success.
+      if (options.method === 'POST' && endpoint === '/scrobble/stop' && response.status === 409) {
+        const alreadyRecorded = parseAlreadyRecordedStopConflict(responseText);
+        if (alreadyRecorded) {
+          return { data: alreadyRecorded as T, pagination: null, headers: responseHeaders };
+        }
+      }
       throw new SimklApiError(
         `simkl api error: ${response.status} ${response.statusText}`,
         response.status,
@@ -413,6 +421,34 @@ export class SimklClient {
     const parsed = Number.parseInt(value, 10);
     return Number.isNaN(parsed) ? null : parsed;
   }
+}
+
+/** Accept only the documented scrobble-stop duplicate; preserve upstream timestamps verbatim. */
+function parseAlreadyRecordedStopConflict(body: string): {
+  already_recorded: true;
+  watched_at: string;
+  expires_at?: string;
+} | null {
+  try {
+    const value: unknown = JSON.parse(body);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const { error, watched_at, expires_at } = value as Record<string, unknown>;
+    if (error !== 'already_watched' || !isSimklTimestamp(watched_at)
+      || (expires_at !== undefined && !isSimklTimestamp(expires_at))) return null;
+    return {
+      already_recorded: true,
+      watched_at,
+      ...(expires_at === undefined ? {} : { expires_at }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isSimklTimestamp(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)
+    && Number.isFinite(Date.parse(value));
 }
 
 export class SimklApiError extends Error {
