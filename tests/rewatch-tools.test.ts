@@ -39,6 +39,38 @@ describe('rewatch MCP tools', () => {
     }
   });
 
+  test('reports a duplicate stop as MCP success and preserves the upstream watch date', async () => {
+    const originalFetch = globalThis.fetch;
+    let attempts = 0;
+    let invalidations = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return Response.json({
+        error: 'already_watched',
+        watched_at: '2026-05-08T14:00:00Z',
+        expires_at: '2026-05-08T15:00:00Z',
+      }, { status: 409 });
+    }) as typeof fetch;
+    try {
+      const registered = new Map<string, (args: any) => Promise<any>>();
+      const server = { registerTool(name: string, _definition: any, handler: (args: any) => Promise<any>) { registered.set(name, handler); } };
+      const service = new RewatchService(new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app' }), () => 'token');
+      registerRewatchTools(server as any, service, async () => { invalidations++; });
+
+      const response = await registered.get('simkl_stop_watching')!({ body: { progress: 100 } });
+      expect(response.isError).toBeUndefined();
+      expect(JSON.parse(response.content[0].text)).toEqual({
+        already_recorded: true,
+        watched_at: '2026-05-08T14:00:00Z',
+        expires_at: '2026-05-08T15:00:00Z',
+      });
+      expect(attempts).toBe(1);
+      expect(invalidations).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('preserves shared AUTH V2 daily-limit guidance for stop errors', async () => {
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app' });
     client.request = async () => { throw new SimklApiError('429 Too Many Requests', 429, '{"error":"user_limit_exceeded"}', { retryAfter: '3600' }); };

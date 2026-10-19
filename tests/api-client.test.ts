@@ -19,6 +19,60 @@ describe('SimklClient request policy', () => {
     globalThis.fetch = originalFetch;
   });
 
+  // issue #43: Simkl's duplicate stop is already persisted upstream.
+  test('returns a successful already-recorded stop without changing its original timestamp or retrying', async () => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return Response.json({
+        error: 'already_watched',
+        watched_at: '2026-05-08T14:00:00Z',
+        expires_at: '2026-05-08T15:00:00Z',
+      }, { status: 409, headers: { 'X-RateLimit-Remaining': '37' } });
+    }) as typeof fetch;
+
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    expect(await client.requestWithMetadata('/scrobble/stop', { method: 'POST', token: 'token', body: { progress: 100 } })).toEqual({
+      data: {
+        already_recorded: true,
+        watched_at: '2026-05-08T14:00:00Z',
+        expires_at: '2026-05-08T15:00:00Z',
+      },
+      headers: { rateLimitRemaining: '37' },
+    });
+    expect(attempts).toBe(1);
+  });
+
+  test('preserves an upstream ISO timestamp with an explicit offset and supports an absent expiry', async () => {
+    globalThis.fetch = (async () => Response.json({
+      error: 'already_watched', watched_at: '2026-05-08T11:00:00-03:00',
+    }, { status: 409 })) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    expect(await client.request('/scrobble/stop', { method: 'POST' })).toEqual({
+      already_recorded: true, watched_at: '2026-05-08T11:00:00-03:00',
+    });
+  });
+
+  test.each([
+    { name: 'wrong error code', endpoint: '/scrobble/stop', method: 'POST' as const, status: 409, body: '{"error":"conflict","watched_at":"2026-05-08T14:00:00Z"}' },
+    { name: 'missing original date', endpoint: '/scrobble/stop', method: 'POST' as const, status: 409, body: '{"error":"already_watched"}' },
+    { name: 'invalid original date', endpoint: '/scrobble/stop', method: 'POST' as const, status: 409, body: '{"error":"already_watched","watched_at":"tomorrow"}' },
+    { name: 'invalid expiry', endpoint: '/scrobble/stop', method: 'POST' as const, status: 409, body: '{"error":"already_watched","watched_at":"2026-05-08T14:00:00Z","expires_at":"unknown"}' },
+    { name: 'unparseable conflict', endpoint: '/scrobble/stop', method: 'POST' as const, status: 409, body: 'not-json' },
+    { name: 'different endpoint', endpoint: '/scrobble/pause', method: 'POST' as const, status: 409, body: '{"error":"already_watched","watched_at":"2026-05-08T14:00:00Z"}' },
+    { name: 'different method', endpoint: '/scrobble/stop', method: 'GET' as const, status: 409, body: '{"error":"already_watched","watched_at":"2026-05-08T14:00:00Z"}' },
+    { name: 'different HTTP status', endpoint: '/scrobble/stop', method: 'POST' as const, status: 400, body: '{"error":"already_watched","watched_at":"2026-05-08T14:00:00Z"}' },
+  ])('keeps $name as an upstream error and never retries', async ({ endpoint, method, status, body }) => {
+    let attempts = 0;
+    globalThis.fetch = (async () => {
+      attempts++;
+      return new Response(body, { status });
+    }) as typeof fetch;
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
+    await expect(client.request(endpoint, { method, rateLimitRetry: false })).rejects.toMatchObject({ statusCode: status });
+    expect(attempts).toBe(1);
+  });
+
   test('adds Simkl identification to relative API requests', async () => {
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' });
     await client.request('/movies/trending/today', { method: 'GET' });

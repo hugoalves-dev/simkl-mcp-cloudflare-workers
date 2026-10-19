@@ -99,7 +99,7 @@ export function registerRewatchTools(server: McpServer, service: RewatchService,
   });
 
   server.registerTool('simkl_stop_watching', {
-    description: 'Stop watching and return Simkl’s full scrobble response. Set allow_rewatch=true only when the user explicitly chose to record this playback as a rewatch; it requires PRO/VIP and progress of at least 80%.',
+    description: 'Stop watching and return the Simkl scrobble response. A 409 already_watched conflict is an already_recorded success with the original watched_at: do not retry. Set allow_rewatch=true only when the user explicitly chose to record this playback as a rewatch; it requires PRO/VIP and progress of at least 80%.',
     inputSchema: {
       body: z.record(z.string(), z.unknown()),
       allow_rewatch: z.boolean().optional().describe('Explicitly record this stop as a rewatch. Defaults to false.'),

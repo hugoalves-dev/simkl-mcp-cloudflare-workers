@@ -81,6 +81,53 @@ test('exclusive profile operations share the library refresh and invalidation qu
   expect(events).toEqual(['first-start', 'first-end', 'second']);
 });
 
+// issue #43: an already-recorded scrobble is a successful upstream state,
+// so it must invalidate the persisted library snapshot just like a normal write.
+test('409 already_watched stop marks cache stale without a duplicate request', async () => {
+  const s = setup();
+  upstream([activities, items, { movies: [] }, { anime: [] }]);
+  await s.cache.read('token');
+  expect(s.saved().forceCheck).toBe(false);
+
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts++;
+    return Response.json({
+      error: 'already_watched',
+      watched_at: '2026-05-08T14:00:00Z',
+      expires_at: '2026-05-08T15:00:00Z',
+    }, { status: 409 });
+  }) as typeof fetch;
+  const result = await s.cache.write('token', '/scrobble/stop', { body: { progress: 100 } });
+  expect(result).toEqual({
+    already_recorded: true,
+    watched_at: '2026-05-08T14:00:00Z',
+    expires_at: '2026-05-08T15:00:00Z',
+  });
+  expect(attempts).toBe(1);
+  expect(s.saved().forceCheck).toBe(true);
+
+  const check = upstream([activities]);
+  await s.cache.read('token');
+  expect(check()).toBe(1);
+  expect(s.saved().forceCheck).toBe(false);
+});
+
+test('unrelated 409 stop does not mark the library as refreshed or retry', async () => {
+  const s = setup();
+  upstream([activities, items, { movies: [] }, { anime: [] }]);
+  await s.cache.read('token');
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts++;
+    return Response.json({ error: 'other_conflict' }, { status: 409 });
+  }) as typeof fetch;
+  await expect(s.cache.write('token', '/scrobble/stop', { body: { progress: 100 } }))
+    .rejects.toMatchObject({ statusCode: 409 });
+  expect(attempts).toBe(1);
+  expect(s.saved().forceCheck).toBe(false);
+});
+
 test('write retries only exact per-second rate_limit once after one second', async () => {
   const waits: number[] = [], s = setup(async ms => { waits.push(ms); });
   let attempts = 0;
