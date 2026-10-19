@@ -79,6 +79,29 @@ test('restores Simkl quota errors from a queued write across Worker RPC', async 
   expect(error).toBeInstanceOf(SimklApiError); expect(error.upstreamCode).toBe('user_limit_exceeded'); expect(error.headers.retryAfter).toBe('3600'); expect(error.message).not.toContain('sensitive');
 });
 
+// issue #42 regression: the Worker RPC boundary must preserve mutation uncertainty and write locks.
+test('reconstructs ambiguous POST 5xx and short write lock without leaking remote messages', async () => {
+  const failures = [
+    { statusCode: 503, upstreamCode: '', writeMayHaveSucceeded: true },
+    { statusCode: 400, upstreamCode: 'write_lock', writeMayHaveSucceeded: false },
+  ];
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({
+    async write() {
+      const details = failures.shift()!;
+      throw Object.assign(new Error('private upstream payload'), { name: 'SimklApiError', ...details });
+    },
+  }) } };
+  const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'token', simklUserId: '42' }));
+  const uncertain = await adapter.write('/sync/history', { method: 'POST', body: {} }).catch(error => error);
+  expect(uncertain).toBeInstanceOf(SimklApiError);
+  expect(uncertain.writeMayHaveSucceeded).toBe(true);
+  expect(uncertain.message).not.toContain('private upstream payload');
+  const lock = await adapter.write('/sync/history', { method: 'POST', body: {} }).catch(error => error);
+  expect(lock).toBeInstanceOf(SimklApiError);
+  expect(lock.upstreamCode).toBe('write_lock');
+  expect(lock.writeMayHaveSucceeded).toBe(false);
+});
+
 test('settings reads and invalidations route through one verified per-account object', async () => {
   const a = setup({ simklToken: 'token-a', simklUserId: '42' });
   const b = setup({ simklToken: 'token-b', simklUserId: '42' });
