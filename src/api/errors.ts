@@ -17,7 +17,11 @@ export function toMcpErrorResult(error: unknown): McpErrorResult {
   const upstreamCode = error.upstreamCode;
 
   let message: string;
-  if (error.statusCode === 429 && upstreamCode === 'rate_limit') {
+  if (error.writeMayHaveSucceeded) {
+    message = 'The Simkl write may have succeeded despite the upstream failure. Inspect history and rewatch sessions before retrying to avoid duplicate changes.';
+  } else if (error.statusCode === 400 && upstreamCode === 'write_lock') {
+    message = 'Another Simkl write is still running for this user. Writes must be serialized; retry shortly after the lock clears.';
+  } else if (error.statusCode === 429 && upstreamCode === 'rate_limit') {
     message = 'Per-second rate limit reached; pause for about one second before another request.';
   } else if (error.statusCode === 429 && upstreamCode === 'user_limit_exceeded') {
     message = 'This user has reached the AUTH V2 daily allowance. The allowance resets at midnight New York time. Manage Connected Apps: https://simkl.com/settings/apps';
