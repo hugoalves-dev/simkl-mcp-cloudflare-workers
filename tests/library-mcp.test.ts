@@ -7,11 +7,11 @@ beforeAll(async () => {
   mock.module('cloudflare:email', () => ({ EmailMessage: class {} }));
   ({ SimklMCP } = await import('../src/mcp-agent'));
 });
-async function setup(readError?: Error) {
+async function setup(readError?: Error, refreshResult: { status: 'refreshed' | 'suppressed'; retryAfterSeconds?: number } = { status: 'refreshed' }) {
   const tools = new Map<string, any>(), resources = new Map<string, any>(), calls: unknown[] = [];
   const items = { shows: [{ status: 'watching', show: { ids: { simkl: 1 }, title: 'Title', year: 2020 }, added_to_watchlist_at: '2026-10-01T00:00:00Z' }], anime: [], movies: [] };
   const agent = Object.create(SimklMCP.prototype);
-  Object.defineProperty(agent, 'env', { value: { SIMKL_CLIENT_ID: 'id', SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async read(token: string, force: boolean) { calls.push({ token, force }); if (readError) throw readError; return items; }, async invalidate() { calls.push('invalidate'); }, async getSettings() { return { account: { type: 'pro' } }; }, async invalidateSettings() {}, async write(token: string, path: string, options: any) { calls.push({ write: path, token, options }); return path === '/scrobble/stop' ? { action: 'scrobble', rewatch_id: 1 } : {}; } }) } } });
+  Object.defineProperty(agent, 'env', { value: { SIMKL_CLIENT_ID: 'id', SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async read(token: string, force: boolean) { calls.push({ token, force }); if (readError) throw readError; return items; }, async refreshLibrary(token: string) { calls.push({ token, manualRefresh: true }); if (readError) throw readError; return refreshResult; }, async invalidate() { calls.push('invalidate'); }, async getSettings() { return { account: { type: 'pro' } }; }, async invalidateSettings() {}, async write(token: string, path: string, options: any) { calls.push({ write: path, token, options }); return path === '/scrobble/stop' ? { action: 'scrobble', rewatch_id: 1 } : {}; } }) } } });
   Object.defineProperty(agent, 'props', { value: { simklToken: 'token', simklUserId: '42' } });
   Object.defineProperty(agent, 'server', { value: {
     registerTool(name: string, _: unknown, callback: any) { tools.set(name, callback); },
@@ -20,9 +20,18 @@ async function setup(readError?: Error) {
   await agent.init();
   return { tools, resources, calls };
 }
-test('MCP force refresh tool forwards force to authenticated cache', async () => {
+test('MCP refresh tool uses the per-account cooldown RPC', async () => {
   const s = await setup(); const result = await s.tools.get('simkl_refresh_library')({});
-  expect(s.calls).toEqual([{ token: 'token', force: true }]); expect(result.content[0].text).toBe('Simkl library refreshed');
+  expect(s.calls).toEqual([{ token: 'token', manualRefresh: true }]);
+  expect(result.content[0].text).toBe('Simkl library refreshed');
+});
+test('MCP refresh tool clearly reports cooldown without claiming an upstream check happened', async () => {
+  const s = await setup(undefined, { status: 'suppressed', retryAfterSeconds: 31 });
+  const result = await s.tools.get('simkl_refresh_library')({});
+  expect(result.isError).not.toBe(true);
+  expect(result.content[0].text).toContain('skipped');
+  expect(result.content[0].text).toContain('31 seconds');
+  expect(result.content[0].text).not.toContain('library refreshed');
 });
 test('MCP resource and watchlist tool both route through cache', async () => {
   globalThis.fetch = (async () => { throw new Error('unexpected raw request'); }) as typeof fetch;

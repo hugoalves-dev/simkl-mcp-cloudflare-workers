@@ -28,13 +28,15 @@ export class CachedLibrary {
   }
   read(token: string, force = false): Promise<LibraryItems> {
     return this.enqueue(async () => {
+      let retryPending = this.retryRequired;
       try {
         if (!token) throw new Error('Simkl authentication required');
         let previous = await this.store.load();
+        retryPending ||= previous?.forceCheck === true;
         const forceRefresh = force || this.retryRequired;
-        // Persist retry intent before a forced attempt so failures and object
-        // restarts cannot re-enter the TTL shortcut with stale library data.
-        if (forceRefresh && previous && !previous.forceCheck) {
+        // Persist retry/invalidation intent, never a manual force request:
+        // explicit refreshes have their own durable one-minute reservation.
+        if (this.retryRequired && previous && !previous.forceCheck) {
           if (previous.version !== 1) throw new Error('Unsupported library cache schema');
           previous = { ...previous, forceCheck: true };
           if (this.store.saveFreshness) await this.store.saveFreshness(previous);
@@ -58,8 +60,9 @@ export class CachedLibrary {
         this.retryRequired = false;
         return snapshot.items;
       } catch (error) {
-        // Preserve retry intent in memory if storage itself could not save it.
-        this.retryRequired = true;
+        // Failed manual checks must not turn into unbounded forced retries.
+        // A pending mutation or failed ordinary read still requires retry.
+        if (!force || retryPending) this.retryRequired = true;
         throw error;
       }
     });

@@ -7,6 +7,7 @@ import type { RewatchRow } from './rewatches.js';
 import { LibraryWriteInvalidationError } from './errors';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
+  refresh(): Promise<{ status: 'refreshed' | 'suppressed'; retryAfterSeconds?: number }>;
   readRewatches(): Promise<RewatchRow[]>;
   invalidate(): Promise<void>;
   getStats(): Promise<Record<string, unknown>>;
@@ -78,6 +79,11 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     async read(force = false) {
       const { object, token } = await stub();
       try { return await object.read(token, force); }
+      catch (error) { throw restoreRpcError(error); }
+    },
+    async refresh() {
+      const { object, token } = await stub();
+      try { return await object.refreshLibrary(token); }
       catch (error) { throw restoreRpcError(error); }
     },
     async readRewatches() {

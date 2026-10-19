@@ -80,6 +80,27 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     });
   }
 
+  /** The only public manual-force entrypoint; queued and durable per Simkl account. */
+  refreshLibrary(accessToken: string): Promise<{ status: 'refreshed' | 'suppressed'; retryAfterSeconds?: number }> {
+    return this.enqueue(async () => {
+      if (!accessToken) throw new Error('Simkl authentication required');
+      const initialized = this.store.getInitialization() !== null;
+      await this.ensureInitializedInternal(accessToken);
+      if (!initialized) return { status: 'refreshed' };
+      const retryAfterSeconds = this.store.tryReserveManualRefresh(Date.now());
+      if (retryAfterSeconds > 0) {
+        // Do not bypass the manual cooldown. A server-side mutation still
+        // requires its normal activities check even inside that window.
+        await this.library.read(accessToken);
+        return { status: 'suppressed', retryAfterSeconds };
+      }
+      // The cooldown reservation is persisted *before* the upstream request,
+      // including when Simkl responds with an error or the object restarts.
+      await this.library.read(accessToken, true);
+      return { status: 'refreshed' };
+    });
+  }
+
   invalidate() { return this.enqueue(() => this.library.invalidate()); }
 
   write(accessToken: string, endpoint: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }) {

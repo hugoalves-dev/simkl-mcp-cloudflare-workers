@@ -5,7 +5,7 @@ const original = globalThis.fetch; afterEach(() => { globalThis.fetch = original
 const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'id' });
 function setup(props: any) {
   const names: string[] = [], reads: any[] = [], invalidations: string[] = [], stats: any[] = [], writes: any[] = [], settingsReads: any[] = [], settingsInvalidations: any[] = [];
-  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async getSettings(token: string) { settingsReads.push({ name, token }); return { account: { type: 'pro' } }; }, async invalidateSettings(token: string) { settingsInvalidations.push({ name, token }); }, async invalidate() { invalidations.push(name); }, async write(token: string, path: string, options: any) { writes.push({ name, token, path, options }); return { ok: true }; } }; } } };
+  const env = { SIMKL_LIBRARY_CACHE: { idFromName(name: string) { names.push(name); return name; }, get(name: string) { return { async read(token: string, force?: boolean) { reads.push({ name, token, force }); return { shows: [], movies: [], anime: [] }; }, async refreshLibrary(token: string) { reads.push({ name, token, manualRefresh: true }); return { status: 'suppressed', retryAfterSeconds: 42 }; }, async getStats(token: string, userId: string) { stats.push({ name, token, userId }); return { total_mins: 20 }; }, async getSettings(token: string) { settingsReads.push({ name, token }); return { account: { type: 'pro' } }; }, async invalidateSettings(token: string) { settingsInvalidations.push({ name, token }); }, async invalidate() { invalidations.push(name); }, async write(token: string, path: string, options: any) { writes.push({ name, token, path, options }); return { ok: true }; } }; } } };
   return { adapter: createLibraryAdapter(env as any, client, () => props), names, reads, invalidations, stats, writes, settingsReads, settingsInvalidations };
 }
 test('verified props route without settings and force is forwarded', async () => {
@@ -135,4 +135,10 @@ test('sanitizes upstream API errors when reading shared settings over Worker RPC
   expect(error).toBeInstanceOf(SimklApiError);
   expect(error.upstreamCode).toBe('user_limit_exceeded');
   expect(error.message).not.toContain('sensitive');
+});
+
+test('manual refresh adapter uses the verified account RPC, not a direct forced read', async () => {
+  const s = setup({ simklToken: 'token', simklUserId: '42' });
+  expect(await s.adapter.refresh()).toEqual({ status: 'suppressed', retryAfterSeconds: 42 });
+  expect(s.reads).toEqual([{ name: 'simkl-library:v1:42', token: 'token', manualRefresh: true }]);
 });
