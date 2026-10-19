@@ -34,11 +34,15 @@ export default { async fetch(request, env) {
  }
  const cache = env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName('simkl-library:v1:' + user));
  if (url.pathname === '/invalidate') { await cache.invalidate(); return new Response('ok'); }
+ if (url.pathname === '/rewatches') {
+   try { return Response.json(await cache.readRewatches('synthetic-token')); }
+   catch { return new Response('rewatch refresh failed', { status: 502 }); }
+ }
  try { return Response.json(await cache.read('synthetic-token', url.searchParams.has('force'))); }
  catch { return new Response('refresh failed', { status: 502 }); }
 } };`;
 const result = await build({ stdin: { contents: entry, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'browser', external: ['cloudflare:workers'], write: false });
-let mode = 'initial', calls = [];
+let mode = 'initial', calls = [], rewatchCalls = 0;
 const oldDate = '2026-10-01T00:00:00Z', newDate = '2026-10-02T00:00:00Z';
 const item = status => ({ status, show: { ids: { simkl: 1 }, title: 'Title' } });
 const config = {
@@ -53,7 +57,19 @@ const config = {
   if (url.pathname === '/sync/history') return Response.json({ added: { movies: 1 } });
   if (url.pathname === '/sync/activities') { const date = mode === 'initial' ? oldDate : mode === 'post-write' ? '2026-10-03T00:00:00Z' : newDate; return Response.json({ all: date, tv_shows: { completed: date, rated_at: mode === 'fail' ? newDate : oldDate } }); }
   if (url.pathname.startsWith('/sync/all-items/')) return Response.json({ [url.pathname.split('/')[3]]: url.pathname.endsWith('/shows') ? [item('watching')] : [] });
-  if (url.pathname === '/sync/all-items') return Response.json({ shows: [item(mode === 'initial' ? 'watching' : 'completed')] });
+  if (url.pathname === '/sync/all-items') {
+    if (url.searchParams.get('allow_rewatch') === 'yes') {
+      rewatchCalls++;
+      assert.equal(url.searchParams.get('extended'), 'full');
+      assert.equal(url.searchParams.get('episode_watched_at'), 'yes');
+      return Response.json({ shows: [
+        item('completed'),
+        { ...item('watching'), is_rewatch: true, rewatch_id: 7, rewatch_status: 'active',
+          watched_episodes_count: mode === 'post-write' ? 2 : 1, total_episodes_count: 5 },
+      ] });
+    }
+    return Response.json({ shows: [item(mode === 'initial' ? 'watching' : 'completed')] });
+  }
   if (url.pathname === '/sync/ratings' && mode === 'fail') return new Response('failed', { status: 503 });
   if (url.pathname === '/sync/ratings') return Response.json(null);
   throw new Error('unexpected endpoint');
@@ -79,14 +95,28 @@ try {
  const count = calls.length; await read(); assert.equal(calls.length, count);
  await read('?user=43'); assert.equal(calls.length, count + 4); // independent user initializes
  mode = 'initial'; const stableReadCount = calls.length; await read(); assert.equal(calls.length, stableReadCount);
+ const readRewatches = async () => {
+   const response = await mf.dispatchFetch('http://cache.test/rewatches');
+   assert.equal(response.status, 200, await response.clone().text());
+   return response.json();
+ };
+ const [r1, r2] = await Promise.all([readRewatches(), readRewatches()]);
+ assert.deepEqual(r1, r2);
+ assert.equal(r1.length, 1); assert.equal(r1[0].rewatchId, 7);
+ assert.equal(JSON.parse(r1[0].itemJson).watched_episodes_count, 1);
+ assert.equal(rewatchCalls, 1); // Concurrent sessions share one baseline.
+ await readRewatches(); assert.equal(rewatchCalls, 1); // TTL makes no upstream pulls.
  const writeResponse = await mf.dispatchFetch('http://cache.test/write'); assert.equal(writeResponse.status, 200);
  assert.equal((await writeResponse.json()).ok, true); assert.equal(calls.at(-1), '/sync/history');
  mode = 'post-write'; const afterWriteCount = calls.length; assert.equal((await read()).shows[0].status, 'completed');
  assert.ok(calls.length > afterWriteCount); assert.equal(calls[afterWriteCount], '/sync/activities');
+ const updatedRewatch = await readRewatches();
+ assert.equal(JSON.parse(updatedRewatch[0].itemJson).watched_episodes_count, 2);
+ assert.equal(rewatchCalls, 2); // A write invalidates rewatch freshness.
  mode = 'quota'; await mf.dispatchFetch('http://cache.test/invalidate');
  for (const path of ['/quota-watchlist', '/quota-refresh']) {
    const response = await mf.dispatchFetch('http://cache.test' + path); const result = await response.json();
    assert.equal(result.isError, true); assert.match(result.content[0].text, /AUTH V2 daily allowance/); assert.match(result.content[0].text, /Retry-After: 3600/); assert.equal(JSON.stringify(result).includes('sensitive-upstream-body'), false);
  }
- console.log('real Worker RPC / SQLite persistence / failed refresh / invalidation / user isolation: PASS');
+ console.log('real Worker RPC / SQLite persistence / rewatch concurrency / invalidation / user isolation: PASS');
 } finally { if (mf) await mf.dispose(); await rm(directory, { recursive: true, force: true }); }
