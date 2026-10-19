@@ -47,7 +47,7 @@ function registerCustomTools(server: McpServer, library: LibraryAdapter) {
     server.registerTool(
       'simkl_my_stats',
       {
-        description: 'Get watching statistics for the current authenticated user',
+        description: 'Get cached watching statistics for the current authenticated Simkl account. Use for own-account stats; no user ID or /users/settings request is needed.',
         inputSchema: z.object({}),
       },
       async () => {
