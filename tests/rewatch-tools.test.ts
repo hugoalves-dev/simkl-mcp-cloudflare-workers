@@ -71,6 +71,25 @@ describe('rewatch MCP tools', () => {
     }
   });
 
+  test('unrecognized scrobble conflict stays an error and discourages blind retries', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app' });
+    let attempts = 0;
+    client.request = async () => {
+      attempts++;
+      throw new SimklApiError('simkl api error: 409 Conflict', 409, '{"error":"unexpected_conflict"}');
+    };
+    const registered = new Map<string, (args: any) => Promise<any>>();
+    const server = {
+      registerTool(name: string, _definition: any, handler: (args: any) => Promise<any>) { registered.set(name, handler); },
+    };
+    registerRewatchTools(server as any, new RewatchService(client, () => 'token'));
+    const result = await registered.get('simkl_stop_watching')!({ body: { progress: 100 } });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('unrecognized scrobble stop conflict');
+    expect(result.content[0].text).toContain('history before any manual retry');
+    expect(attempts).toBe(1);
+  });
+
   test('preserves shared AUTH V2 daily-limit guidance for stop errors', async () => {
     const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app' });
     client.request = async () => { throw new SimklApiError('429 Too Many Requests', 429, '{"error":"user_limit_exceeded"}', { retryAfter: '3600' }); };
