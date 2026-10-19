@@ -180,7 +180,7 @@ test('issue #44: failed manual refresh occupies its slot but does not force repe
       checks++;
       throw new Error('upstream unavailable');
     }) as typeof fetch;
-    await expect(object.refreshLibrary('token')).rejects.toThrow('upstream unavailable');
+    await expect(object.refreshLibrary('token')).rejects.toThrow('simkl api request failed');
     expect(checks).toBe(1);
     expect(new LibraryStore(data.storage).loadSnapshot()?.forceCheck).toBe(false);
     expect((await cache(data.storage).refreshLibrary('token')).status).toBe('suppressed');
