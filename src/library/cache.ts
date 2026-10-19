@@ -6,6 +6,8 @@ import { parseLibraryCacheTtlSeconds } from './refresh';
 import { fetchInitialLibrary } from './sync.js';
 import { refreshUserProfile, refreshUserSettings } from './profile.js';
 import { normalizeSimklId } from './identity.js';
+import { refreshRewatches } from './rewatches.js';
+import { LibraryWriteInvalidationError } from './errors.js';
 import type { LibraryInitialization, LibraryItemRow } from './types.js';
 import type { RequestOptions } from '../api/client.js';
 
@@ -81,7 +83,29 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
   invalidate() { return this.enqueue(() => this.library.invalidate()); }
 
   write(accessToken: string, endpoint: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }) {
-    return this.enqueue(() => this.library.write(accessToken, endpoint, options));
+    return this.enqueue(async () => {
+      const result = await this.library.write(accessToken, endpoint, options);
+      if (['/sync/history', '/sync/history/remove', '/scrobble/stop'].includes(endpoint)) {
+        try { this.store.invalidateRewatches(); }
+        catch { throw new LibraryWriteInvalidationError(); }
+      }
+      return result;
+    });
+  }
+
+  /** All callers share the existing /sync/activities throttle and this DO queue. */
+  readRewatches(accessToken: string) {
+    return this.enqueue(async () => {
+      if (!accessToken) throw new Error('Simkl authentication required');
+      await this.ensureInitializedInternal(accessToken);
+      await this.library.read(accessToken);
+      const current = this.store.loadActivitySnapshot();
+      if (!current) throw new Error('Simkl library activities unavailable');
+      const previous = this.store.loadRewatches();
+      const next = await refreshRewatches(this.client, accessToken, previous, current.activities);
+      if (next !== previous) this.store.saveRewatches(next);
+      return next.rows;
+    });
   }
 
   readItems(): Promise<LibraryItemRow[]> {
