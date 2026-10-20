@@ -355,7 +355,13 @@ for (const config of toolsWhitelist) {
   }
 
   const operation = pathEntry[schemaMethod];
-  let params = (operation.parameters || []).map(resolveLocalReference);
+  // Local tool guidance overrides upstream parameter prose without modifying the OpenAPI source.
+  let params = (operation.parameters || []).map(resolveLocalReference).map((param: any) => ({
+    ...param,
+    ...(config.parameterDescriptions?.[param.name] !== undefined
+      ? { description: config.parameterDescriptions[param.name] }
+      : {}),
+  }));
 
   if (operation.requestBody) {
     const requestBody = resolveLocalReference(operation.requestBody);

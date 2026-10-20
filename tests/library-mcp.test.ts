@@ -11,7 +11,7 @@ async function setup(readError?: Error, refreshResult: { status: 'refreshed' | '
   const tools = new Map<string, any>(), resources = new Map<string, any>(), calls: unknown[] = [];
   const items = { shows: [{ status: 'watching', show: { ids: { simkl: 1 }, title: 'Title', year: 2020 }, added_to_watchlist_at: '2026-10-01T00:00:00Z' }], anime: [], movies: [] };
   const agent = Object.create(SimklMCP.prototype);
-  Object.defineProperty(agent, 'env', { value: { SIMKL_CLIENT_ID: 'id', SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async read(token: string, force: boolean) { calls.push({ token, force }); if (readError) throw readError; return items; }, async refreshLibrary(token: string) { calls.push({ token, manualRefresh: true }); if (readError) throw readError; return refreshResult; }, async invalidate() { calls.push('invalidate'); }, async getSettings() { return { account: { type: 'pro' } }; }, async invalidateSettings() {}, async write(token: string, path: string, options: any) { calls.push({ write: path, token, options }); return path === '/scrobble/stop' ? { action: 'scrobble', rewatch_id: 1 } : {}; } }) } } });
+  Object.defineProperty(agent, 'env', { value: { SIMKL_CLIENT_ID: 'id', SIMKL_LIBRARY_CACHE: { idFromName: (id: string) => id, get: () => ({ async read(token: string, force: boolean) { calls.push({ token, force }); if (readError) throw readError; return items; }, async refreshLibrary(token: string) { calls.push({ token, manualRefresh: true }); if (readError) throw readError; return refreshResult; }, async invalidate() { calls.push('invalidate'); }, async getSettings() { return { account: { type: 'pro' } }; }, async getStats() { calls.push('stats-from-cache'); return { completed: 17 }; }, async invalidateSettings() {}, async write(token: string, path: string, options: any) { calls.push({ write: path, token, options }); return path === '/scrobble/stop' ? { action: 'scrobble', rewatch_id: 1 } : {}; } }) } } });
   Object.defineProperty(agent, 'props', { value: { simklToken: 'token', simklUserId: '42' } });
   Object.defineProperty(agent, 'server', { value: {
     registerTool(name: string, _: unknown, callback: any) { tools.set(name, callback); },
@@ -57,4 +57,13 @@ for (const name of ['simkl_get_watchlist', 'simkl_refresh_library']) test(name+'
   const rpcError = Object.assign(new Error('sensitive upstream response'), { name: 'SimklApiError', statusCode: 429, upstreamCode: 'user_limit_exceeded', headers: { retryAfter: '3600', rateLimitRemaining: '0' } });
   const s = await setup(rpcError); const result = await s.tools.get(name)({ type: 'shows', status: 'watching' });
   expect(result.isError).toBe(true); expect(result.content[0].text).toContain('daily'); expect(result.content[0].text).toContain('Retry-After: 3600'); expect(result.content[0].text).not.toContain('sensitive');
+});
+
+test('simkl_my_stats returns cached stats without a settings or upstream API request', async () => {
+  globalThis.fetch = (async () => { throw new Error('unexpected direct Simkl API request'); }) as typeof fetch;
+  const s = await setup();
+  const result = await s.tools.get('simkl_my_stats')({});
+  expect(result.isError).not.toBe(true);
+  expect(JSON.parse(result.content[0].text)).toEqual({ completed: 17 });
+  expect(s.calls).toEqual(['stats-from-cache']);
 });

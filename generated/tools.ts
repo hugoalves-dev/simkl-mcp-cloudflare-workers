@@ -728,8 +728,8 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_user_stats',
-      { description: 'Get a user\'s watch statistics', inputSchema: {
-      user_id: z.string().describe('Target user\'s numeric Simkl id (positive integer). For the authenticated user, first call [`GET /users/settings`](/api-reference/simkl/get-user-settings) and pass back `account.id`. Passing `0` retur')
+      { description: 'Get watch statistics for another explicitly identified Simkl user. For your own authenticated account, use simkl_my_stats instead: it reads the per-account cache without a settings lookup.', inputSchema: {
+      user_id: z.string().describe('Numeric Simkl ID of another explicitly identified user. For your own account, use simkl_my_stats with no arguments; do not fetch /users/settings.')
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
     try {

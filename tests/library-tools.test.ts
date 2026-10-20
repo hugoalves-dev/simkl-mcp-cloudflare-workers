@@ -145,3 +145,17 @@ test('watchlist schema exposes only cache filters and pagination', () => {
   expect(schema.safeParse({ title: 'planet', limit: 10, offset: 0 }).success).toBe(true);
   expect(schema.safeParse({ date_from: '2020-01-01' }).success).toBe(false);
 });
+
+test('simkl_get_user_stats requests only the explicitly identified other user', async () => {
+  const requestedPaths: string[] = [];
+  const callbacks = tools({
+    async requestWithMetadata(path: string) {
+      requestedPaths.push(path);
+      return { data: { completed: 5 }, headers: {} };
+    },
+  });
+  const result = await callbacks.get('simkl_get_user_stats')!({ user_id: '345' });
+  expect(result.isError).not.toBe(true);
+  expect(JSON.parse(result.content[0].text)).toEqual({ completed: 5 });
+  expect(requestedPaths).toEqual(['/users/345/stats']);
+});

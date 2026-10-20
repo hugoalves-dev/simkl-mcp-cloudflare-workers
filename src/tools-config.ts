@@ -16,6 +16,7 @@ interface ToolConfig {
   omitParams?: string[];
   omitFromGenerated?: boolean;
   description?: string;
+  parameterDescriptions?: Record<string, string>;
   extraQueryParams?: string[];
   batchArrayFields?: string[];
   legacyEpisodeAlias?: boolean;
@@ -180,7 +181,15 @@ export const toolsWhitelist: ToolConfig[] = [
   }},
 
   // user stats
-  { path: '/users/:user_id/stats', method: 'get', responseFormat: { type: 'json' }},
+  {
+    path: '/users/:user_id/stats',
+    method: 'get',
+    description: 'Get watch statistics for another explicitly identified Simkl user. For your own authenticated account, use simkl_my_stats instead: it reads the per-account cache without a settings lookup.',
+    parameterDescriptions: {
+      user_id: 'Numeric Simkl ID of another explicitly identified user. For your own account, use simkl_my_stats with no arguments; do not fetch /users/settings.',
+    },
+    responseFormat: { type: 'json' },
+  },
 
   // watchlist (cached library)
   {
