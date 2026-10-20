@@ -1,4 +1,6 @@
-import { SimklApiError, type SimklClient } from '../api/client.js';
+import type { SimklClient } from '../api/client.js';
+import { LibrarySyncLimitError } from './errors.js';
+import { isMaxItems, logSyncPartition } from './partitions.js';
 import { normalizeSimklId } from './identity.js';
 import {
   isRecord, jsonBytes, MEDIA_TYPES, STATUSES_BY_MEDIA, MAX_ROW_JSON_BYTES, MAX_PENDING_ITEM_BYTES,
@@ -54,8 +56,18 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
     try {
       await pull(`/sync/all-items/${mediaType}`, mediaType);
     } catch (error) {
-      if (!(error instanceof SimklApiError) || error.statusCode !== 400 || error.upstreamCode !== 'max_items') throw error;
-      for (const status of STATUSES_BY_MEDIA[mediaType]) await pull(`/sync/all-items/${mediaType}/${status}`, mediaType);
+      if (!isMaxItems(error)) throw error;
+      logSyncPartition('initial', 'baseline', 'type', 'max_items', mediaType);
+      for (const status of STATUSES_BY_MEDIA[mediaType]) {
+        try {
+          await pull(`/sync/all-items/${mediaType}/${status}`, mediaType);
+        } catch (statusError) {
+          if (!isMaxItems(statusError)) throw statusError;
+          logSyncPartition('initial', 'baseline', 'status', 'unrecoverable', mediaType, status);
+          throw new LibrarySyncLimitError('initial', 'baseline', mediaType, status);
+        }
+      }
+      logSyncPartition('initial', 'baseline', 'type', 'success', mediaType);
     }
   }
   return { activities, items: [...items.values()] };
