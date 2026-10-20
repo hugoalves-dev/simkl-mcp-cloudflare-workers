@@ -2,12 +2,15 @@ import { SimklApiError, type RequestOptions, type SimklClient } from '../api/cli
 import { LibrarySyncLimitError } from './errors.js';
 import { normalizeSimklId } from './identity.js';
 import {
+  createLibrarySyncRun, observeLibrarySyncRequest, type LibrarySyncRun,
+  type SyncPhase,
+} from './sync-telemetry.js';
+import {
   isRecord, jsonBytes, MAX_PENDING_ITEM_BYTES, MAX_ROW_JSON_BYTES,
   MEDIA_TYPES, STATUSES_BY_MEDIA, type LibraryItem, type LibraryItems, type MediaType,
 } from './types.js';
 
 export type SyncOperation = 'delta' | 'ratings' | 'membership';
-export type SyncPhase = 'initial' | 'incremental';
 
 export function isMaxItems(error: unknown): error is SimklApiError {
   return error instanceof SimklApiError && error.statusCode === 400 && error.upstreamCode === 'max_items';
@@ -22,10 +25,12 @@ export function logSyncPartition(
   media?: MediaType,
   status?: string,
   attempts?: number,
+  run?: LibrarySyncRun,
 ): void {
   console.info(JSON.stringify({
     component: 'simkl_library_sync',
     event: 'partition_fallback',
+    ...(run ? { syncId: run.syncId } : {}),
     phase, operation, stage, outcome,
     ...(media ? { media } : {}),
     ...(status ? { status } : {}),
@@ -54,8 +59,10 @@ export async function fetchPartitionedLibrary(
   operation: SyncOperation,
   query: RequestOptions['query'],
   validate: (response: unknown) => LibraryItems,
+  run?: LibrarySyncRun,
 ): Promise<LibraryItems> {
   const path = operation === 'ratings' ? '/sync/ratings' : '/sync/all-items';
+  const telemetry = run ?? createLibrarySyncRun();
   let attempts = 0;
   let fallbackActive = false;
   const request = async (media?: MediaType, status?: string): Promise<LibraryItems> => {
@@ -63,21 +70,31 @@ export async function fetchPartitionedLibrary(
     if (fallbackActive) await new Promise<void>(resolve => setTimeout(resolve, 125));
     attempts++;
     const suffix = media ? `/${media}${status ? `/${status}` : ''}` : '';
-    const response = await client.request<unknown>(path + suffix, {
-      method: 'GET', token, query, responseProfile: 'library',
-    });
-    const result = validate(response);
-    if (media) {
-      for (const other of MEDIA_TYPES) {
-        if (other !== media && result[other].length > 0) throw new Error('Unexpected Simkl library partition media');
-      }
-      if (status && operation === 'delta') {
-        for (const item of result[media]) {
-          if (item.status !== status) throw new Error('Invalid Simkl library partition status');
+    return observeLibrarySyncRequest(
+      telemetry,
+      {
+        phase: 'incremental', operation, media, status,
+        queryMode: operation === 'membership' ? 'full_ids' : 'date_from',
+      },
+      async () => {
+        const response = await client.request<unknown>(path + suffix, {
+          method: 'GET', token, query, responseProfile: 'library',
+        });
+        const result = validate(response);
+        if (media) {
+          for (const other of MEDIA_TYPES) {
+            if (other !== media && result[other].length > 0) throw new Error('Unexpected Simkl library partition media');
+          }
+          if (status && operation === 'delta') {
+            for (const item of result[media]) {
+              if (item.status !== status) throw new Error('Invalid Simkl library partition status');
+            }
+          }
         }
-      }
-    }
-    return result;
+        return result;
+      },
+      result => MEDIA_TYPES.reduce((sum, type) => sum + result[type].length, 0),
+    );
   };
   const combined = empty();
   const keys = new Map<string, string>();
@@ -106,7 +123,7 @@ export async function fetchPartitionedLibrary(
   } catch (error) {
     if (!isMaxItems(error)) throw error;
     fallbackActive = true;
-    logSyncPartition('incremental', operation, 'all', 'max_items', undefined, undefined, attempts);
+    logSyncPartition('incremental', operation, 'all', 'max_items', undefined, undefined, attempts, telemetry);
   }
 
   try {
@@ -115,10 +132,10 @@ export async function fetchPartitionedLibrary(
         append(await request(media));
       } catch (error) {
         if (!isMaxItems(error)) throw error;
-        logSyncPartition('incremental', operation, 'type', 'max_items', media, undefined, attempts);
+        logSyncPartition('incremental', operation, 'type', 'max_items', media, undefined, attempts, telemetry);
         if (operation === 'ratings') {
           // /sync/ratings/{type}/{rating} would drop user_rating:null removals.
-          logSyncPartition('incremental', operation, 'type', 'unrecoverable', media, undefined, attempts);
+          logSyncPartition('incremental', operation, 'type', 'unrecoverable', media, undefined, attempts, telemetry);
           throw new LibrarySyncLimitError('incremental', operation, media);
         }
         for (const status of STATUSES_BY_MEDIA[media]) {
@@ -127,16 +144,16 @@ export async function fetchPartitionedLibrary(
           } catch (statusError) {
             if (!isMaxItems(statusError)) throw statusError;
             // No documented, lossless split beyond one type/status.
-            logSyncPartition('incremental', operation, 'status', 'unrecoverable', media, status, attempts);
+            logSyncPartition('incremental', operation, 'status', 'unrecoverable', media, status, attempts, telemetry);
             throw new LibrarySyncLimitError('incremental', operation, media, status);
           }
         }
       }
     }
-    logSyncPartition('incremental', operation, 'all', 'success', undefined, undefined, attempts);
+    logSyncPartition('incremental', operation, 'all', 'success', undefined, undefined, attempts, telemetry);
     return combined;
   } catch (error) {
-    logSyncPartition('incremental', operation, 'all', 'failed', undefined, undefined, attempts);
+    logSyncPartition('incremental', operation, 'all', 'failed', undefined, undefined, attempts, telemetry);
     throw error;
   }
 }
