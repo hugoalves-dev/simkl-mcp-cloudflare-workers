@@ -1,4 +1,5 @@
-import type { SimklClient, RequestOptions } from '../api/client';
+import type { SimklClient } from '../api/client';
+import { fetchPartitionedLibrary } from './partitions';
 import { MEDIA_TYPES, type Activities, type LibraryItem, type LibraryItems, type LibrarySnapshot } from './types';
 import { fetchInitialLibrary } from './sync';
 import { normalizeSimklId } from './identity';
@@ -50,10 +51,6 @@ function validateActivities(value: unknown): Activities {
   }
   return data;
 }
-async function fetchItems(client: SimklClient, endpoint: string, options: RequestOptions): Promise<LibraryItems> {
-  const response = await client.request<unknown>(endpoint, { ...options, responseProfile: 'library' });
-  return validateItems(response);
-}
 function merge(items: LibraryItems, updates: LibraryItems): void {
   for (const type of MEDIA_TYPES) {
     const map = new Map(items[type].map(item => [libraryItemId(item), item]));
@@ -86,12 +83,12 @@ export async function refreshLibrary(client: SimklClient, token: string, previou
       return next !== undefined && next !== previous.activities[category]?.[field];
     }));
     const query = { date_from: previous.activities.all };
-    if (changed(statuses)) merge(items, await fetchItems(client, '/sync/all-items', { method: 'GET', token, query }));
+    if (changed(statuses)) merge(items, await fetchPartitionedLibrary(client, token, 'delta', query, validateItems));
     // Official synchronization guide documents GET /sync/ratings for reads;
     // POST /sync/ratings is the add-rating mutation, despite the blueprint typo.
-    if (changed(['rated_at'])) merge(items, await fetchItems(client, '/sync/ratings', { method: 'GET', token, query }));
+    if (changed(['rated_at'])) merge(items, await fetchPartitionedLibrary(client, token, 'ratings', query, validateItems));
     if (changed(['removed_from_list'])) {
-      const membership = await fetchItems(client, '/sync/all-items', { method: 'GET', token, query: { extended: 'simkl_ids_only' } });
+      const membership = await fetchPartitionedLibrary(client, token, 'membership', { extended: 'simkl_ids_only' }, validateItems);
       for (const type of MEDIA_TYPES) {
         const ids = new Set(membership[type].map(libraryItemId));
         items[type] = items[type].filter(item => ids.has(libraryItemId(item)));
