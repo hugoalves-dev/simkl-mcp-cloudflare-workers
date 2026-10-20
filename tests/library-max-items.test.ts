@@ -251,3 +251,103 @@ test('fallback logs only bounded partition metadata, never token or title', asyn
     expect(s.peak()).toBe(1);
   } finally { console.info = originalInfo; }
 });
+
+test('instrumentation logs activity gate, exact request order and commit-readiness correlation', async () => {
+  const originalInfo = console.info;
+  const logs: Array<Record<string, unknown>> = [];
+  console.info = (...args: unknown[]) => {
+    const text = args.map(String).join(' ');
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.component === 'simkl_library_sync') logs.push(parsed);
+    } catch { /* unrelated test output */ }
+  };
+  try {
+    const s = setup(path => {
+      if (path === '/sync/activities') return activities();
+      if (path === '/sync/all-items') throw maxItems();
+      if (path === '/sync/all-items/shows') return { shows: [show(1)] };
+      return {};
+    });
+    const result = await refreshLibrary(s.client, 'VERY_SECRET_TOKEN', previous(), opts);
+    expect(result.activities.all).toBe(newDate);
+    const requests = logs.filter(log => log.event === 'upstream_request');
+    expect(requests).toHaveLength(5);
+    expect(requests.map(log => log.requestNo)).toEqual([1, 2, 3, 4, 5]);
+    expect(requests.map(log => log.operation)).toEqual(['activities', 'delta', 'delta', 'delta', 'delta']);
+    expect(requests.map(log => log.outcome)).toEqual(['success', 'failed', 'success', 'success', 'success']);
+    expect(requests[1].reason).toBe('max_items');
+    expect(requests[1].queryMode).toBe('date_from');
+    expect(requests[2].media).toBe('shows');
+    expect(logs.find(log => log.event === 'activities_gate')?.outcome).toBe('watermark_changed');
+    expect(logs.filter(log => log.event === 'route' && log.outcome === 'required').map(log => log.operation)).toEqual(['delta']);
+    expect(logs.find(log => log.event === 'snapshot_ready')?.requests).toBe(5);
+    expect(new Set(logs.map(log => log.syncId)).size).toBe(1);
+    expect(typeof logs[0].syncId).toBe('string');
+    for (const log of requests) expect(typeof log.durationMs).toBe('number');
+    const rendered = JSON.stringify(logs);
+    expect(rendered).not.toContain('VERY_SECRET_TOKEN');
+    expect(rendered).not.toContain(oldDate);
+    expect(rendered).not.toContain(newDate);
+    expect(rendered).not.toContain('Title');
+    expect(rendered).not.toContain('Show');
+    expect(rendered).not.toContain('simkl_id');
+  } finally { console.info = originalInfo; }
+});
+
+test('incremental unchanged activities and TTL shortcut are observable without redundant requests', async () => {
+  const originalInfo = console.info;
+  const logs: Array<Record<string, unknown>> = [];
+  console.info = (...args: unknown[]) => {
+    try {
+      const entry = JSON.parse(args.map(String).join(' '));
+      if (entry.component === 'simkl_library_sync') logs.push(entry);
+    } catch { /* ignore */ }
+  };
+  try {
+    const s = setup(path => {
+      if (path === '/sync/activities') return { all: oldDate };
+      throw new Error('unexpected library pull');
+    });
+    await refreshLibrary(s.client, 'token', previous(), opts);
+    expect(s.calls).toHaveLength(1);
+    expect(logs.find(log => log.event === 'activities_gate')?.outcome).toBe('watermark_unchanged');
+    expect(logs.filter(log => log.event === 'upstream_request')).toHaveLength(1);
+    logs.length = 0;
+    await refreshLibrary(s.client, 'token', previous(), { ...opts, now: 299_999 });
+    expect(s.calls).toHaveLength(1);
+    expect(logs.find(log => log.event === 'activities_gate')?.outcome).toBe('ttl_hit');
+    expect(logs.filter(log => log.event === 'upstream_request')).toHaveLength(0);
+  } finally { console.info = originalInfo; }
+});
+
+test('failed requests log only sanitized classifications and never raw upstream error content', async () => {
+  const originalInfo = console.info;
+  const logs: Array<Record<string, unknown>> = [];
+  console.info = (...args: unknown[]) => {
+    try {
+      const entry = JSON.parse(args.map(String).join(' '));
+      if (entry.component === 'simkl_library_sync') logs.push(entry);
+    } catch { /* ignore */ }
+  };
+  try {
+    const before = previous(), saved = structuredClone(before);
+    const s = setup(path => {
+      if (path === '/sync/activities') return activities('rated_at');
+      if (path === '/sync/ratings') throw new SimklApiError(
+        'SECRET upstream message with title, token and timestamp', 503,
+        '{"secret":"private user title"}',
+      );
+      return {};
+    });
+    await expect(refreshLibrary(s.client, 'SECRET_ACCESS_TOKEN', before, opts)).rejects.toThrow('SECRET upstream message');
+    expect(before).toEqual(saved);
+    const error = logs.find(log => log.event === 'upstream_request' && log.outcome === 'failed');
+    expect(error?.reason).toBe('upstream_http');
+    const rendered = JSON.stringify(logs);
+    expect(rendered).not.toContain('SECRET');
+    expect(rendered).not.toContain('private user title');
+    expect(rendered).not.toContain(oldDate);
+    expect(logs.filter(log => log.event === 'snapshot_ready')).toHaveLength(0);
+  } finally { console.info = originalInfo; }
+});
