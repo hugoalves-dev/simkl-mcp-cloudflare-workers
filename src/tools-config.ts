@@ -2,7 +2,7 @@ import { formatList, withImdb, withRating } from './format/media.js';
 
 type ResponseFormat =
   | { type: 'simple', template: (result: any, args: any) => string | string[] }
-  | { type: 'json', mediaType?: 'tv' | 'movies' | 'anime' };
+  | { type: 'json', mediaType?: 'tv' | 'movies' | 'anime', tvFinaleDescriptions?: boolean };
 
 interface ToolConfig {
   path: string;
@@ -119,7 +119,7 @@ export const toolsWhitelist: ToolConfig[] = [
   { path: '/movies/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'movies' }},
   { path: '/anime/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'anime' }},
 
-  { path: '/tv/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
+  { path: '/tv/episodes/:id', method: 'get', authorization: 'none', description: 'List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or null) when supplied by Simkl. Numeric finale_type codes are omitted from the MCP response. Anime is unaffected.', responseFormat: { type: 'json', tvFinaleDescriptions: true }},
   { path: '/anime/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
 
   { path: '/tv/best/:filter', method: 'get', responseFormat: {
