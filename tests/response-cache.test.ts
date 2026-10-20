@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { SimklClient, SimklApiError } from '../src/api/client';
 import { createResponseCacheKey, getResponseCachePolicy, RESPONSE_CACHE_TTL_SECONDS } from '../src/api/response-cache';
+import { registerTools } from '../generated/tools';
 
 describe('shared response cache policy', () => {
   test('uses the full URL as the key without authorization data', () => {
@@ -88,6 +89,38 @@ describe('SimklClient shared cache behavior', () => {
     await client.request('/users/settings', { method: 'GET', token: 'user-two' });
     expect(fetchCount).toBe(3);
     expect(putCount).toBe(1);
+  });
+
+  test('TV finale descriptions are added after cache reads without changing the shared cached JSON', async () => {
+    const upstream = [{ title: 'The Iron Throne', season: 8, episode: 6, type: 'episode', finale_type: 3, ids: { simkl_id: 4262296 } }];
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchCount++;
+      expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+      return Response.json(upstream);
+    }) as typeof fetch;
+
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+    const callbacks = new Map<string, (args: { id: string }) => Promise<any>>();
+    registerTools({
+      registerTool(name: string, _config: unknown, handler: (args: { id: string }) => Promise<any>) {
+        callbacks.set(name, handler);
+      },
+    } as any, client, () => 'some-user-token');
+
+    const tool = callbacks.get('simkl_get_show_episodes')!;
+    const first = await tool({ id: '17465' });
+    const second = await tool({ id: '17465' });
+    const enriched = [{ ...upstream[0], finale_type_description: 'Series Finale' }];
+    expect(first.isError).not.toBe(true);
+    expect(second.isError).not.toBe(true);
+    expect(JSON.parse(first.content[0].text)).toEqual(enriched);
+    expect(JSON.parse(second.content[0].text)).toEqual(enriched);
+    expect(fetchCount).toBe(1);
+    expect(putCount).toBe(1);
+    expect(entries.size).toBe(1);
+    expect(JSON.parse(await [...entries.values()][0].text())).toEqual(upstream);
+    expect([...entries.values()][0].headers.get('Cache-Control'))
+      .toBe(`public, max-age=${RESPONSE_CACHE_TTL_SECONDS.details}`);
   });
 
   test('does not cache failed upstream responses', async () => {

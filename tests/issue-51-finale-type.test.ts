@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { SimklClient } from '../src/api/client';
 import { registerTools } from '../generated/tools';
+import { withTvFinaleDescriptions } from '../src/format/episodes';
 
 type Episode = { title: string; type: string; finale_type?: 1 | 2 | 3 | null; ids: { simkl_id: number } };
 type ToolResult = { isError?: boolean; content: Array<{ type: 'text'; text: string }> };
@@ -29,19 +30,22 @@ async function callEpisodesTool(name: 'simkl_get_show_episodes' | 'simkl_get_ani
   const result = await registered.get(name)!({ id });
   expect(result.isError).not.toBe(true);
   expect(paths).toEqual([name === 'simkl_get_show_episodes' ? `/tv/episodes/${id}` : `/anime/episodes/${id}`]);
-  // Compare the exact JSON data and its serialized representation: no coercion, filtering, or injected fields.
-  expect(result.content[0].text).toBe(JSON.stringify(payload, null, 2));
-  return JSON.parse(result.content[0].text) as Episode[];
+  // Anime remains a raw JSON pass-through; only TV gets derived descriptions.
+  if (name === 'simkl_get_anime_episodes') {
+    expect(result.content[0].text).toBe(JSON.stringify(payload, null, 2));
+  }
+  return JSON.parse(result.content[0].text) as (Episode & { finale_type_description?: string | null })[];
 }
 
 describe('issue #51: finale_type on TV episodes', () => {
-  for (const value of [1, 2, 3, null] as const) {
-    test(`preserves TV finale_type=${String(value)} exactly`, async () => {
+  for (const [value, description] of [[1, 'Mid-season Finale'], [2, 'Season Finale'], [3, 'Series Finale'], [null, null]] as const) {
+    test(`preserves TV finale_type=${String(value)} with matching description`, async () => {
       const episode = tvEpisodes.find(item => item.type === 'episode' && item.finale_type === value);
       expect(episode).toBeDefined();
       const [actual] = await callEpisodesTool('simkl_get_show_episodes', '17465', [episode!]);
       expect(Object.hasOwn(actual, 'finale_type')).toBe(true);
       expect(actual.finale_type).toBe(value);
+      expect(actual).toEqual({ ...episode, finale_type_description: description });
     });
   }
 
@@ -49,8 +53,27 @@ describe('issue #51: finale_type on TV episodes', () => {
     const special = tvEpisodes.find(item => item.type === 'special')!;
     const [actual] = await callEpisodesTool('simkl_get_show_episodes', '17465', [special]);
     expect(actual.finale_type).toBe(2);
+    expect(actual.finale_type_description).toBe('Season Finale');
     expect(Object.hasOwn(actual, 'season')).toBe(false);
     expect(Object.hasOwn(actual, 'episode')).toBe(false);
+  });
+
+  test('does not manufacture a description when TV finale_type is absent or unrecognized', async () => {
+    const missing: Episode = { title: 'Unmarked', type: 'episode', ids: { simkl_id: 99 } };
+    const future = { title: 'Unknown marker', type: 'episode', finale_type: 4, ids: { simkl_id: 100 } } as unknown as Episode;
+    const actual = await callEpisodesTool('simkl_get_show_episodes', '17465', [missing, future]);
+    expect(actual).toEqual([missing, future]);
+    expect(actual.every(item => !Object.hasOwn(item, 'finale_type_description'))).toBe(true);
+  });
+
+  test('enrichment is immutable and handles empty and non-array responses', () => {
+    const source = tvEpisodes[0];
+    const original = JSON.stringify(source);
+    const decorated = withTvFinaleDescriptions([source, null]);
+    expect(decorated).toEqual([{ ...source, finale_type_description: 'Mid-season Finale' }, null]);
+    expect(JSON.stringify(source)).toBe(original);
+    expect(withTvFinaleDescriptions([])).toEqual([]);
+    expect(withTvFinaleDescriptions(null)).toBeNull();
   });
 
   test('anime episodes without finale_type remain unchanged, including specials', async () => {

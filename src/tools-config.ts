@@ -2,7 +2,7 @@ import { formatList, withImdb, withRating } from './format/media.js';
 
 type ResponseFormat =
   | { type: 'simple', template: (result: any, args: any) => string | string[] }
-  | { type: 'json', mediaType?: 'tv' | 'movies' | 'anime' };
+  | { type: 'json', mediaType?: 'tv' | 'movies' | 'anime', tvFinaleDescriptions?: boolean };
 
 interface ToolConfig {
   path: string;
@@ -119,7 +119,7 @@ export const toolsWhitelist: ToolConfig[] = [
   { path: '/movies/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'movies' }},
   { path: '/anime/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'anime' }},
 
-  { path: '/tv/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
+  { path: '/tv/episodes/:id', method: 'get', authorization: 'none', description: 'List TV episodes. finale_type: 1 mid-season finale, 2 season finale, 3 series finale, null not a finale. Responses also include finale_type_description for known values; absent finale_type remains absent.', responseFormat: { type: 'json', tvFinaleDescriptions: true }},
   { path: '/anime/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
 
   { path: '/tv/best/:filter', method: 'get', responseFormat: {
