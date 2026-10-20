@@ -4,7 +4,7 @@ import { getAiringItems, formatAiringTool, SimklCalendarPayloadError } from '../
 import { SimklClient } from '../src/api/client';
 import { registerTools } from '../generated/tools';
 import fixture from './fixtures/calendar-v2.json';
-import { simklCalendarPath } from '../src/api/calendar';
+import { simklCalendarPath, resolveSimklCalendarDay, simklCalendarPaths } from '../src/api/calendar';
 
 describe('simklCalendarPath', () => {
   test.each([
@@ -53,10 +53,12 @@ describe('airing MCP date schema regression', () => {
         expect(inputSchema.safeParse({ date, sort: 'time' }).success).toBe(true);
       }
 
+      expect(inputSchema.safeParse({ date: 'today', timeZone: 'America/Sao_Paulo' }).success).toBe(true);
       const publicSchema = z.toJSONSchema(inputSchema) as { properties?: Record<string, any> };
       expect(publicSchema.properties?.date?.type).toBe('string');
       expect(publicSchema.properties?.date?.enum).toBeUndefined();
       expect(publicSchema.properties?.date?.pattern).toBeUndefined();
+      expect(publicSchema.properties?.timeZone?.type).toBe('string');
     },
   );
 });
@@ -237,5 +239,105 @@ describe('airing MCP tools + SimklClient + Cache API regression', () => {
       log.mockRestore();
       warn.mockRestore();
     }
+  });
+});
+
+describe('issue #46: calendar time zones', () => {
+  const entry = (id: number, date: string) => ({ simkl_id: id, date, episode: { season: 1, episode: 1 } });
+  const payload = (...dates: string[]) => ({
+    calendar: dates.map((date, i) => entry(100 + i, date)),
+    metadata: Object.fromEntries(dates.map((_, i) => [String(100 + i), { title: `Show ${i}` }])),
+  });
+
+  test('today in Sao Paulo evening is still the local date; tomorrow is the next date', async () => {
+    const now = new Date('2026-10-21T01:30:00Z'); // Oct 20, 22:30 in Sao Paulo
+    const data = payload('2026-10-20T02:59:59Z', '2026-10-20T03:00:00Z',
+      '2026-10-21T02:59:59Z', '2026-10-21T03:00:00Z');
+    const client = { request: async () => data } as any;
+    expect(resolveSimklCalendarDay('today', 'America/Sao_Paulo', now).day).toBe('2026-10-20');
+    const today = await getAiringItems(client, 'tv', 'today', 'time', now, 'America/Sao_Paulo');
+    expect(today.map(item => item.date)).toEqual(['2026-10-20T03:00:00Z', '2026-10-21T02:59:59Z']);
+    const tomorrow = await getAiringItems(client, 'tv', 'tomorrow', 'time', now, 'America/Sao_Paulo');
+    expect(tomorrow.map(item => item.date)).toEqual(['2026-10-21T03:00:00Z']);
+  });
+
+  test('positive UTC offset uses local today even when UTC still says yesterday', async () => {
+    const now = new Date('2026-10-20T16:30:00Z'); // Oct 21, 01:30 in Tokyo
+    const range = resolveSimklCalendarDay('today', 'Asia/Tokyo', now);
+    expect(range.day).toBe('2026-10-21');
+    expect(new Date(range.start).toISOString()).toBe('2026-10-20T15:00:00.000Z');
+    expect(new Date(range.end).toISOString()).toBe('2026-10-21T15:00:00.000Z');
+    const items = await getAiringItems({ request: async () =>
+      payload('2026-10-20T14:59:59Z', '2026-10-20T15:00:00Z',
+        '2026-10-21T14:59:59Z', '2026-10-21T15:00:00Z') } as any,
+    'anime', 'today', 'time', now, 'Asia/Tokyo');
+    expect(items.map(item => item.date)).toEqual(['2026-10-20T15:00:00Z', '2026-10-21T14:59:59Z']);
+  });
+
+  test.each([
+    ['08-03-2026', '2026-03-08T05:00:00.000Z', '2026-03-09T04:00:00.000Z', 23],
+    ['01-11-2026', '2026-11-01T04:00:00.000Z', '2026-11-02T05:00:00.000Z', 25],
+  ])('DST transition %s has its true local-day boundaries', (date, start, end, hours) => {
+    const interval = resolveSimklCalendarDay(date, 'America/New_York');
+    expect(new Date(interval.start).toISOString()).toBe(start);
+    expect(new Date(interval.end).toISOString()).toBe(end);
+    expect((interval.end - interval.start) / 3_600_000).toBe(hours);
+  });
+
+  test('DST fall-back includes both repeated local 01:30 airings', async () => {
+    const items = await getAiringItems({ request: async () =>
+      payload('2026-11-01T05:30:00Z', '2026-11-01T06:30:00Z') } as any,
+    'tv', '01-11-2026', 'time', new Date(), 'America/New_York');
+    expect(items).toHaveLength(2);
+  });
+
+  test('explicit date fetches both UTC month archives across a local day boundary', async () => {
+    const requests: string[] = [];
+    const byPath = {
+      'https://data.simkl.in/calendar/v2/2026/10/tv.json': payload('2026-10-31T03:00:00Z'),
+      'https://data.simkl.in/calendar/v2/2026/11/tv.json': payload('2026-11-01T02:59:59Z', '2026-11-01T03:00:00Z'),
+    };
+    const client = { request: async (path: string) => {
+      requests.push(path);
+      return byPath[path as keyof typeof byPath];
+    } } as any;
+    const interval = resolveSimklCalendarDay('31-10-2026', 'America/Sao_Paulo');
+    expect(simklCalendarPaths('tv', '31-10-2026', interval)).toEqual(Object.keys(byPath));
+    const items = await getAiringItems(client, 'tv', '31-10-2026', 'time', new Date(), 'America/Sao_Paulo');
+    expect(requests).toEqual(Object.keys(byPath));
+    expect(items.map(item => item.date)).toEqual(['2026-10-31T03:00:00Z', '2026-11-01T02:59:59Z']);
+  });
+
+  test('relative days crossing a UTC month use rolling and both archives, without duplicate sessions', async () => {
+    const interval = resolveSimklCalendarDay('today', 'America/Sao_Paulo', new Date('2026-10-31T15:00:00Z'));
+    expect(simklCalendarPaths('tv', 'today', interval)).toEqual([
+      'https://data.simkl.in/calendar/v2/tv.json',
+      'https://data.simkl.in/calendar/v2/2026/10/tv.json',
+      'https://data.simkl.in/calendar/v2/2026/11/tv.json',
+    ]);
+    const items = await getAiringItems({ request: async () =>
+      payload('2026-11-01T01:00:00Z') } as any,
+    'tv', 'today', 'time', new Date('2026-10-31T15:00:00Z'), 'America/Sao_Paulo');
+    expect(items).toHaveLength(1);
+  });
+
+  test('default UTC keeps the legacy explicit-date behavior', async () => {
+    const items = await getAiringItems({ request: async () =>
+      payload('2026-08-22T00:00:00Z', '2026-08-23T00:00:00Z') } as any,
+    'anime', '22-08-2026');
+    expect(items.map(item => item.date)).toEqual(['2026-08-22T00:00:00Z']);
+  });
+
+  test.each([
+    ['31-02-2026', 'UTC', 'Invalid calendar date'],
+    ['29-02-2026', 'UTC', 'Invalid calendar date'],
+    ['2026-10-20', 'UTC', 'Invalid calendar date'],
+    ['today', 'Invalid/Somewhere', 'Invalid calendar time zone'],
+    ['today', '+03:00', 'Invalid calendar time zone'],
+  ])('rejects invalid date or IANA zone before fetching: %s / %s', async (date, timeZone, message) => {
+    let calls = 0;
+    await expect(getAiringItems({ request: async () => { calls++; return payload(); } } as any,
+      'tv', date, 'time', new Date('2026-10-20T12:00:00Z'), timeZone)).rejects.toThrow(message);
+    expect(calls).toBe(0);
   });
 });

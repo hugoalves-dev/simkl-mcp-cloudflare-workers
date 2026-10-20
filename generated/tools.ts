@@ -601,7 +601,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_airing_shows',
-      { description: 'Get TV episode airings from Simkl’s free v2 calendar file.', inputSchema: z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).'), sort: z.enum(['time', 'rank', 'popularity']).optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Get TV episode airings for a local calendar day from Simkl’s free v2 calendar file. Optional IANA timeZone; defaults to UTC.', inputSchema: z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026); selected in timeZone.'), sort: z.enum(['time', 'rank', 'popularity']).optional(), timeZone: z.string().optional().describe('IANA time zone (e.g. America/Sao_Paulo). Defaults to UTC.') }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
         try {
           return await formatAiringTool(client, 'tv', args);
@@ -613,7 +613,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_airing_anime',
-      { description: 'Get anime episode airings from Simkl’s free v2 calendar file.', inputSchema: z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).'), sort: z.enum(['time', 'rank', 'popularity']).optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Get anime episode airings for a local calendar day from Simkl’s free v2 calendar file. Optional IANA timeZone; defaults to UTC.', inputSchema: z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026); selected in timeZone.'), sort: z.enum(['time', 'rank', 'popularity']).optional(), timeZone: z.string().optional().describe('IANA time zone (e.g. America/Sao_Paulo). Defaults to UTC.') }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
         try {
           return await formatAiringTool(client, 'anime', args);
