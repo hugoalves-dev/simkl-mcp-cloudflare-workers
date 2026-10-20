@@ -45,7 +45,10 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
     }
   }
 
+  let fallbackActive = false;
   async function pull(path: string, mediaType: MediaType): Promise<void> {
+    // Pace fallback requests without slowing the normal initial sync.
+    if (fallbackActive) await new Promise<void>(resolve => setTimeout(resolve, 125));
     // /sync/all-items returns the entire filtered library without pagination.
     const response = await client.request<unknown>(path, {
       method: 'GET', token: accessToken, responseProfile: 'library',
@@ -57,6 +60,7 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
       await pull(`/sync/all-items/${mediaType}`, mediaType);
     } catch (error) {
       if (!isMaxItems(error)) throw error;
+      fallbackActive = true;
       logSyncPartition('initial', 'baseline', 'type', 'max_items', mediaType);
       for (const status of STATUSES_BY_MEDIA[mediaType]) {
         try {
