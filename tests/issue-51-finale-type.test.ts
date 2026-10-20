@@ -38,7 +38,7 @@ async function callEpisodesTool(name: 'simkl_get_show_episodes' | 'simkl_get_ani
 }
 
 describe('issue #51: finale_type on TV episodes', () => {
-  for (const [value, description] of [[1, 'Mid-season Finale'], [2, 'Season Finale'], [3, 'Series Finale'], [null, null]] as const) {
+  for (const [value, description] of [[1, 'Mid-season Finale'], [2, 'Season Finale'], [3, 'Series Finale'], [null, 'Not a finale']] as const) {
     test(`returns only the description for TV finale_type=${String(value)}`, async () => {
       const episode = tvEpisodes.find(item => item.type === 'episode' && item.finale_type === value);
       expect(episode).toBeDefined();
@@ -46,6 +46,7 @@ describe('issue #51: finale_type on TV episodes', () => {
       expect(Object.hasOwn(actual, 'finale_type')).toBe(false);
       const { finale_type: _code, ...fields } = episode!;
       expect(actual).toEqual({ ...fields, finale_type_description: description });
+      if (value === null) expect(actual.finale_type_description).toBe('Not a finale');
     });
   }
 
@@ -76,6 +77,12 @@ describe('issue #51: finale_type on TV episodes', () => {
     expect(JSON.stringify(source)).toBe(original);
     expect(withTvFinaleDescriptions([])).toEqual([]);
     expect(withTvFinaleDescriptions(null)).toBeNull();
+    const ordinary = tvEpisodes.find(item => item.type === 'episode' && item.finale_type === null)!;
+    const { finale_type: _ordinaryCode, ...ordinaryFields } = ordinary;
+    expect(withTvFinaleDescriptions([ordinary]))
+      .toEqual([{ ...ordinaryFields, finale_type_description: 'Not a finale' }]);
+    expect(Object.hasOwn(ordinary, 'finale_type')).toBe(true);
+    expect(ordinary.finale_type).toBeNull();
   });
 
   test('anime episodes without finale_type remain unchanged, including specials', async () => {

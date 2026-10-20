@@ -7,7 +7,7 @@ export function withTvFinaleDescriptions(response: unknown): unknown {
     const item = episode as Record<string, unknown>;
     if (!Object.hasOwn(item, 'finale_type')) return episode;
 
-    const description = item.finale_type === null ? null
+    const description = item.finale_type === null ? 'Not a finale'
       : item.finale_type === 1 ? 'Mid-season Finale'
       : item.finale_type === 2 ? 'Season Finale'
       : item.finale_type === 3 ? 'Series Finale'

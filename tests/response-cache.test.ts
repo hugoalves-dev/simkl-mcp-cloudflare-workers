@@ -92,7 +92,10 @@ describe('SimklClient shared cache behavior', () => {
   });
 
   test('TV finale descriptions are added after cache reads without changing the shared cached JSON', async () => {
-    const upstream = [{ title: 'The Iron Throne', season: 8, episode: 6, type: 'episode', finale_type: 3, ids: { simkl_id: 4262296 } }];
+    const upstream = [
+      { title: 'The Iron Throne', season: 8, episode: 6, type: 'episode', finale_type: 3, ids: { simkl_id: 4262296 } },
+      { title: 'Winterfell', season: 8, episode: 1, type: 'episode', finale_type: null, ids: { simkl_id: 2653268 } },
+    ];
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       fetchCount++;
       expect(new Headers(init?.headers).has('Authorization')).toBe(false);
@@ -111,7 +114,11 @@ describe('SimklClient shared cache behavior', () => {
     const first = await tool({ id: '17465' });
     const second = await tool({ id: '17465' });
     const { finale_type: _code, ...fields } = upstream[0];
-    const enriched = [{ ...fields, finale_type_description: 'Series Finale' }];
+    const { finale_type: _ordinaryCode, ...ordinaryFields } = upstream[1];
+    const enriched = [
+      { ...fields, finale_type_description: 'Series Finale' },
+      { ...ordinaryFields, finale_type_description: 'Not a finale' },
+    ];
     expect(first.isError).not.toBe(true);
     expect(second.isError).not.toBe(true);
     expect(JSON.parse(first.content[0].text)).toEqual(enriched);
