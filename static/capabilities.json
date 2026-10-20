@@ -807,7 +807,7 @@
     },
     {
       "name": "simkl_get_show_episodes",
-      "description": "List episodes for a TV show",
+      "description": "List TV episodes. finale_type: 1 mid-season finale, 2 season finale, 3 series finale, null not a finale. Responses also include finale_type_description for known values; absent finale_type remains absent.",
       "inputSchema": {
         "type": "object",
         "properties": {

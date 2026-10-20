@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { asAiring, formatList, withImdb, withRating, withSimklItemLink } from '../src/format/media.js';
+import { withTvFinaleDescriptions } from '../src/format/episodes.js';
 import { simklTrendingPath } from '../src/api/trending.js';
 import { toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
@@ -487,7 +488,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_show_episodes',
-      { description: 'List episodes for a TV show', inputSchema: {
+      { description: 'List TV episodes. finale_type: 1 mid-season finale, 2 season finale, 3 series finale, null not a finale. Responses also include finale_type_description for known values; absent finale_type remains absent.', inputSchema: {
       id: z.string().describe('**Simkl ID of the TV show** — the parent show\'s Simkl ID (not an individual episode ID). The endpoint returns the full episode list for that show. Use a Simkl ID directly when you have one — the resp')
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
@@ -499,7 +500,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
       });
       const result = response.data;
       const responseHeaders = response.headers;
-      const formatted = JSON.stringify(result, null, 2);
+      const formatted = JSON.stringify(withTvFinaleDescriptions(result), null, 2);
       return {
         _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
         content: Array.isArray(formatted)
