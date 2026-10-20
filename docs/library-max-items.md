@@ -11,7 +11,7 @@ Source of truth: [Simkl Sync guide](https://api.simkl.org/guides/sync#if-a-pull-
 
 Movie statuses: `plantowatch`, `completed`, `dropped`. Show/anime statuses: `watching`, `plantowatch`, `hold`, `completed`, `dropped`. No pagination, date-window paging, or nonstandard filter is used.
 
-Fallback requests are paced at 125 ms or more between calls, below the documented 10 GET/sec per-token limit (other client-wide concurrent traffic must still honor the shared limit). All partitions execute serially and only after confirmed `400 max_items`. Normal responses use a single request. Data is combined by media type + stable Simkl ID; duplicates and conflicting/malformed rows are rejected. Existing row and aggregate JSON size guards remain in force. Persist the activities watermark and data only after **all** needed deltas, ratings and full membership requests succeed.
+Initial and incremental fallback requests are paced at 125 ms or more between calls, below the documented 10 GET/sec per-token limit (other client-wide concurrent traffic must still honor the shared limit). All partitions execute serially and only after confirmed `400 max_items`. Normal responses use a single request. Data is combined by media type + stable Simkl ID; duplicates and conflicting/malformed rows are rejected. Existing row and aggregate JSON size guards remain in force. Persist the activities watermark and data only after **all** needed deltas, ratings and full membership requests succeed.
 
 ## Unrecoverable conditions
 
