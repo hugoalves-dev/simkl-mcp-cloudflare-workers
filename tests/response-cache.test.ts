@@ -132,6 +132,122 @@ describe('SimklClient shared cache behavior', () => {
       .toBe(`public, max-age=${RESPONSE_CACHE_TTL_SECONDS.details}`);
   });
 
+
+  test('logs TV episode cache MISS, STORE, HIT with allowlisted metadata and no IDs or secrets', async () => {
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'secret-client-id' });
+      const endpoint = '/tv/episodes/17465';
+      const query = { debug: 'query-secret' };
+
+      const first = await client.request(endpoint, {
+        method: 'GET', authorization: 'none', query, token: 'user-secret-one',
+      });
+      const second = await client.request(endpoint, {
+        method: 'GET', authorization: 'none', query, token: 'user-secret-two',
+      });
+      expect(second).toEqual(first);
+      expect(fetchCount).toBe(1);
+      expect(putCount).toBe(1);
+      expect(entries.size).toBe(1);
+      expect([...entries.values()][0].headers.get('Cache-Control'))
+        .toBe(`public, max-age=${RESPONSE_CACHE_TTL_SECONDS.details}`);
+
+      const events = logSpy.mock.calls
+        .filter(args => args[0] === 'simkl.tv.episodes.cache')
+        .map(args => args[1]);
+      const context = { resource: 'tv/episodes', media: 'tv', ttlSeconds: RESPONSE_CACHE_TTL_SECONDS.details };
+      expect(events).toEqual([
+        { event: 'MISS', ...context },
+        { event: 'STORE', ...context },
+        { event: 'HIT', ...context },
+      ]);
+
+      // No telemetry from unrelated public endpoints or user-private requests.
+      await client.request('/anime/episodes/17465', { method: 'GET', authorization: 'none' });
+      await client.request('/users/settings', { method: 'GET', token: 'user-secret-three' });
+      expect(logSpy.mock.calls.filter(args => args[0] === 'simkl.tv.episodes.cache').map(args => args[1]))
+        .toEqual(events);
+
+      const serializedLogs = JSON.stringify(logSpy.mock.calls);
+      for (const secret of ['17465', 'query-secret', 'secret-client-id', 'user-secret-one', 'user-secret-two', 'user-secret-three']) {
+        expect(serializedLogs).not.toContain(secret);
+      }
+      expect(serializedLogs).not.toContain('https://');
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test('reports TV episode cache match and put errors without breaking the upstream read', async () => {
+    Object.defineProperty(globalThis, 'caches', {
+      configurable: true,
+      value: {
+        default: {
+          match: async () => { throw new Error('private-match-error'); },
+          put: async () => { throw new Error('private-put-error'); },
+        },
+      },
+    });
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'secret-client-id' });
+      expect(await client.request('/tv/episodes/17465', { method: 'GET', authorization: 'none', token: 'user-secret' }))
+        .toEqual({ count: 1 });
+      const context = { resource: 'tv/episodes', media: 'tv', ttlSeconds: RESPONSE_CACHE_TTL_SECONDS.details };
+      expect(logSpy.mock.calls.filter(args => args[0] === 'simkl.tv.episodes.cache').map(args => args[1]))
+        .toEqual([
+          { event: 'ERROR', ...context, operation: 'match' },
+          { event: 'ERROR', ...context, operation: 'put' },
+        ]);
+      expect(fetchCount).toBe(1);
+      const serializedLogs = JSON.stringify(logSpy.mock.calls);
+      for (const secret of ['17465', 'secret-client-id', 'user-secret', 'private-match-error', 'private-put-error']) {
+        expect(serializedLogs).not.toContain(secret);
+      }
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test('reports TV episode cache UNAVAILABLE without falsely claiming HIT or STORE', async () => {
+    delete (globalThis as typeof globalThis & { caches?: CacheStorage }).caches;
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+      expect(await client.request('/tv/episodes/17465', { method: 'GET', authorization: 'none' }))
+        .toEqual({ count: 1 });
+      expect(logSpy.mock.calls.filter(args => args[0] === 'simkl.tv.episodes.cache').map(args => args[1]))
+        .toEqual([
+          { event: 'UNAVAILABLE', resource: 'tv/episodes', media: 'tv', ttlSeconds: RESPONSE_CACHE_TTL_SECONDS.details },
+        ]);
+      expect(fetchCount).toBe(1);
+      expect(putCount).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test('does not log TV episode STORE for invalid JSON or failed upstream responses', async () => {
+    const logSpy = spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'client-id' });
+      globalThis.fetch = (async () => new Response('not-json', { status: 200 })) as typeof fetch;
+      await expect(client.request('/tv/episodes/17465', { method: 'GET', authorization: 'none' }))
+        .rejects.toThrow('invalid json response');
+      globalThis.fetch = (async () => new Response('not found', { status: 404 })) as typeof fetch;
+      await expect(client.request('/tv/episodes/99999', { method: 'GET', authorization: 'none' }))
+        .rejects.toBeInstanceOf(SimklApiError);
+      const events = logSpy.mock.calls
+        .filter(args => args[0] === 'simkl.tv.episodes.cache')
+        .map(args => (args[1] as { event: string }).event);
+      expect(events).toEqual(['MISS', 'MISS']);
+      expect(putCount).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   test('does not cache failed upstream responses', async () => {
     globalThis.fetch = (async () => {
       fetchCount++;
