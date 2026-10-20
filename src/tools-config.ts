@@ -134,10 +134,10 @@ export const toolsWhitelist: ToolConfig[] = [
   {
     path: '/tv/airing',
     method: 'get',
-    description: 'Get TV episode airings from Simkl’s free v2 calendar file.',
+    description: 'Get TV episode airings for a local calendar day from Simkl’s free v2 calendar file. Optional IANA timeZone; defaults to UTC.',
     custom: {
       name: 'simkl_get_airing_shows',
-      schema: "z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).'), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
+      schema: "z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026); selected in timeZone.'), sort: z.enum(['time', 'rank', 'popularity']).optional(), timeZone: z.string().optional().describe('IANA time zone (e.g. America/Sao_Paulo). Defaults to UTC.') })",
       imports: ["import { formatAiringTool } from '../src/api/airing.js';"],
       handler: `async (args: any) => {
         try {
@@ -151,10 +151,10 @@ export const toolsWhitelist: ToolConfig[] = [
   {
     path: '/anime/airing',
     method: 'get',
-    description: 'Get anime episode airings from Simkl’s free v2 calendar file.',
+    description: 'Get anime episode airings for a local calendar day from Simkl’s free v2 calendar file. Optional IANA timeZone; defaults to UTC.',
     custom: {
       name: 'simkl_get_airing_anime',
-      schema: "z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).'), sort: z.enum(['time', 'rank', 'popularity']).optional() })",
+      schema: "z.object({ date: z.string().optional().describe('Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026); selected in timeZone.'), sort: z.enum(['time', 'rank', 'popularity']).optional(), timeZone: z.string().optional().describe('IANA time zone (e.g. America/Sao_Paulo). Defaults to UTC.') })",
       imports: ["import { formatAiringTool } from '../src/api/airing.js';"],
       handler: `async (args: any) => {
         try {

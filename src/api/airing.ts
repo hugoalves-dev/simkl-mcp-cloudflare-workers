@@ -1,5 +1,5 @@
 import { asAiring, formatList, type MediaItem } from '../format/media';
-import { simklCalendarPath } from './calendar';
+import { resolveSimklCalendarDay, simklCalendarPaths } from './calendar';
 
 export type SimklAiringType = 'tv' | 'anime';
 export type SimklAiringSort = 'time' | 'rank' | 'popularity';
@@ -92,30 +92,45 @@ export async function getAiringItems(
   date?: string,
   sort: SimklAiringSort = 'time',
   now = new Date(),
+  timeZone = 'UTC',
 ): Promise<CalendarItem[]> {
-  const payload = parseCalendarPayload(await client.request<unknown>(simklCalendarPath(type, date), {
-    method: 'GET',
-    authorization: 'none',
-  }));
-
-  const day = date && date !== 'today' && date !== 'tomorrow'
-    ? `${date.slice(6, 10)}-${date.slice(3, 5)}-${date.slice(0, 2)}`
-    : new Date(now.getTime() + (date === 'tomorrow' ? 86_400_000 : 0)).toISOString().slice(0, 10);
+  const interval = resolveSimklCalendarDay(date, timeZone, now);
+  const paths = simklCalendarPaths(type, date, interval);
+  const payloads = await Promise.all(paths.map(async path =>
+    parseCalendarPayload(await client.request<unknown>(path, {
+      method: 'GET',
+      authorization: 'none',
+    }))
+  ));
 
   const filtered: CalendarItem[] = [];
+  const seen = new Set<string>();
   let invalidEntries = 0;
   let missingMetadata = 0;
-  for (const rawEntry of payload.calendar) {
-    if (!isCalendarEntry(rawEntry)) {
-      invalidEntries++;
-      continue;
+  for (const payload of payloads) {
+    for (const rawEntry of payload.calendar) {
+      if (!isCalendarEntry(rawEntry)) {
+        invalidEntries++;
+        continue;
+      }
+      const instant = Date.parse(rawEntry.date);
+      if (!Number.isFinite(instant)) {
+        invalidEntries++;
+        continue;
+      }
+      if (instant < interval.start || instant >= interval.end) continue;
+
+      // Current and monthly calendar files may contain the same airing.
+      const key = `${rawEntry.simkl_id}:${instant}:${rawEntry.episode?.season ?? ''}:${rawEntry.episode?.episode ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const metadata = payload.metadata[String(rawEntry.simkl_id)];
+      if (!isRecord(metadata) || typeof metadata.title !== 'string' || !metadata.title.trim()) {
+        missingMetadata++;
+      }
+      filtered.push(enrichCalendarEntry(rawEntry, metadata));
     }
-    if (rawEntry.date.slice(0, 10) !== day) continue;
-    const metadata = payload.metadata[String(rawEntry.simkl_id)];
-    if (!isRecord(metadata) || typeof metadata.title !== 'string' || !metadata.title.trim()) {
-      missingMetadata++;
-    }
-    filtered.push(enrichCalendarEntry(rawEntry, metadata));
   }
   if (invalidEntries > 0 || missingMetadata > 0) {
     console.warn('simkl.calendar.validation', {
@@ -134,9 +149,9 @@ export async function getAiringItems(
 export async function formatAiringTool(
   client: Parameters<typeof getAiringItems>[0],
   type: SimklAiringType,
-  args: { date?: string; sort?: SimklAiringSort },
+  args: { date?: string; sort?: SimklAiringSort; timeZone?: string },
 ) {
-  const items = await getAiringItems(client, type, args.date, args.sort);
+  const items = await getAiringItems(client, type, args.date, args.sort, new Date(), args.timeZone);
   return { content: formatList(items, asAiring, 20, type).map(text => ({ type: 'text' as const, text })) };
 }
 

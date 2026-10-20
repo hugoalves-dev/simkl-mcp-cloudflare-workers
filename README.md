@@ -86,6 +86,9 @@ commit no longer matches `main` skip deployment, including retries of old runs.
 - **Scrobble**: `simkl_start_watching`, `simkl_pause_watching`, `simkl_stop_watching`
 - **Sync/tracking**: `simkl_add_to_watchlist`, `simkl_mark_watched`, `simkl_remove_from_history`, `simkl_add_rating`, `simkl_get_watchlist`
 - **Discovery**: `simkl_get_trending_by_genre`, `simkl_get_trending_shows`, `simkl_get_trending_movies`, `simkl_get_trending_anime`, `simkl_get_best_shows`, `simkl_get_best_anime`, `simkl_get_show_by_id`, `simkl_get_movie_by_id`, `simkl_get_anime_by_id`, `simkl_get_show_episodes`, `simkl_get_anime_episodes`, `simkl_get_shows_by_genre`, `simkl_get_movies_by_genre`, `simkl_get_anime_by_genre`, `simkl_get_airing_shows`, `simkl_get_airing_anime`
+
+Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) accept `date: today | tomorrow | DD-MM-YYYY` and optional `timeZone` (IANA, for example `America/Sao_Paulo`). **Default: UTC** for backwards compatibility. Results are filtered by the requested **local calendar day**, respecting daylight saving time. Returned airing timestamps remain in UTC (`Z`).
+
 - **User**: `simkl_get_user_stats`, `simkl_my_stats`
 - **Rewatches**: `simkl_start_rewatch`, `simkl_update_rewatch`, `simkl_get_rewatches`, and `simkl_stop_watching` with optional explicit rewatch intent
 - **Resources**: `watchlist/{type}/{status}`, `trending/{type}/{interval}`

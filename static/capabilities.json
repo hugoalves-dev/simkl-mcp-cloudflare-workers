@@ -939,12 +939,12 @@
     },
     {
       "name": "simkl_get_airing_shows",
-      "description": "Get TV episode airings from Simkl’s free v2 calendar file.",
+      "description": "Get TV episode airings for a local calendar day from Simkl’s free v2 calendar file. Optional IANA timeZone; defaults to UTC.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "date": {
-            "description": "Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).",
+            "description": "Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026); selected in timeZone.",
             "type": "string"
           },
           "sort": {
@@ -954,6 +954,10 @@
               "rank",
               "popularity"
             ]
+          },
+          "timeZone": {
+            "description": "IANA time zone (e.g. America/Sao_Paulo). Defaults to UTC.",
+            "type": "string"
           }
         },
         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -968,12 +972,12 @@
     },
     {
       "name": "simkl_get_airing_anime",
-      "description": "Get anime episode airings from Simkl’s free v2 calendar file.",
+      "description": "Get anime episode airings for a local calendar day from Simkl’s free v2 calendar file. Optional IANA timeZone; defaults to UTC.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "date": {
-            "description": "Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026).",
+            "description": "Optional: today, tomorrow, or DD-MM-YYYY (e.g. 15-03-2026); selected in timeZone.",
             "type": "string"
           },
           "sort": {
@@ -983,6 +987,10 @@
               "rank",
               "popularity"
             ]
+          },
+          "timeZone": {
+            "description": "IANA time zone (e.g. America/Sao_Paulo). Defaults to UTC.",
+            "type": "string"
           }
         },
         "$schema": "http://json-schema.org/draft-07/schema#"
