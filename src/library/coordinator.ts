@@ -30,10 +30,12 @@ export class CachedLibrary {
   read(token: string, force = false): Promise<LibraryItems> {
     return this.enqueue(async () => {
       const telemetry = createLibrarySyncRun();
+      let syncPhase: 'initial' | 'incremental' = 'incremental';
       let retryPending = this.retryRequired;
       try {
         if (!token) throw new Error('Simkl authentication required');
         let previous = await this.store.load();
+        syncPhase = !previous || previous.activities.all === null ? 'initial' : 'incremental';
         retryPending ||= previous?.forceCheck === true;
         const forceRefresh = force || this.retryRequired;
         // Persist retry/invalidation intent, never a manual force request:
@@ -71,7 +73,7 @@ export class CachedLibrary {
         return snapshot.items;
       } catch (error) {
         logLibrarySync(telemetry, 'sync_failed', {
-          phase: 'incremental',
+          phase: syncPhase,
           outcome: 'previous_snapshot_preserved',
           reason: error instanceof LibrarySyncLimitError ? 'partition_exhausted'
             : error instanceof SimklApiError && error.upstreamCode === 'max_items' ? 'max_items' : 'upstream_or_validation',
