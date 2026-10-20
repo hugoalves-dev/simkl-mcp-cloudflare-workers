@@ -57,7 +57,10 @@ export async function fetchPartitionedLibrary(
 ): Promise<LibraryItems> {
   const path = operation === 'ratings' ? '/sync/ratings' : '/sync/all-items';
   let attempts = 0;
+  let fallbackActive = false;
   const request = async (media?: MediaType, status?: string): Promise<LibraryItems> => {
+    // Pace only fallback requests (8/sec ceiling per object) to respect Simkl's 10 GET/sec limit.
+    if (fallbackActive) await new Promise<void>(resolve => setTimeout(resolve, 125));
     attempts++;
     const suffix = media ? `/${media}${status ? `/${status}` : ''}` : '';
     const response = await client.request<unknown>(path + suffix, {
@@ -102,6 +105,7 @@ export async function fetchPartitionedLibrary(
     return combined;
   } catch (error) {
     if (!isMaxItems(error)) throw error;
+    fallbackActive = true;
     logSyncPartition('incremental', operation, 'all', 'max_items', undefined, undefined, attempts);
   }
 
