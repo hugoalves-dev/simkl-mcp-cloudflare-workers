@@ -122,7 +122,8 @@ export async function refreshLibrary(client: SimklClient, token: string, previou
       }
     }
   }
-  logLibrarySync(telemetry, 'snapshot_ready', {
+  // fetchInitialLibrary already emits readiness for Phase 1 using the same syncId.
+  if (phase === 'incremental') logLibrarySync(telemetry, 'snapshot_ready', {
     phase, outcome: 'ready', rows: MEDIA_TYPES.reduce((sum, type) => sum + items[type].length, 0),
     requests: telemetry.requests,
   });
