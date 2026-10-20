@@ -54,7 +54,7 @@ test('does not split other statuses/errors or recursively split a failed status'
     if (path === '/sync/activities') return activities;
     throw new SimklApiError('too many', 400, '{"error":"max_items"}');
   });
-  await expect(fetchInitialLibrary(client, 'token')).rejects.toThrow('too many');
+  await expect(fetchInitialLibrary(client, 'token')).rejects.toMatchObject({ name: 'LibrarySyncLimitError', phase: 'initial', operation: 'baseline', media: 'shows', status: 'watching' });
   expect(calls.map(c => c.path)).toEqual(['/sync/activities', '/sync/all-items/shows', '/sync/all-items/shows/watching']);
 });
 
