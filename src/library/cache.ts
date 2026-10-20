@@ -4,6 +4,7 @@ import { LibraryStore } from './store.js';
 import { CachedLibrary } from './coordinator';
 import { parseLibraryCacheTtlSeconds } from './refresh';
 import { fetchInitialLibrary } from './sync.js';
+import { createLibrarySyncRun, logLibrarySync } from './sync-telemetry.js';
 import { refreshUserProfile, refreshUserSettings } from './profile.js';
 import { normalizeSimklId } from './identity.js';
 import { refreshRewatches } from './rewatches.js';
@@ -66,10 +67,24 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
 
   private async initialize(accessToken: string): Promise<LibraryInitialization> {
     // Token belongs only to this operation; never assign it to object or storage state.
-    const candidate = await fetchInitialLibrary(this.client, accessToken);
-    const completion = this.store.commit(candidate);
-    await this.library.completeInitialization();
-    return completion;
+    const telemetry = createLibrarySyncRun();
+    try {
+      const candidate = await fetchInitialLibrary(this.client, accessToken, undefined, telemetry);
+      const completion = this.store.commit(candidate);
+      await this.library.completeInitialization();
+      logLibrarySync(telemetry, 'snapshot_committed', {
+        phase: 'initial', outcome: 'saved', rows: completion.itemCount, requests: telemetry.requests,
+      });
+      return completion;
+    } catch (error) {
+      logLibrarySync(telemetry, 'sync_failed', {
+        phase: 'initial', outcome: 'snapshot_uncommitted',
+        reason: error instanceof Error && error.name === 'LibrarySyncLimitError'
+          ? 'partition_exhausted' : 'upstream_or_validation',
+        requests: telemetry.requests,
+      });
+      throw error;
+    }
   }
 
   read(accessToken: string, force = false) {
@@ -86,9 +101,13 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
       if (!accessToken) throw new Error('Simkl authentication required');
       const initialized = this.store.getInitialization() !== null;
       await this.ensureInitializedInternal(accessToken);
-      if (!initialized) return { status: 'refreshed' };
+      if (!initialized) {
+        console.info(JSON.stringify({ component: 'simkl_library_sync', event: 'manual_refresh', outcome: 'initialized' }));
+        return { status: 'refreshed' };
+      }
       const retryAfterSeconds = this.store.tryReserveManualRefresh(Date.now());
       if (retryAfterSeconds > 0) {
+        console.info(JSON.stringify({ component: 'simkl_library_sync', event: 'manual_refresh', outcome: 'cooldown', retryAfterSeconds }));
         // Do not bypass the manual cooldown. A server-side mutation still
         // requires its normal activities check even inside that window.
         await this.library.read(accessToken);
@@ -96,6 +115,7 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
       }
       // The cooldown reservation is persisted *before* the upstream request,
       // including when Simkl responds with an error or the object restarts.
+      console.info(JSON.stringify({ component: 'simkl_library_sync', event: 'manual_refresh', outcome: 'forced' }));
       await this.library.read(accessToken, true);
       return { status: 'refreshed' };
     });
