@@ -35,7 +35,7 @@ export class CachedLibrary {
       try {
         if (!token) throw new Error('Simkl authentication required');
         let previous = await this.store.load();
-        syncPhase = !previous || previous.activities.all === null ? 'initial' : 'incremental';
+        syncPhase = !previous || previous.activities?.all === null ? 'initial' : 'incremental';
         retryPending ||= previous?.forceCheck === true;
         const forceRefresh = force || this.retryRequired;
         // Persist retry/invalidation intent, never a manual force request:
