@@ -1,5 +1,9 @@
 import type { SimklClient } from '../api/client.js';
 import { LibrarySyncLimitError } from './errors.js';
+import {
+  createLibrarySyncRun, logLibrarySync, observeLibrarySyncRequest,
+  type LibrarySyncRun,
+} from './sync-telemetry.js';
 import { isMaxItems, logSyncPartition } from './partitions.js';
 import { normalizeSimklId } from './identity.js';
 import {
@@ -7,13 +11,20 @@ import {
   type LibraryCandidate, type LibraryItemRow, type MediaType,
 } from './types.js';
 
-export async function fetchInitialLibrary(client: SimklClient, accessToken: string, knownActivities?: Record<string, unknown>): Promise<LibraryCandidate> {
-  const activities = knownActivities ?? await client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken });
+export async function fetchInitialLibrary(client: SimklClient, accessToken: string, knownActivities?: Record<string, unknown>, run?: LibrarySyncRun): Promise<LibraryCandidate> {
+  const telemetry = run ?? createLibrarySyncRun();
+  const activities = knownActivities ?? await observeLibrarySyncRequest(
+    telemetry, { phase: 'initial', operation: 'activities', queryMode: 'none' },
+    () => client.request<unknown>('/sync/activities', { method: 'GET', token: accessToken }),
+  );
   if (!isRecord(activities) || (activities.all !== null && (typeof activities.all !== 'string' || !Number.isFinite(Date.parse(activities.all))))) {
     throw new Error('Invalid Simkl activities snapshot');
   }
 
-  if (activities.all === null) return { activities, items: [] };
+  if (activities.all === null) {
+    logLibrarySync(telemetry, 'snapshot_ready', { phase: 'initial', outcome: 'empty', rows: 0, requests: telemetry.requests });
+    return { activities, items: [] };
+  }
 
   const items = new Map<string, LibraryItemRow>();
   let pendingBytes = 0;
@@ -50,10 +61,18 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
     // Pace fallback requests without slowing the normal initial sync.
     if (fallbackActive) await new Promise<void>(resolve => setTimeout(resolve, 125));
     // /sync/all-items returns the entire filtered library without pagination.
-    const response = await client.request<unknown>(path, {
-      method: 'GET', token: accessToken, responseProfile: 'library',
-    });
-    append(response, mediaType);
+    await observeLibrarySyncRequest(
+      telemetry,
+      { phase: 'initial', operation: 'baseline', media: mediaType, status: path.split('/')[4], queryMode: 'none' },
+      async () => {
+        const response = await client.request<unknown>(path, {
+          method: 'GET', token: accessToken, responseProfile: 'library',
+        });
+        append(response, mediaType);
+        return response;
+      },
+      response => isRecord(response) && Array.isArray(response[mediaType]) ? response[mediaType].length : 0,
+    );
   }
   for (const mediaType of MEDIA_TYPES) {
     try {
@@ -61,18 +80,21 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
     } catch (error) {
       if (!isMaxItems(error)) throw error;
       fallbackActive = true;
-      logSyncPartition('initial', 'baseline', 'type', 'max_items', mediaType);
+      logSyncPartition('initial', 'baseline', 'type', 'max_items', mediaType, undefined, undefined, telemetry);
       for (const status of STATUSES_BY_MEDIA[mediaType]) {
         try {
           await pull(`/sync/all-items/${mediaType}/${status}`, mediaType);
         } catch (statusError) {
           if (!isMaxItems(statusError)) throw statusError;
-          logSyncPartition('initial', 'baseline', 'status', 'unrecoverable', mediaType, status);
+          logSyncPartition('initial', 'baseline', 'status', 'unrecoverable', mediaType, status, undefined, telemetry);
           throw new LibrarySyncLimitError('initial', 'baseline', mediaType, status);
         }
       }
-      logSyncPartition('initial', 'baseline', 'type', 'success', mediaType);
+      logSyncPartition('initial', 'baseline', 'type', 'success', mediaType, undefined, undefined, telemetry);
     }
   }
+  logLibrarySync(telemetry, 'snapshot_ready', {
+    phase: 'initial', outcome: 'ready', rows: items.size, requests: telemetry.requests,
+  });
   return { activities, items: [...items.values()] };
 }
