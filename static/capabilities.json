@@ -807,7 +807,7 @@
     },
     {
       "name": "simkl_get_show_episodes",
-      "description": "List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or Not a finale). Simkl's null finale_type means Not a finale; numeric finale_type codes are omitted from the MCP response. Anime is unaffected.",
+      "description": "List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or Not a finale). A null finale_type value means Not a finale; numeric finale_type codes are omitted from the MCP response. Anime is unaffected.",
       "inputSchema": {
         "type": "object",
         "properties": {

@@ -488,7 +488,7 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_get_show_episodes',
-      { description: 'List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or Not a finale). Simkl's null finale_type means Not a finale; numeric finale_type codes are omitted from the MCP response. Anime is unaffected.', inputSchema: {
+      { description: 'List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or Not a finale). A null finale_type value means Not a finale; numeric finale_type codes are omitted from the MCP response. Anime is unaffected.', inputSchema: {
       id: z.string().describe('**Simkl ID of the TV show** — the parent show\'s Simkl ID (not an individual episode ID). The endpoint returns the full episode list for that show. Use a Simkl ID directly when you have one — the resp')
     }, annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {

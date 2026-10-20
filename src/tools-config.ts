@@ -119,7 +119,7 @@ export const toolsWhitelist: ToolConfig[] = [
   { path: '/movies/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'movies' }},
   { path: '/anime/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json', mediaType: 'anime' }},
 
-  { path: '/tv/episodes/:id', method: 'get', authorization: 'none', description: 'List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or Not a finale). Simkl's null finale_type means Not a finale; numeric finale_type codes are omitted from the MCP response. Anime is unaffected.', responseFormat: { type: 'json', tvFinaleDescriptions: true }},
+  { path: '/tv/episodes/:id', method: 'get', authorization: 'none', description: 'List TV episodes with finale_type_description (Mid-season Finale, Season Finale, Series Finale, or Not a finale). A null finale_type value means Not a finale; numeric finale_type codes are omitted from the MCP response. Anime is unaffected.', responseFormat: { type: 'json', tvFinaleDescriptions: true }},
   { path: '/anime/episodes/:id', method: 'get', authorization: 'none', responseFormat: { type: 'json' }},
 
   { path: '/tv/best/:filter', method: 'get', responseFormat: {
