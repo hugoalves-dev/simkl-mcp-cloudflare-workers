@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Anime Episode 1",
+    "episode": 1,
+    "type": "episode",
+    "ids": {
+      "simkl_id": 6101
+    }
+  },
+  {
+    "title": "Bonus Episode",
+    "type": "special",
+    "ids": {
+      "simkl_id": 6102
+    }
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "title": "The Midpoint",
+    "season": 1,
+    "episode": 6,
+    "type": "episode",
+    "finale_type": 1,
+    "ids": {
+      "simkl_id": 5101
+    }
+  },
+  {
+    "title": "Season End",
+    "season": 1,
+    "episode": 12,
+    "type": "episode",
+    "finale_type": 2,
+    "ids": {
+      "simkl_id": 5102
+    }
+  },
+  {
+    "title": "Series End",
+    "season": 4,
+    "episode": 8,
+    "type": "episode",
+    "finale_type": 3,
+    "ids": {
+      "simkl_id": 5103
+    }
+  },
+  {
+    "title": "Ordinary Episode",
+    "season": 1,
+    "episode": 1,
+    "type": "episode",
+    "finale_type": null,
+    "ids": {
+      "simkl_id": 5104
+    }
+  },
+  {
+    "title": "Bonus Finale",
+    "type": "special",
+    "finale_type": 2,
+    "ids": {
+      "simkl_id": 5105
+    }
+  }
+]
