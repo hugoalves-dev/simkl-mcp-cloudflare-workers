@@ -152,38 +152,51 @@ export class SimklClient {
     const cache = cachePolicy && typeof caches !== 'undefined' ? caches.default : undefined;
     const cacheKey = cache && cachePolicy ? createResponseCacheKey(requestUrl) : undefined;
 
-    // Emit only allowlisted calendar metadata; never log the URL, query string,
-    // client ID, Authorization header, user token, or upstream response body.
+    // Emit only allowlisted cache metadata. Do not log the URL, show ID, query
+    // string, client ID, authorization, user token, or upstream response body.
+    // Workers Observability supplies traceId/requestId for correlation.
     const calendarParts = cachePolicy && requestUrl.origin === 'https://data.simkl.in'
       ? /^\/calendar\/v2\/(?:(\d{4})\/([1-9]|1[0-2])\/)?(tv|anime|movie_release)\.json$/.exec(requestUrl.pathname)
       : null;
-    const logCalendarCache = (
+    const isTvEpisodesCache = Boolean(cachePolicy && requestUrl.origin === 'https://api.simkl.com'
+      && /^\/tv\/episodes\/[^/]+$/.test(requestUrl.pathname));
+    const logResponseCache = (
       event: 'HIT' | 'MISS' | 'STORE' | 'ERROR' | 'UNAVAILABLE',
       operation?: 'match' | 'put'
     ): void => {
-      if (!calendarParts || !cachePolicy) return;
-      console.info('simkl.calendar.cache', {
-        event,
-        resource: 'calendar/v2',
-        media: calendarParts[3],
-        period: calendarParts[1] ? 'monthly' : 'current',
-        ...(calendarParts[1] ? { year: Number(calendarParts[1]), month: Number(calendarParts[2]) } : {}),
-        ttlSeconds: cachePolicy.ttlSeconds,
-        ...(operation ? { operation } : {}),
-      });
+      if (!cachePolicy) return;
+      if (calendarParts) {
+        console.info('simkl.calendar.cache', {
+          event,
+          resource: 'calendar/v2',
+          media: calendarParts[3],
+          period: calendarParts[1] ? 'monthly' : 'current',
+          ...(calendarParts[1] ? { year: Number(calendarParts[1]), month: Number(calendarParts[2]) } : {}),
+          ttlSeconds: cachePolicy.ttlSeconds,
+          ...(operation ? { operation } : {}),
+        });
+      } else if (isTvEpisodesCache) {
+        console.info('simkl.tv.episodes.cache', {
+          event,
+          resource: 'tv/episodes',
+          media: 'tv',
+          ttlSeconds: cachePolicy.ttlSeconds,
+          ...(operation ? { operation } : {}),
+        });
+      }
     };
 
     let response: Response | undefined;
     if (cache && cacheKey) {
       try {
         response = await cache.match(cacheKey);
-        logCalendarCache(response ? 'HIT' : 'MISS');
+        logResponseCache(response ? 'HIT' : 'MISS');
       } catch {
-        logCalendarCache('ERROR', 'match');
+        logResponseCache('ERROR', 'match');
         // Cache failures should not make the upstream API unavailable.
       }
     } else {
-      logCalendarCache('UNAVAILABLE');
+      logResponseCache('UNAVAILABLE');
     }
 
     const cacheHit = Boolean(response);
@@ -297,9 +310,9 @@ export class SimklClient {
             statusText: response.statusText,
             headers: cacheHeaders,
           }));
-          logCalendarCache('STORE');
+          logResponseCache('STORE');
         } catch {
-          logCalendarCache('ERROR', 'put');
+          logResponseCache('ERROR', 'put');
           // Cache writes are best-effort; return the successful upstream response.
         }
       }
