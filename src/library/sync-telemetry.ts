@@ -34,6 +34,7 @@ export function logLibrarySync(
     rows?: number;
     requests?: number;
     reason?: string;
+    httpStatus?: number;
   },
 ): void {
   console.info(JSON.stringify({
@@ -85,6 +86,7 @@ export async function observeLibrarySyncRequest<T>(
       ...fields,
       outcome: 'failed',
       reason: sanitizedReason(error),
+      ...(error instanceof SimklApiError ? { httpStatus: error.statusCode } : {}),
       requestNo,
       durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
     });
