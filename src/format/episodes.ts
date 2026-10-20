@@ -13,8 +13,11 @@ export function withTvFinaleDescriptions(response: unknown): unknown {
       : item.finale_type === 3 ? 'Series Finale'
       : undefined;
 
-    // Unknown future codes (or malformed values) pass through untouched.
-    if (description === undefined) return episode;
-    return { ...item, finale_type_description: description };
+    // Simkl's numeric enum is internal; never expose it to MCP consumers.
+    // Unknown future codes are omitted rather than leaking undocumented numbers.
+    const result = { ...item };
+    delete result.finale_type;
+    if (description !== undefined) result.finale_type_description = description;
+    return result;
   });
 }

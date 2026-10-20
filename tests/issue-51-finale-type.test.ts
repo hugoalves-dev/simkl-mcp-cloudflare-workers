@@ -39,30 +39,31 @@ async function callEpisodesTool(name: 'simkl_get_show_episodes' | 'simkl_get_ani
 
 describe('issue #51: finale_type on TV episodes', () => {
   for (const [value, description] of [[1, 'Mid-season Finale'], [2, 'Season Finale'], [3, 'Series Finale'], [null, null]] as const) {
-    test(`preserves TV finale_type=${String(value)} with matching description`, async () => {
+    test(`returns only the description for TV finale_type=${String(value)}`, async () => {
       const episode = tvEpisodes.find(item => item.type === 'episode' && item.finale_type === value);
       expect(episode).toBeDefined();
       const [actual] = await callEpisodesTool('simkl_get_show_episodes', '17465', [episode!]);
-      expect(Object.hasOwn(actual, 'finale_type')).toBe(true);
-      expect(actual.finale_type).toBe(value);
-      expect(actual).toEqual({ ...episode, finale_type_description: description });
+      expect(Object.hasOwn(actual, 'finale_type')).toBe(false);
+      const { finale_type: _code, ...fields } = episode!;
+      expect(actual).toEqual({ ...fields, finale_type_description: description });
     });
   }
 
-  test('preserves finale_type on a TV special without inventing numbered season/episode', async () => {
+  test('returns only the finale description on a TV special without inventing numbered season/episode', async () => {
     const special = tvEpisodes.find(item => item.type === 'special')!;
     const [actual] = await callEpisodesTool('simkl_get_show_episodes', '17465', [special]);
-    expect(actual.finale_type).toBe(2);
+    expect(Object.hasOwn(actual, 'finale_type')).toBe(false);
     expect(actual.finale_type_description).toBe('Season Finale');
     expect(Object.hasOwn(actual, 'season')).toBe(false);
     expect(Object.hasOwn(actual, 'episode')).toBe(false);
   });
 
-  test('does not manufacture a description when TV finale_type is absent or unrecognized', async () => {
+  test('omits unknown numeric codes and does not invent descriptions for missing or unknown values', async () => {
     const missing: Episode = { title: 'Unmarked', type: 'episode', ids: { simkl_id: 99 } };
     const future = { title: 'Unknown marker', type: 'episode', finale_type: 4, ids: { simkl_id: 100 } } as unknown as Episode;
     const actual = await callEpisodesTool('simkl_get_show_episodes', '17465', [missing, future]);
-    expect(actual).toEqual([missing, future]);
+    expect(actual).toEqual([missing, { title: future.title, type: future.type, ids: future.ids }]);
+    expect(actual.every(item => !Object.hasOwn(item, 'finale_type'))).toBe(true);
     expect(actual.every(item => !Object.hasOwn(item, 'finale_type_description'))).toBe(true);
   });
 
@@ -70,7 +71,8 @@ describe('issue #51: finale_type on TV episodes', () => {
     const source = tvEpisodes[0];
     const original = JSON.stringify(source);
     const decorated = withTvFinaleDescriptions([source, null]);
-    expect(decorated).toEqual([{ ...source, finale_type_description: 'Mid-season Finale' }, null]);
+    const { finale_type: _code, ...fields } = source;
+    expect(decorated).toEqual([{ ...fields, finale_type_description: 'Mid-season Finale' }, null]);
     expect(JSON.stringify(source)).toBe(original);
     expect(withTvFinaleDescriptions([])).toEqual([]);
     expect(withTvFinaleDescriptions(null)).toBeNull();

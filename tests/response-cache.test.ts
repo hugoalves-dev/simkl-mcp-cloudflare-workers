@@ -110,11 +110,13 @@ describe('SimklClient shared cache behavior', () => {
     const tool = callbacks.get('simkl_get_show_episodes')!;
     const first = await tool({ id: '17465' });
     const second = await tool({ id: '17465' });
-    const enriched = [{ ...upstream[0], finale_type_description: 'Series Finale' }];
+    const { finale_type: _code, ...fields } = upstream[0];
+    const enriched = [{ ...fields, finale_type_description: 'Series Finale' }];
     expect(first.isError).not.toBe(true);
     expect(second.isError).not.toBe(true);
     expect(JSON.parse(first.content[0].text)).toEqual(enriched);
     expect(JSON.parse(second.content[0].text)).toEqual(enriched);
+    expect(first.content[0].text).not.toContain('"finale_type":');
     expect(fetchCount).toBe(1);
     expect(putCount).toBe(1);
     expect(entries.size).toBe(1);
