@@ -3,6 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Canonical public endpoint for the independent Simkl MCP deployment.
+[[routes]]
+pattern = "mcp-simkl.hugojava.dev"
+custom_domain = true
+
 # kv namespace for oauth provider storage
 [[kv_namespaces]]
 binding = "OAUTH_KV"

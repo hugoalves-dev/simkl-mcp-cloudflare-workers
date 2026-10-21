@@ -151,7 +151,6 @@ jobs:
           WORKER_URL: ${{ vars.WORKER_URL }}
         run: |
           if [ -z "$WORKER_URL" ]; then
-            WORKER_URL="$(sed -nE 's@.*(https://[a-zA-Z0-9.-]+\.workers\.dev).*@\1@p' deploy.log | tail -1)"
+            WORKER_URL="https://mcp-simkl.hugojava.dev"
           fi
-          test -n "$WORKER_URL" || { echo "::error::Set WORKER_URL for deployments without a workers.dev URL"; exit 1; }
           bun run smoke:capabilities "$WORKER_URL"

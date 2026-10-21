@@ -9,6 +9,28 @@ An independently maintained [Model Context Protocol (MCP)](https://modelcontextp
 > [!IMPORTANT]
 > **Independent community project.** Originally based on [srevinsaju/simkl-mcp](https://github.com/srevinsaju/simkl-mcp), this repository is now maintained separately by [@vitorhugo-dotnet](https://github.com/vitorhugo-dotnet). It follows its own technical direction, releases, and roadmap, and is **not an upstream mirror**. It is not officially affiliated with or endorsed by Simkl or the original project's maintainer.
 
+## Public MCP server
+
+**Official endpoint for this independently maintained community deployment:**
+
+- **Streamable HTTP (recommended):** https://mcp-simkl.hugojava.dev/mcp
+- **Legacy SSE:** https://mcp-simkl.hugojava.dev/sse
+- **Landing page and capability catalog:** https://mcp-simkl.hugojava.dev/
+- **Health check:** https://mcp-simkl.hugojava.dev/health
+
+Point a compatible MCP client at the `/mcp` URL and complete Simkl OAuth authorization. This deployment is operated by [@vitorhugo-dotnet](https://github.com/vitorhugo-dotnet); **it is not an official Simkl-hosted or Simkl-endorsed integration**.
+
+```json
+{
+  "mcpServers": {
+    "simkl": {
+      "transport": "streamable-http",
+      "url": "https://mcp-simkl.hugojava.dev/mcp"
+    }
+  }
+}
+```
+
 ![Simkl MCP screenshot](docs/img.png)
 
 ## Highlights
@@ -25,6 +47,18 @@ An independently maintained [Model Context Protocol (MCP)](https://modelcontextp
 This project prioritizes a **TypeScript/Bun implementation deployed on Cloudflare Workers**, rather than requiring a separately operated server or Kubernetes cluster. It is developed independently of the original repository; upstream features, architectural changes, and release schedules are not automatically inherited.
 
 For issues and contributions specific to this implementation, use this repository's [issues](https://github.com/vitorhugo-dotnet/simkl-mcp-cloudflare-workers/issues) and [pull requests](https://github.com/vitorhugo-dotnet/simkl-mcp-cloudflare-workers/pulls).
+
+## Why Cloudflare Workers?
+
+This community MCP server runs on **Cloudflare Workers** to minimize hosting cost and operational overhead. A managed, request-driven runtime avoids keeping a VPS or container cluster running for an HTTP integration.
+
+- **Low maintenance:** Cloudflare handles the runtime, public routing, and edge TLS; no OS updates, container orchestration, or always-on server to manage.
+- **Cost-conscious:** a generous free tier for modest workloads, with usage-based costs when quotas are exceeded. Actual costs depend on request volume, CPU, KV, Durable Objects, storage and plan limits; free hosting is not guaranteed.
+- **Durable state:** SQLite-backed **Durable Objects** persist per-user Simkl library snapshots and MCP sessions; **Workers KV** supports short-lived OAuth state.
+- **Fewer Simkl API calls:** **Workers Cache API** caches eligible public catalog responses, while incremental per-account sync avoids needless full-library refreshes.
+- **Easy releases:** TypeScript/Bun, Wrangler, tests and GitHub Actions produce reproducible deployments.
+
+**Trade-offs:** these services create Cloudflare vendor lock-in and platform-specific limits. Cache API entries are local to each data center, not a globally consistent shared store. Usage can become billable at scale. This is an intentional trade-off against the ongoing cost and maintenance of running dedicated infrastructure.
 
 ## Setup
 - Create a Simkl OAuth app and grab `SIMKL_CLIENT_ID` and `SIMKL_CLIENT_SECRET` (redirect URI must match `.../oauth/callback`).
@@ -52,7 +86,7 @@ Add to `claude_desktop_config.json` (or equivalent):
   }
 }
 ```
-For local development, use `http://localhost:8787/mcp`; for a deployed Worker, replace the host with your Worker URL, such as `https://your-worker.workers.dev/mcp`. On first connect, you’ll be redirected to Simkl to approve access, then returned to `/oauth/callback`.
+For local development, use `http://localhost:8787/mcp`; for this public deployment, use `https://mcp-simkl.hugojava.dev/mcp`. For your own deployment, substitute your Worker hostname. On first connect, you’ll be redirected to Simkl to approve access, then returned to the configured OAuth callback.
 
 The `/sse` endpoint remains available for MCP clients that require the legacy SSE transport. Prefer `/mcp` for new connections.
 
@@ -60,11 +94,13 @@ The `/sse` endpoint remains available for MCP clients that require the legacy SS
 ```bash
 wrangler secret put SIMKL_CLIENT_ID
 wrangler secret put SIMKL_CLIENT_SECRET
-wrangler secret put OAUTH_REDIRECT_URI # e.g., https://your-worker.workers.dev/oauth/callback
+wrangler secret put OAUTH_REDIRECT_URI # must match your registered Simkl OAuth callback
 bun run deploy            # staging
 bun run deploy:production # optional
 ```
-Configure remote MCP clients to use `https://your-worker.workers.dev/mcp` with Streamable HTTP (Claude: Settings → Connectors → Add Server). Use `https://your-worker.workers.dev/sse` only for clients that still require the legacy SSE transport.
+Configure remote MCP clients to use `https://mcp-simkl.hugojava.dev/mcp` for this public deployment (Claude: Settings → Connectors → Add Server). For self-hosted deployments, substitute your own hostname. Use `/sse` only for clients that still require legacy SSE.
+
+The public domain is provisioned as a **Workers Custom Domain** and declared in `wrangler.toml`; Cloudflare manages its proxied DNS record and TLS certificate. **OAuth requires a matching Simkl-registered callback:** register `https://<your-host>/oauth/callback` in your Simkl app and set `OAUTH_REDIRECT_URI` accordingly for your own deployment. The public deployment's callback is stored as a Cloudflare secret. Its value and the callback authorized in the Simkl app must be verified before changing it; attaching a domain alone does not migrate OAuth credentials.
 
 ### GitHub Actions deployment
 
@@ -231,8 +267,9 @@ After changing registrations, run `bun run capabilities` and commit the updated
 `static/capabilities.json`. CI checks drift against both shared registration and
 the actual agent. The page and catalog revalidate on subsequent requests.
 
-For a custom domain, set the repository Actions variable `WORKER_URL` to the
-deployed Worker origin; otherwise CI uses the workers.dev URL from Wrangler.
+CI smoke-tests the public custom domain `https://mcp-simkl.hugojava.dev` by default.
+For forks or another deployment, set the repository Actions variable `WORKER_URL`
+to override the origin used by CI.
 The deployment workflow runs `bun run smoke:capabilities "$WORKER_URL"` after a
 successful deployment and compares its public catalog to the local build. The
 same command can be run against `http://localhost:8787` during `bun run dev`.
