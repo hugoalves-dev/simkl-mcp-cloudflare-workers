@@ -309,10 +309,14 @@ test('structured events distinguish TTL cache hits from unchanged upstream activ
     await s.cache.read('private-access-token', true);
     expect(requests()).toBe(1);
     const events = info.mock.calls.map(([line]) => JSON.parse(String(line)));
-    expect(events).toEqual([
+    expect(events.filter(event => event.component === 'simkl_library_cache')).toEqual([
       { component: 'simkl_library_cache', event: 'cache_hit' },
       { component: 'simkl_library_cache', event: 'activities_unchanged' },
     ]);
+    const sync = events.filter(event => event.component === 'simkl_library_sync');
+    expect(sync.some(event => event.event === 'activities_gate' && event.outcome === 'ttl_hit')).toBe(true);
+    expect(sync.some(event => event.event === 'snapshot_committed' && event.outcome === 'freshness_saved')).toBe(true);
+    expect(sync.filter(event => event.event === 'upstream_request' && event.operation === 'activities')).toHaveLength(2);
     expect(JSON.stringify(events)).not.toContain('private-access-token');
   } finally {
     info.mockRestore();

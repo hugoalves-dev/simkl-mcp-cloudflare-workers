@@ -1,5 +1,6 @@
 import { SimklApiError } from './client.js';
 import { SimklGenreInputError } from './trending.js';
+import { LibrarySyncLimitError } from '../library/errors.js';
 
 interface McpErrorResult {
   isError: true;
@@ -7,6 +8,9 @@ interface McpErrorResult {
 }
 
 export function toMcpErrorResult(error: unknown): McpErrorResult {
+  if (error instanceof LibrarySyncLimitError) {
+    return { isError: true, content: [{ type: 'text', text: `SIMKL_SYNC_PARTITION_EXHAUSTED: ${error.message}` }] };
+  }
   if (error instanceof SimklGenreInputError) {
     return { isError: true, content: [{ type: 'text', text: error.message }] };
   }

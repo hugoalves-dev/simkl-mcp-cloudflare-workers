@@ -1,4 +1,9 @@
-import type { SimklClient, RequestOptions } from '../api/client';
+import type { SimklClient } from '../api/client';
+import { fetchPartitionedLibrary } from './partitions';
+import {
+  createLibrarySyncRun, logLibrarySync, observeLibrarySyncRequest,
+  type LibrarySyncRun,
+} from './sync-telemetry';
 import { MEDIA_TYPES, type Activities, type LibraryItem, type LibraryItems, type LibrarySnapshot } from './types';
 import { fetchInitialLibrary } from './sync';
 import { normalizeSimklId } from './identity';
@@ -50,10 +55,6 @@ function validateActivities(value: unknown): Activities {
   }
   return data;
 }
-async function fetchItems(client: SimklClient, endpoint: string, options: RequestOptions): Promise<LibraryItems> {
-  const response = await client.request<unknown>(endpoint, { ...options, responseProfile: 'library' });
-  return validateItems(response);
-}
 function merge(items: LibraryItems, updates: LibraryItems): void {
   for (const type of MEDIA_TYPES) {
     const map = new Map(items[type].map(item => [libraryItemId(item), item]));
@@ -69,15 +70,28 @@ function merge(items: LibraryItems, updates: LibraryItems): void {
     items[type] = [...map.values()];
   }
 }
-export async function refreshLibrary(client: SimklClient, token: string, previous: LibrarySnapshot | undefined, options: { ttlSeconds: number; now: number; force?: boolean }): Promise<LibrarySnapshot> {
+export async function refreshLibrary(client: SimklClient, token: string, previous: LibrarySnapshot | undefined, options: { ttlSeconds: number; now: number; force?: boolean; telemetry?: LibrarySyncRun }): Promise<LibrarySnapshot> {
+  const telemetry = options.telemetry ?? createLibrarySyncRun();
   if (previous && previous.version !== 1) throw new Error('Unsupported library cache schema');
-  if (previous && !previous.forceCheck && !options.force && options.now >= previous.checkedAt && options.now - previous.checkedAt < options.ttlSeconds * 1000) return previous;
-  const activities = validateActivities(await client.request('/sync/activities', { method: 'GET', token }));
+  if (previous && !previous.forceCheck && !options.force && options.now >= previous.checkedAt && options.now - previous.checkedAt < options.ttlSeconds * 1000) {
+    logLibrarySync(telemetry, 'activities_gate', { phase: 'incremental', outcome: 'ttl_hit', requests: 0 });
+    return previous;
+  }
+  const activities = validateActivities(await observeLibrarySyncRequest(
+    telemetry, { phase: previous ? 'incremental' : 'initial', operation: 'activities', queryMode: 'none' },
+    () => client.request('/sync/activities', { method: 'GET', token }),
+  ));
   if (previous && activities.all !== null && previous.activities.all !== null && Date.parse(activities.all) < Date.parse(previous.activities.all)) throw new Error('Simkl activity watermark regressed');
+  const phase = !previous || previous.activities.all === null ? 'initial' : 'incremental';
+  logLibrarySync(telemetry, 'activities_gate', {
+    phase, outcome: phase === 'initial' ? 'baseline_required'
+      : activities.all === previous!.activities.all ? 'watermark_unchanged' : 'watermark_changed',
+    requests: telemetry.requests,
+  });
   const items = previous && previous.activities.all !== null && activities.all !== null ? structuredClone(previous.items) : empty();
   // A null watermark has no date_from baseline; the first activity needs Phase 1.
   if (!previous || previous.activities.all === null) {
-    const initial = await fetchInitialLibrary(client, token, activities);
+    const initial = await fetchInitialLibrary(client, token, activities, telemetry);
     for (const row of initial.items) items[row.mediaType].push(JSON.parse(row.itemJson));
   } else if (activities.all !== null && activities.all !== previous.activities.all) {
     const changed = (fields: string[]) => (['tv_shows', 'movies', 'anime'] as const).some(category => fields.some(field => {
@@ -86,17 +100,32 @@ export async function refreshLibrary(client: SimklClient, token: string, previou
       return next !== undefined && next !== previous.activities[category]?.[field];
     }));
     const query = { date_from: previous.activities.all };
-    if (changed(statuses)) merge(items, await fetchItems(client, '/sync/all-items', { method: 'GET', token, query }));
+    const routes = {
+      delta: changed(statuses),
+      ratings: changed(['rated_at']),
+      membership: changed(['removed_from_list']),
+    };
+    for (const operation of ['delta', 'ratings', 'membership'] as const) {
+      logLibrarySync(telemetry, 'route', {
+        phase: 'incremental', operation, outcome: routes[operation] ? 'required' : 'skipped',
+      });
+    }
+    if (routes.delta) merge(items, await fetchPartitionedLibrary(client, token, 'delta', query, validateItems, telemetry));
     // Official synchronization guide documents GET /sync/ratings for reads;
     // POST /sync/ratings is the add-rating mutation, despite the blueprint typo.
-    if (changed(['rated_at'])) merge(items, await fetchItems(client, '/sync/ratings', { method: 'GET', token, query }));
-    if (changed(['removed_from_list'])) {
-      const membership = await fetchItems(client, '/sync/all-items', { method: 'GET', token, query: { extended: 'simkl_ids_only' } });
+    if (routes.ratings) merge(items, await fetchPartitionedLibrary(client, token, 'ratings', query, validateItems, telemetry));
+    if (routes.membership) {
+      const membership = await fetchPartitionedLibrary(client, token, 'membership', { extended: 'simkl_ids_only' }, validateItems, telemetry);
       for (const type of MEDIA_TYPES) {
         const ids = new Set(membership[type].map(libraryItemId));
         items[type] = items[type].filter(item => ids.has(libraryItemId(item)));
       }
     }
   }
+  // fetchInitialLibrary already emits readiness for Phase 1 using the same syncId.
+  if (phase === 'incremental') logLibrarySync(telemetry, 'snapshot_ready', {
+    phase, outcome: 'ready', rows: MEDIA_TYPES.reduce((sum, type) => sum + items[type].length, 0),
+    requests: telemetry.requests,
+  });
   return { version: 1, items, activities, checkedAt: options.now, forceCheck: false };
 }

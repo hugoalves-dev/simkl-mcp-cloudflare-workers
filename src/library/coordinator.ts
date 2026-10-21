@@ -1,7 +1,8 @@
 import { SimklApiError, type RequestOptions, type SimklClient } from '../api/client';
 import type { LibraryItems, LibrarySnapshot } from './types';
 import { refreshLibrary } from './refresh';
-import { LibraryWriteInvalidationError } from './errors';
+import { LibrarySyncLimitError, LibraryWriteInvalidationError } from './errors';
+import { createLibrarySyncRun, logLibrarySync } from './sync-telemetry';
 
 /** Cloudflare attaches $metadata.traceId to this console event in Workers Logs. */
 function logCacheEvent(event: 'cache_hit' | 'activities_unchanged'): void {
@@ -28,10 +29,13 @@ export class CachedLibrary {
   }
   read(token: string, force = false): Promise<LibraryItems> {
     return this.enqueue(async () => {
+      const telemetry = createLibrarySyncRun();
+      let syncPhase: 'initial' | 'incremental' = 'incremental';
       let retryPending = this.retryRequired;
       try {
         if (!token) throw new Error('Simkl authentication required');
         let previous = await this.store.load();
+        syncPhase = !previous || previous.activities?.all === null ? 'initial' : 'incremental';
         retryPending ||= previous?.forceCheck === true;
         const forceRefresh = force || this.retryRequired;
         // Persist retry/invalidation intent, never a manual force request:
@@ -42,7 +46,9 @@ export class CachedLibrary {
           if (this.store.saveFreshness) await this.store.saveFreshness(previous);
           else await this.store.save(previous);
         }
-        const snapshot = await refreshLibrary(this.client, token, previous, { ttlSeconds: this.ttlSeconds, now: this.now(), force: forceRefresh });
+        const snapshot = await refreshLibrary(this.client, token, previous, {
+          ttlSeconds: this.ttlSeconds, now: this.now(), force: forceRefresh, telemetry,
+        });
         if (snapshot === previous) {
           // The TTL shortcut served the persisted snapshot without an upstream check.
           if (previous) logCacheEvent('cache_hit');
@@ -55,11 +61,24 @@ export class CachedLibrary {
             await this.store.save(snapshot);
           }
           // Only log after persistence succeeds; never report a failed refresh as successful.
+          logLibrarySync(telemetry, 'snapshot_committed', {
+            phase: !previous || previous.activities.all === null ? 'initial' : 'incremental',
+            outcome: activitiesUnchanged ? 'freshness_saved' : 'saved',
+            rows: Object.values(snapshot.items).reduce((sum, rows) => sum + rows.length, 0),
+            requests: telemetry.requests,
+          });
           if (activitiesUnchanged) logCacheEvent('activities_unchanged');
         }
         this.retryRequired = false;
         return snapshot.items;
       } catch (error) {
+        logLibrarySync(telemetry, 'sync_failed', {
+          phase: syncPhase,
+          outcome: 'previous_snapshot_preserved',
+          reason: error instanceof LibrarySyncLimitError ? 'partition_exhausted'
+            : error instanceof SimklApiError && error.upstreamCode === 'max_items' ? 'max_items' : 'upstream_or_validation',
+          requests: telemetry.requests,
+        });
         // Failed manual checks must not turn into unbounded forced retries.
         // A pending mutation or failed ordinary read still requires retry.
         if (!force || retryPending) this.retryRequired = true;

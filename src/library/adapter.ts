@@ -4,7 +4,7 @@ type SimklAuthProps = { simklToken: string; simklUserId?: string };
 import type { SimklLibraryCache } from './cache';
 import type { LibraryItems } from './types';
 import type { RewatchRow } from './rewatches.js';
-import { LibraryWriteInvalidationError } from './errors';
+import { LibrarySyncLimitError, LibraryWriteInvalidationError } from './errors';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
   refresh(): Promise<{ status: 'refreshed' | 'suppressed'; retryAfterSeconds?: number }>;
@@ -17,9 +17,19 @@ export interface LibraryAdapter {
 }
 export const verifiedAccountId = normalizeSimklId;
 function restoreRpcError(error: unknown): unknown {
-  if (error instanceof SimklApiError) return error;
+  if (error instanceof SimklApiError || error instanceof LibrarySyncLimitError) return error;
   if (!error || typeof error !== 'object') return error;
   const remote = error as Record<string, unknown>;
+  if (remote.name === 'LibrarySyncLimitError'
+    && (remote.phase === 'initial' || remote.phase === 'incremental')
+    && ['baseline', 'delta', 'ratings', 'membership'].includes(String(remote.operation))
+    && ['shows', 'movies', 'anime'].includes(String(remote.media))
+    && (remote.status === undefined || ['watching', 'plantowatch', 'hold', 'completed', 'dropped'].includes(String(remote.status)))) {
+    return new LibrarySyncLimitError(
+      remote.phase, remote.operation as 'baseline' | 'delta' | 'ratings' | 'membership',
+      remote.media as 'shows' | 'movies' | 'anime', remote.status as string | undefined,
+    );
+  }
   const status = remote.statusCode;
   if (remote.name !== 'SimklApiError' || typeof status !== 'number' || !Number.isInteger(status)
     || !(status === 0 || (status >= 100 && status <= 599))) return error;
