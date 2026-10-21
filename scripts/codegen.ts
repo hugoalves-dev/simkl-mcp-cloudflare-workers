@@ -360,6 +360,9 @@ for (const config of toolsWhitelist) {
   // Local tool guidance overrides upstream parameter prose without modifying the OpenAPI source.
   let params = (operation.parameters || []).map(resolveLocalReference).map((param: any) => ({
     ...param,
+    ...(config.parameterEnums?.[param.name] !== undefined
+      ? { schema: { ...param.schema, enum: config.parameterEnums[param.name] } }
+      : {}),
     ...(config.parameterDescriptions?.[param.name] !== undefined
       ? { description: config.parameterDescriptions[param.name] }
       : {}),
