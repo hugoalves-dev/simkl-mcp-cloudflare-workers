@@ -69,8 +69,8 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_search_by_text',
-      { description: 'Search by text query', inputSchema: {
-      type: z.enum(['tv', 'anime', 'movie']).describe('Search type.'),
+      { description: 'Search Simkl by title. Prefer tv for TV shows, anime for anime, or movie for movies whenever the media type is known or reliably inferred. Use all only when the correct type cannot be determined; it is not the default. One all request suffices instead of three separate searches. Mixed results carry their own endpoint_type. Do not search before scrobble or write operations when usable IDs are already available.', inputSchema: {
+      type: z.enum(['tv', 'anime', 'movie', 'all']).describe('Prefer tv for TV, anime for anime, or movie for movies when known or inferred. Use all only as the unknown-type fallback; never as a convenience default.'),
       q: z.string().optional().describe('Required. The search term — matches `title` and `all_titles[]` across the chosen catalog (movies / TV / anime).  Examples: `john wick`, `john wick 2014`, `breaking bad`, `cowboy bebop`.'),
       page: z.number().optional().describe('Page number for paginated endpoints (1-based).'),
       limit: z.number().optional().describe('Items per page. Capped at 50.'),
