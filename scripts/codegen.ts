@@ -397,7 +397,7 @@ for (const config of toolsWhitelist) {
 
   // build config object
   const configParts = [
-    `description: '${cleanDesc.replace(/'/g, "\\'")}'`,
+    `description: '${cleanDesc.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`,
     `inputSchema: ${schema}`,
   ];
   if (annotations) {
