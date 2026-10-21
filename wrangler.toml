@@ -2,6 +2,9 @@ name = "simkl-mcp"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+# Preserve existing workers.dev MCP clients and PR preview URLs.
+workers_dev = true
+preview_urls = true
 
 # Canonical public endpoint for the independent Simkl MCP deployment.
 [[routes]]
