@@ -1,4 +1,5 @@
 import { routes } from './http-routes';
+import { withoutIdleMcpListener } from './mcp-listener';
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import type { TokenExchangeCallbackOptions, TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
 import { SimklMCP } from './mcp-agent.js';
@@ -81,7 +82,7 @@ export function createOAuthProvider(env: Env): OAuthProvider {
   return new OAuthProvider({
     apiHandlers: {
       [routes.sse]: SimklMCP.serveSSE(routes.sse),
-      [routes.mcp]: SimklMCP.serve(routes.mcp),
+      [routes.mcp]: withoutIdleMcpListener(SimklMCP.serve(routes.mcp)),
     },
 
     defaultHandler: authHandler as unknown as ExportedHandler,
