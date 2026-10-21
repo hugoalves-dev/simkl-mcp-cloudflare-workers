@@ -99,7 +99,7 @@
     },
     {
       "name": "simkl_search_by_text",
-      "description": "Search by text query",
+      "description": "Search Simkl by title. Prefer tv for TV shows, anime for anime, or movie for movies whenever the media type is known or reliably inferred. Use all only when the correct type cannot be determined; it is not the default. One all request suffices instead of three separate searches. Mixed results carry their own endpoint_type. Do not search before scrobble or write operations when usable IDs are already available.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -108,9 +108,10 @@
             "enum": [
               "tv",
               "anime",
-              "movie"
+              "movie",
+              "all"
             ],
-            "description": "Search type."
+            "description": "Prefer tv for TV, anime for anime, or movie for movies when known or inferred. Use all only as the unknown-type fallback; never as a convenience default."
           },
           "q": {
             "description": "Required. The search term — matches `title` and `all_titles[]` across the chosen catalog (movies / TV / anime).  Examples: `john wick`, `john wick 2014`, `breaking bad`, `cowboy bebop`.",

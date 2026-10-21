@@ -17,6 +17,7 @@ interface ToolConfig {
   omitFromGenerated?: boolean;
   description?: string;
   parameterDescriptions?: Record<string, string>;
+  parameterEnums?: Record<string, string[]>;
   extraQueryParams?: string[];
   batchArrayFields?: string[];
   legacyEpisodeAlias?: boolean;
@@ -48,12 +49,21 @@ export const toolsWhitelist: ToolConfig[] = [
     },
   },
   // search
-  { path: '/search/:type', method: 'get', responseFormat: {
+  {
+    path: '/search/:type',
+    method: 'get',
+    description: 'Search Simkl by title. Prefer tv for TV shows, anime for anime, or movie for movies whenever the media type is known or reliably inferred. Use all only when the correct type cannot be determined; it is not the default. One all request suffices instead of three separate searches. Mixed results carry their own endpoint_type. Do not search before scrobble or write operations when usable IDs are already available.',
+    parameterEnums: { type: ['tv', 'anime', 'movie', 'all'] },
+    parameterDescriptions: {
+      type: 'Prefer tv for TV, anime for anime, or movie for movies when known or inferred. Use all only as the unknown-type fallback; never as a convenience default.',
+    },
+    responseFormat: {
     type: 'simple',
     template: (results: any, args: any) => results.length > 0
       ? formatList(results, withImdb, 10, args.type)
       : [`no results for "${args.q}"`]
-  }},
+    },
+  },
   {
     path: '/search/id',
     method: 'get',
