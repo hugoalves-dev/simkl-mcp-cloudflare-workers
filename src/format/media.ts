@@ -3,6 +3,7 @@
 export interface MediaItem {
   title?: string;
   year?: number;
+  endpoint_type?: string;
   date?: string;
   ids?: { simkl_id?: number; simkl?: number; imdb?: string; slug?: string };
   ratings?: { simkl?: { rating?: number } };
@@ -56,9 +57,19 @@ export function formatList(
   items: MediaItem[],
   format: ItemFormatter = formatItem,
   limit = DEFAULT_LIMIT,
-  type?: SimklMediaType,
+  type?: SimklMediaType | 'movie' | 'all',
 ): string[] {
-  return items.slice(0, limit).map((item, index) => format(item, index, type));
+  return items.slice(0, limit).map((item, index) => {
+    if (type === 'all') {
+      // /search/all mixes media types. Never guess a URL from the request type.
+      const actualType = item.endpoint_type;
+      if (actualType !== 'movies' && actualType !== 'tv' && actualType !== 'anime') {
+        throw new Error('Invalid Simkl search endpoint_type');
+      }
+      return `${format(item, index, actualType)} - type: ${actualType}`;
+    }
+    return format(item, index, type === 'movie' ? 'movies' : type);
+  });
 }
 
 function simklId(item: MediaItem) {
