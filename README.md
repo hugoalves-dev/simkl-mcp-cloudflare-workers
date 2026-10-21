@@ -7,11 +7,11 @@ Support for this independent project is entirely optional.
 An independently maintained [Model Context Protocol (MCP)](https://modelcontextprotocol.io/docs/getting-started/intro) server for [Simkl](https://simkl.com), built with **TypeScript, Bun, and Cloudflare Workers**. Search, discover, and track movies, TV shows, and anime from MCP-compatible clients.
 
 > [!IMPORTANT]
-> **Independent community project.** Originally based on [srevinsaju/simkl-mcp](https://github.com/srevinsaju/simkl-mcp), this repository is now maintained separately by [@vitorhugo-dotnet](https://github.com/vitorhugo-dotnet). It follows its own technical direction, releases, and roadmap, and is **not an upstream mirror**. It is not officially affiliated with or endorsed by Simkl or the original project's maintainer.
+> **Unofficial, independent community project.** This MCP server is developed, hosted, and maintained by [@vitorhugo-dotnet](https://github.com/vitorhugo-dotnet), **not by Simkl**. There is **no official affiliation, partnership, sponsorship, endorsement, or support from Simkl**. Originally based on [srevinsaju/simkl-mcp](https://github.com/srevinsaju/simkl-mcp), this repository is maintained separately, with its own technical direction, releases, and roadmap. It is **not an upstream mirror** or an official continuation of the original project, and is not endorsed by its original maintainer.
 
 ## Public MCP server
 
-**Official endpoint for this independently maintained community deployment:**
+**Public endpoint operated by this project's independent maintainer (not Simkl):**
 
 - **Streamable HTTP (recommended):** https://mcp-simkl.hugojava.dev/mcp
 - **Legacy SSE:** https://mcp-simkl.hugojava.dev/sse
@@ -109,6 +109,13 @@ Install → Codegen → Typecheck → Test → Deploy. Generated bindings are up
 and downloaded by the later jobs. Tests include the Worker RPC/persistence fixture.
 Pull requests run validation; successful pushes to `main` deploy the `simkl-mcp`
 Worker from `wrangler.toml`. A manual run on `main` can retry deployment.
+
+Both the `CI and Deploy` and `Code generation` workflows skip push/PR events
+when **all changed files are documentation-only**: Markdown (`**/*.md`),
+`docs/**`, `.simkl-doc-watch/**`, `.github/ISSUE_TEMPLATE/**`, or `LICENSE`.
+Source code, runtime/configuration files, workflow YAML, and mixed changes still
+trigger the workflows. Manual deployment and the scheduled Simkl API documentation
+watch remain available.
 
 Set the repository Actions secrets `CLOUDFLARE_API_TOKEN` (with permission to deploy
 this Worker and its configured bindings) and `CLOUDFLARE_ACCOUNT_ID`. Existing
