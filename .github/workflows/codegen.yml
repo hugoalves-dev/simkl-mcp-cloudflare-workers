@@ -2,8 +2,20 @@ name: Code generation
 
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.simkl-doc-watch/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'LICENSE'
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.simkl-doc-watch/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'LICENSE'
 
 permissions:
   contents: read
