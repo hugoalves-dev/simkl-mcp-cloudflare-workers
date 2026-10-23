@@ -149,7 +149,7 @@
         }
       },
       "AllowRewatchQuery": {
-        "description": "Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry per saved rewatch session alongside the item's normal entry. Available to Simkl **PRO** and **VIP** users — non-PRO callers see no effect even with the flag set.\n\n⚠️ **Do not enable this flag until you've read the [Rewatches guide](/guides/rewatches) end-to-end and implemented the precautions.** Used carelessly (on retries, on every scrobble event, on importer re-runs, without pinning `rewatch_id` after the first write), it will pollute the user's history stats and rewatches panel with phantom sessions. The flag should be gated behind explicit user intent — a dedicated \"Rewatch\" button — never on background or automated flows. Also expose a per-user *Track rewatches* toggle in your app's settings (default off) — not every user wants the rewatch-session complexity.\n\nLimits: up to **50 rewatches per item** (movie, show, or anime), and any two watch events on the **same item** (movie or episode) must be at least **2 days apart** — a new rewatch within 48 hours of the previous watch of that same item collapses into the same session (it's a rewatch, not a rewind 😄). Full walkthrough — session lifecycle (`active` / `completed` / `closed` with bidirectional transitions), episode-level tracking, reading sessions back from `GET /sync/all-items`, and ready-made code for simkl.com-style UI patterns — in the [Rewatches guide](/guides/rewatches).",
+        "description": "Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry per saved rewatch session alongside the item's normal entry. Available to Simkl **PRO** and **VIP** users — non-PRO callers see no effect even with the flag set.\n\n⚠️ **Do not enable this flag until you've read the [Rewatches guide](/guides/rewatches) end-to-end and implemented the precautions.** Used carelessly (on retries, on every scrobble event, on importer re-runs, without pinning `rewatch_id` after the first write), it will pollute the user's history stats and rewatches panel with phantom sessions. The flag should be gated behind explicit user intent — a dedicated \"Rewatch\" button — never on background or automated flows. Also expose a per-user *Track rewatches* toggle in your app's settings (default off) — not every user wants the rewatch-session complexity.\n\nLimits: up to **50 rewatches per item** (movie, show, or anime), and any two watch events on the **same item** (movie or episode) must be at least **2 days apart** — a rewatch dated within 48 hours of the previous watch of that same item is ignored (it's a rewatch, not a rewind 😄). Full walkthrough — session lifecycle (`active` / `completed` / `closed` with bidirectional transitions), episode-level tracking, reading sessions back from `GET /sync/all-items`, and ready-made code for simkl.com-style UI patterns — in the [Rewatches guide](/guides/rewatches).",
         "example": "yes",
         "in": "query",
         "name": "allow_rewatch",
@@ -4540,6 +4540,60 @@
         },
         "type": "object"
       },
+      "HistoryRemoveRequest": {
+        "description": "Body for `/sync/history/remove` — the same shape as [`/sync/history`](/api-reference/simkl/add-to-history), plus an optional `rewatch_id` on an item to remove from that rewatch session only. Items go under `movies[]`, `shows[]` or `anime[]`.",
+        "properties": {
+          "anime": {
+            "description": "Array of anime entries (same shape as `shows[]`).",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRemoveRewatchTarget"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "episodes": {
+            "description": "Top-level convenience array for marking episode-level history without nesting. The server wraps each entry into a synthetic single-season show. Each item carries the same shape as items under `shows[].seasons[].episodes[]` plus the parent `show` reference.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "movies": {
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Movie"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRemoveRewatchTarget"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "shows": {
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRemoveRewatchTarget"
+                }
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "HistoryRemoveResponse": {
         "description": "Counts of items removed plus any IDs Simkl could not match.",
         "properties": {
@@ -4555,6 +4609,16 @@
                 "example": 1,
                 "type": "integer"
               },
+              "rewatch_episodes": {
+                "description": "Number of episodes removed from rewatch sessions (items sent with a `rewatch_id` and `seasons`).",
+                "example": 0,
+                "type": "integer"
+              },
+              "rewatches": {
+                "description": "Number of [rewatch sessions](/guides/rewatches) deleted — items sent with a `rewatch_id` and no `seasons`, or whose session was left with no episodes.",
+                "example": 0,
+                "type": "integer"
+              },
               "shows": {
                 "description": "Number of shows removed from the user's library entirely (only counts items where you sent the show without `seasons`/`episodes`).",
                 "example": 0,
@@ -4564,13 +4628,22 @@
             "required": [
               "movies",
               "shows",
-              "episodes"
+              "episodes",
+              "rewatches",
+              "rewatch_episodes"
             ],
             "type": "object"
           },
           "not_found": {
-            "description": "Per-type lists of input items Simkl could not match. **There is no `not_found.episodes` array** — even when you targeted specific episodes, only the parent movie/show object lands here if the lookup failed.",
+            "description": "Per-type lists of input items Simkl could not match. `episodes` holds shows Simkl did match, each with only the episode numbers that don't exist.",
             "properties": {
+              "episodes": {
+                "description": "A matched show per entry, with only the requested episodes that don't exist in `seasons`.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "movies": {
                 "description": "Input movie objects Simkl could not match.",
                 "items": {
@@ -4588,7 +4661,8 @@
             },
             "required": [
               "movies",
-              "shows"
+              "shows",
+              "episodes"
             ],
             "type": "object"
           }
@@ -4599,13 +4673,30 @@
         ],
         "type": "object"
       },
+      "HistoryRemoveRewatchTarget": {
+        "properties": {
+          "rewatch_id": {
+            "description": "Remove from this [rewatch session](/guides/rewatches) only — the original watch stays. Without `seasons` the whole session is deleted; with `seasons` only those episodes. Simkl PRO / VIP. Take it from a `GET /sync/all-items?allow_rewatch=yes` row with `is_rewatch: true`, or from the write that created the session.",
+            "example": 655240,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "HistoryRequest": {
-        "description": "Body for `/sync/history` and `/sync/history/remove`. Items go under `movies[]`, `shows[]`, or `anime[]` — Simkl resolves anime titles correctly under either `shows[]` or `anime[]`, so match the field to your data type when known.",
+        "description": "Body for `/sync/history`. Items go under `movies[]`, `shows[]`, or `anime[]` — Simkl resolves anime titles correctly under either `shows[]` or `anime[]`, so match the field to your data type when known. Each item can also carry the rewatch fields `is_rewatch`, `rewatch_id` and `rewatch_status`.",
         "properties": {
           "anime": {
             "description": "Array of anime entries (same shape as `shows[]`).",
             "items": {
-              "$ref": "#/components/schemas/Show"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRewatchFields"
+                }
+              ]
             },
             "type": "array"
           },
@@ -4619,15 +4710,52 @@
           },
           "movies": {
             "items": {
-              "$ref": "#/components/schemas/Movie"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Movie"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRewatchFields"
+                }
+              ]
             },
             "type": "array"
           },
           "shows": {
             "items": {
-              "$ref": "#/components/schemas/Show"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRewatchFields"
+                }
+              ]
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HistoryRewatchFields": {
+        "properties": {
+          "is_rewatch": {
+            "description": "`true` logs this item as a rewatch even when the server wouldn't detect one; `false` never logs a rewatch. Needs `?allow_rewatch=yes` and a PRO / VIP account. See [Rewatches](/guides/rewatches).",
+            "type": "boolean"
+          },
+          "rewatch_id": {
+            "description": "Add to this rewatch session — from `added.statuses[].response.rewatch_id` of an earlier write, or a `GET /sync/all-items?allow_rewatch=yes` row. Must belong to this user and title.",
+            "example": 655494,
+            "type": "integer"
+          },
+          "rewatch_status": {
+            "description": "Set the session's state. `completed` is honoured for movies only; on a show it is stored as `closed` — a show session becomes `completed` only by covering every aired episode.",
+            "enum": [
+              "active",
+              "closed",
+              "completed"
+            ],
+            "type": "string"
           }
         },
         "type": "object"
@@ -7175,6 +7303,19 @@
                   "null"
                 ]
               },
+              "rewatch_id": {
+                "description": "`POST /sync/history` with `?allow_rewatch=yes` only: the rewatch session this write landed in. Send it on later writes to keep adding to the same session.",
+                "type": "integer"
+              },
+              "rewatch_status": {
+                "description": "`POST /sync/history` with `?allow_rewatch=yes` only: the state of the session in `rewatch_id` after this write. See [Rewatches guide → Session states](/guides/rewatches#session-states).",
+                "enum": [
+                  "active",
+                  "completed",
+                  "closed"
+                ],
+                "type": "string"
+              },
               "simkl_type": {
                 "enum": [
                   "movie",
@@ -7184,32 +7325,33 @@
                 "type": "string"
               },
               "status": {
-                "description": "Resulting list status.",
-                "enum": [
-                  "watching",
-                  "plantowatch",
-                  "hold",
-                  "dropped",
-                  "completed",
-                  "removed"
-                ],
-                "type": "string"
+                "description": "Resulting list status. On `POST /sync/history` rewatch writes for shows and anime it currently comes back as the numeric code instead — `1` watching, `2` plantowatch, `3` completed, `4` dropped, `5` hold.",
+                "oneOf": [
+                  {
+                    "enum": [
+                      "watching",
+                      "plantowatch",
+                      "hold",
+                      "dropped",
+                      "completed",
+                      "removed"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ],
+                    "type": "integer"
+                  }
+                ]
               }
             },
             "type": "object"
-          },
-          "rewatch_id": {
-            "description": "Present when a rewatch session was created or resumed by this call. Use this value on subsequent writes to update the same session.",
-            "type": "integer"
-          },
-          "rewatch_status": {
-            "description": "Lifecycle state of the rewatch session referenced by `rewatch_id`. Writable values: `active`, `closed`, and (movies only) `completed`. For TV / anime, `completed` is silently clamped to `closed` — only coverage of every aired regular episode (specials in season 0 don't count) promotes a show session to `completed`. A `closed` write against a coverage-earned `completed` session is a no-op. Resuming a finished session without `rewatch_id` requires a `last_watched_at` / `watched_at` that pinpoints the target row; bare `is_rewatch: true` (no `rewatch_status`) always targets the singleton `active` session. See [Rewatches guide → Session states](/guides/rewatches#session-states).",
-            "enum": [
-              "active",
-              "completed",
-              "closed"
-            ],
-            "type": "string"
           }
         },
         "type": "object"
@@ -18244,7 +18386,7 @@
             }
           },
           {
-            "description": "Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry per saved rewatch session alongside the item's normal entry. Available to Simkl **PRO** and **VIP** users — non-PRO callers see no effect even with the flag set.\n\n⚠️ **Do not enable this flag until you've read the [Rewatches guide](/guides/rewatches) end-to-end and implemented the precautions.** Used carelessly (on retries, on every scrobble event, on importer re-runs, without pinning `rewatch_id` after the first write), it will pollute the user's history stats and rewatches panel with phantom sessions. The flag should be gated behind explicit user intent — a dedicated \"Rewatch\" button — never on background or automated flows. Also expose a per-user *Track rewatches* toggle in your app's settings (default off) — not every user wants the rewatch-session complexity.\n\nLimits: up to **50 rewatches per item** (movie, show, or anime), and any two watch events on the **same item** (movie or episode) must be at least **2 days apart** — a new rewatch within 48 hours of the previous watch of that same item collapses into the same session (it's a rewatch, not a rewind 😄). Full walkthrough — session lifecycle (`active` / `completed` / `closed` with bidirectional transitions), episode-level tracking, reading sessions back from `GET /sync/all-items`, and ready-made code for simkl.com-style UI patterns — in the [Rewatches guide](/guides/rewatches).",
+            "description": "Opt into rewatch tracking. When `yes`, `POST /sync/history` records an additional rewatch session instead of being a no-op for already-watched items, and `GET /sync/all-items` returns one extra entry per saved rewatch session alongside the item's normal entry. Available to Simkl **PRO** and **VIP** users — non-PRO callers see no effect even with the flag set.\n\n⚠️ **Do not enable this flag until you've read the [Rewatches guide](/guides/rewatches) end-to-end and implemented the precautions.** Used carelessly (on retries, on every scrobble event, on importer re-runs, without pinning `rewatch_id` after the first write), it will pollute the user's history stats and rewatches panel with phantom sessions. The flag should be gated behind explicit user intent — a dedicated \"Rewatch\" button — never on background or automated flows. Also expose a per-user *Track rewatches* toggle in your app's settings (default off) — not every user wants the rewatch-session complexity.\n\nLimits: up to **50 rewatches per item** (movie, show, or anime), and any two watch events on the **same item** (movie or episode) must be at least **2 days apart** — a rewatch dated within 48 hours of the previous watch of that same item is ignored (it's a rewatch, not a rewind 😄). Full walkthrough — session lifecycle (`active` / `completed` / `closed` with bidirectional transitions), episode-level tracking, reading sessions back from `GET /sync/all-items`, and ready-made code for simkl.com-style UI patterns — in the [Rewatches guide](/guides/rewatches).",
             "examples": {
               "all_modifiers_inspection_only": {
                 "summary": "INSPECTION ONLY — every modifier on at once. NOT a production default — payload size + PRO-only fields. Use it to see every possible response field in one place.",
@@ -19713,7 +19855,7 @@
     },
     "/sync/history": {
       "post": {
-        "description": "Record watch events. The unit is the **watch event** — adding \"I watched The Walking Dead S01E01 at 8pm\" — not list membership (use [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) for that, or set `status` per-item here to do both at once).\n\n<Tip>\n**You don't need a Simkl ID.** Same as `/sync/add-to-list` — the server resolves any combination of identifiers (`imdb`, `tmdb`, `tvdb`, `mal`, `anidb`, `anilist`, `kitsu`) plus `title` + `year`. See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys) for the full list, and the [/sync/add-to-list ID-resolution table](/api-reference/simkl/add-to-list) for per-slot semantics.\n</Tip>\n\n#### Granularity — when does the server expand \"implicit all\"?\n\nThe body shape determines whether you mark a single episode, a season, or a whole show.\n\n**One movie** — single movie completion.\n\n```json\n{ \"movies\": [{ \"ids\": {...} }] }\n```\n\n**Whole show** — every episode marked. *\"I finished this whole series.\"* Send `status: \"completed\"` with no `seasons` / `episodes`.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"status\": \"completed\" }] }\n```\n\n**Whole season** — every episode of one season. *\"I finished season 2.\"* Send `seasons[]` without an inner `episodes`.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"seasons\": [{ \"number\": 2 }] }] }\n```\n\n**Specific episodes only** — per-event scrobbling, manual tick-off.\n\n```json\n{\n \"shows\": [{\n \"ids\": {...},\n \"seasons\": [{\n \"number\": 1,\n \"episodes\": [{ \"number\": 1 }, { \"number\": 2 }]\n }]\n }]\n}\n```\n\n**Top-level `episodes[]` shorthand** — auto-wraps to `seasons: [{ number: 1,... }]`. Useful for anime sequential numbering and single-season shows.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"episodes\": [{ \"number\": 1 }] }] }\n```\n\nThe response always reports the actual count of episodes affected in `added.episodes`, so apps can verify the server expanded correctly.\n\n#### Memo-only updates (and \"add to watchlist + memo\" in one call)\n\nThis endpoint is the **only way to set a memo on an item.** [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) accepts the `memo` field in the request body and echoes it back in the response, but **does not persist it** — silently discarded.\n\nTo set or update a memo without recording a watch event, send `ids` + `status` + `memo`:\n\n```json\n{\n \"movies\": [{\n \"ids\": { \"simkl\": 53536 },\n \"status\": \"plantowatch\",\n \"memo\": { \"text\": \"Remind me why I added this\", \"is_private\": true }\n }]\n}\n```\n\nTwo behaviors worth knowing:\n\n- **Memos attach to watchlist items only.** The item has to be in one of the five statuses (`watching` / `plantowatch` / `hold` / `dropped` / `completed`) for the memo to stick. Sending `status` makes this explicit.\n- **The endpoint auto-adds items.** If the item isn't on the user's watchlist yet, this same call creates the watchlist row at the specified `status` AND saves the memo in one shot. `added.movies` / `added.shows` reports the count of newly-added items (`0` when the item was already there and you only changed memo/status).\n\nTo read memos back, call `GET /sync/all-items?memos=yes` — see the [Sync guide](/guides/sync).\n\n#### Per-item options\n\n| Field | Type | Notes |\n|---|---|---|\n| `watched_at` | ISO-8601 string | Pin the watch event to a specific time. Defaults to request time. |\n| `added_at` | ISO-8601 string | Override when the item was added to the watchlist (rarely used outside backups). |\n| `status` | string | Set the watchlist status (`watching`/`plantowatch`/`hold`/`completed`/`dropped`) in the same call. Combine with `rating` to do \"watched + rate + status\" in one request. |\n| `rating` | int 1-10 | Rate the item alongside the watch event. Same effect as a separate `POST /sync/ratings` call. |\n| `memo` | `{ \"text\": string, \"is_private\": bool }` | User memo, max 140 chars. `is_private: false` shows the memo on the user's public profile + activity feed; `true` keeps it self-only. Read-back requires `/sync/all-items?memos=yes`. |\n| `is_rewatch` | bool | Force the rewatch path on this item even if the server can't auto-detect (used by backup/restore tools). Requires `?allow_rewatch=yes` query param to take effect. |\n| `use_tvdb_anime_seasons` | bool *(anime-only, optional)* | Default `false` (AniDB sequential — flat single-season). Set `true` to interpret `season`/`number` as TVDB per-season numbering. **Only needed when your source uses TVDB-style numbering AND the title is multi-season in TVDB** (e.g. Demon Slayer S2 Entertainment District). Single-season anime and AniDB-sequential inputs work without this flag. Use when syncing from Plex/Sonarr/Kodi/Jellyfin. |\n\n#### Rewatches\n\nRe-posting an already-watched episode is a **no-op by default** — the server detects the duplicate and skips. To insert a rewatch session, send `?allow_rewatch=yes` as a query parameter. The server then creates a separate rewatch row that doesn't double-count the original watch.\n\n**Simkl PRO / VIP only.** Free-tier callers with `?allow_rewatch=yes` get a silent no-op (`added: { movies: 0, shows: 0, episodes: 0 }`) that still consumes a rate-limit slot. Check `account.type` from [`GET /users/settings`](/api-reference/simkl/get-user-settings) at sign-in and gate the flag on `\"pro\"` / `\"vip\"`. Cache the value; refetch only when `activities.settings.all` from [`GET /sync/activities`](/api-reference/simkl/get-activities) bumps. Full pattern in [Rewatches guide → PRO / VIP gate](/guides/rewatches).\n\nFor backup/restore tools that always want to insert (even when the auto-detect heuristic can't fire), set `is_rewatch: true` per-item AND pass the query param.\n\n#### Response: `added` and `not_found`\n\n```json\n{\n \"added\": {\n \"movies\": <int count>,\n \"shows\": <int count>,\n \"episodes\": <int count>,\n \"statuses\": [\n {\n \"request\": { /* echo of input item, with type added */ },\n \"response\": {\n \"status\": \"completed\",\n \"simkl_type\": \"tv\" | \"anime\" | \"movie\",\n \"anime_type\": \"tv\" | \"movie\" | \"ova\" | null\n }\n }\n ]\n },\n \"not_found\": {\n \"movies\": [...],\n \"shows\": [...],\n \"episodes\": [...]\n }\n}\n```\n\n**`added.statuses[*].response.status`** is the **resolved Watchlist status** the server placed the item on — e.g. a `\"completed\"` write on a still-airing show is silently downgraded to `\"watching\"` and reflected here. **You don't need a follow-up [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list)** — this call already moves the item; chaining would just overwrite the server's smarter decision.\n\n**`added.statuses[*].response.simkl_type`** tells you which catalog the item resolved to (useful when you sent ambiguous IDs — TMDB IDs can be either movie or tv on Simkl). Always inspect to know what got created.\n\n**`not_found`** carries the verbatim input for items the resolver couldn't match (typo, fuzzy-title miss, ID not in Simkl's catalog yet). Apps should:\n\n- Show \"we couldn't track: …\" UI for these\n- Offer manual ID-entry fallback\n- Don't infer success from the 201 status alone — branch on `not_found.movies.length === 0 && not_found.shows.length === 0 && not_found.episodes.length === 0`\n\n#### Errors\n\n`400 empty_field` if a per-item required field is missing. `400 wrong_parameter` for invalid enum values. Empty body `{}` returns 201 with zero counts (NOT 400) — that's a known asymmetry vs `/scrobble/start` which 400s on empty body.\n\n<Card title=\"Sync guide — full walkthrough\" icon=\"arrows-rotate\" href=\"/guides/sync\" horizontal>\n Initial-pull-then-delta-loop pattern, `date_from` semantics, deletion reconciliation, Trakt/Letterboxd migration recipes.\n</Card>\n\n#### When to use `/sync/history` vs `/sync/add-to-list`\n\n| Goal | Endpoint |\n|---|---|\n| User finished watching → mark watched + rate + memo | **`/sync/history`** (carries all three in one shape) |\n| User clicked \"Add to Plan to Watch\" button | **`/sync/add-to-list`** (status-only, no watch event) |\n| Backfill from Trakt/Letterboxd/IMDb (events with timestamps) | **`/sync/history`** with `watched_at` per item |\n| Bulk import a watchlist (no watch events) | **`/sync/add-to-list`** |\n| Remove an item from the user's library | **[`/sync/history/remove`](/api-reference/simkl/remove-from-history)** |\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
+        "description": "Record watch events. The unit is the **watch event** — adding \"I watched The Walking Dead S01E01 at 8pm\" — not list membership (use [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) for that, or set `status` per-item here to do both at once).\n\n<Tip>\n**You don't need a Simkl ID.** Same as `/sync/add-to-list` — the server resolves any combination of identifiers (`imdb`, `tmdb`, `tvdb`, `mal`, `anidb`, `anilist`, `kitsu`) plus `title` + `year`. See [Standard media objects → Supported ID keys](/conventions/standard-media-objects#supported-id-keys) for the full list, and the [/sync/add-to-list ID-resolution table](/api-reference/simkl/add-to-list) for per-slot semantics.\n</Tip>\n\n#### Granularity — when does the server expand \"implicit all\"?\n\nThe body shape determines whether you mark a single episode, a season, or a whole show.\n\n**One movie** — single movie completion.\n\n```json\n{ \"movies\": [{ \"ids\": {...} }] }\n```\n\n**Whole show** — every episode marked. *\"I finished this whole series.\"* Send `status: \"completed\"` with no `seasons` / `episodes`.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"status\": \"completed\" }] }\n```\n\n**Whole season** — every episode of one season. *\"I finished season 2.\"* Send `seasons[]` without an inner `episodes`.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"seasons\": [{ \"number\": 2 }] }] }\n```\n\n**Specific episodes only** — per-event scrobbling, manual tick-off.\n\n```json\n{\n \"shows\": [{\n \"ids\": {...},\n \"seasons\": [{\n \"number\": 1,\n \"episodes\": [{ \"number\": 1 }, { \"number\": 2 }]\n }]\n }]\n}\n```\n\n**Top-level `episodes[]` shorthand** — auto-wraps to `seasons: [{ number: 1,... }]`. Useful for anime sequential numbering and single-season shows.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"episodes\": [{ \"number\": 1 }] }] }\n```\n\nThe response always reports the actual count of episodes affected in `added.episodes`, so apps can verify the server expanded correctly.\n\n#### Memo-only updates (and \"add to watchlist + memo\" in one call)\n\nThis endpoint is the **only way to set a memo on an item.** [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) accepts the `memo` field in the request body and echoes it back in the response, but **does not persist it** — silently discarded.\n\nTo set or update a memo without recording a watch event, send `ids` + `status` + `memo`:\n\n```json\n{\n \"movies\": [{\n \"ids\": { \"simkl\": 53536 },\n \"status\": \"plantowatch\",\n \"memo\": { \"text\": \"Remind me why I added this\", \"is_private\": true }\n }]\n}\n```\n\nTwo behaviors worth knowing:\n\n- **Memos attach to watchlist items only.** The item has to be in one of the five statuses (`watching` / `plantowatch` / `hold` / `dropped` / `completed`) for the memo to stick. Sending `status` makes this explicit.\n- **The endpoint auto-adds items.** If the item isn't on the user's watchlist yet, this same call creates the watchlist row at the specified `status` AND saves the memo in one shot. `added.movies` / `added.shows` reports the count of newly-added items (`0` when the item was already there and you only changed memo/status).\n\nTo read memos back, call `GET /sync/all-items?memos=yes` — see the [Sync guide](/guides/sync).\n\n#### Per-item options\n\n| Field | Type | Notes |\n|---|---|---|\n| `watched_at` | ISO-8601 string | Pin the watch event to a specific time. Defaults to request time. |\n| `added_at` | ISO-8601 string | Override when the item was added to the watchlist (rarely used outside backups). |\n| `status` | string | Set the watchlist status (`watching`/`plantowatch`/`hold`/`completed`/`dropped`) in the same call. Combine with `rating` to do \"watched + rate + status\" in one request. |\n| `rating` | int 1-10 | Rate the item alongside the watch event. Same effect as a separate `POST /sync/ratings` call. |\n| `memo` | `{ \"text\": string, \"is_private\": bool }` | User memo, max 140 chars. `is_private: false` shows the memo on the user's public profile + activity feed; `true` keeps it self-only. Read-back requires `/sync/all-items?memos=yes`. |\n| `is_rewatch` | bool | `true` logs the item as a rewatch even when the server wouldn't detect one (backup / restore); `false` never logs a rewatch. Needs `?allow_rewatch=yes` — see **Rewatches** below. |\n| `rewatch_id` | int | Add to this rewatch session — the id from an earlier response or a `/sync/all-items?allow_rewatch=yes` row. Needs `?allow_rewatch=yes`. |\n| `rewatch_status` | string | Set the session's state: `active`, `closed`, or for movies `completed`. Needs `?allow_rewatch=yes`. |\n| `use_tvdb_anime_seasons` | bool *(anime-only, optional)* | Default `false` (AniDB sequential — flat single-season). Set `true` to interpret `season`/`number` as TVDB per-season numbering. **Only needed when your source uses TVDB-style numbering AND the title is multi-season in TVDB** (e.g. Demon Slayer S2 Entertainment District). Single-season anime and AniDB-sequential inputs work without this flag. Use when syncing from Plex/Sonarr/Kodi/Jellyfin. |\n\n#### Rewatches\n\nLogging a rewatch needs `?allow_rewatch=yes` on the URL **and** a Simkl PRO or VIP account. Without either, re-posting something already watched changes nothing. With both, an item lands in a rewatch session when:\n\n- **a movie the user already completed** is posted again;\n- **every episode in the payload** is already on the user's history. A payload with any new episode is recorded as a normal watch and no rewatch is created, and a show sent without episodes is never treated as a rewatch;\n- or the item carries **`is_rewatch: true`** — the backup / restore path, which also starts a session on a show you haven't sent episodes for.\n\n`is_rewatch: false` turns rewatch handling off for that item, so rows copied back from [`GET /sync/all-items`](/api-reference/simkl/get-all-items) never create a session. A Plan to Watch item can't be rewatched. On a Free account the rewatch part is skipped silently — no `rewatch_id` comes back — while anything not yet watched is still recorded normally. Check `account.type` from [`GET /users/settings`](/api-reference/simkl/get-user-settings) before sending the flag; see [Rewatches guide → PRO / VIP gate](/guides/rewatches).\n\nThe response carries `rewatch_id` and `rewatch_status` in `added.statuses[].response`, and a newly created session counts in `added.movies` / `added.shows`. Send that `rewatch_id` on later writes to keep adding to the same session. `rewatch_status` sets the session's state — `active`, `closed`, or for movies `completed`; on a show `completed` is stored as `closed`, because only a session covering every aired episode becomes `completed`. On a show, a state change sent without episodes also needs `is_rewatch: true`, or the server never reaches the session.\n\n**Two days apart.** A movie rewatch dated within 2 days of the original watch or of an earlier rewatch is ignored. So is an episode dated before its original watch, or within 2 days of it or of the same episode in another session. Ignored rewatches don't create a session and don't count in `added`.\n\n<Warning>\n**On show and anime rewatch writes, `response.status` is currently a number** — `1` watching, `2` plantowatch, `3` completed, `4` dropped, `5` hold — instead of the string every other write returns. Accept both.\n</Warning>\n\n#### Response: `added` and `not_found`\n\n```json\n{\n \"added\": {\n \"movies\": <int count>,\n \"shows\": <int count>,\n \"episodes\": <int count>,\n \"statuses\": [\n {\n \"request\": { /* echo of input item, with type added */ },\n \"response\": {\n \"status\": \"completed\",\n \"simkl_type\": \"tv\" | \"anime\" | \"movie\",\n \"anime_type\": \"tv\" | \"movie\" | \"ova\" | null,\n \"rewatch_id\": <int>,  \"rewatch_status\": \"active\" | \"completed\" | \"closed\"   (rewatch writes only)\n }\n }\n ]\n },\n \"not_found\": {\n \"movies\": [...],\n \"shows\": [...],\n \"episodes\": [...]\n }\n}\n```\n\n**`added.statuses[*].response.status`** is the **resolved Watchlist status** the server placed the item on — e.g. a `\"completed\"` write on a still-airing show is silently downgraded to `\"watching\"` and reflected here. **You don't need a follow-up [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list)** — this call already moves the item; chaining would just overwrite the server's smarter decision.\n\n**`added.statuses[*].response.simkl_type`** tells you which catalog the item resolved to (useful when you sent ambiguous IDs — TMDB IDs can be either movie or tv on Simkl). Always inspect to know what got created.\n\n**`not_found`** carries the verbatim input for items the resolver couldn't match (typo, fuzzy-title miss, ID not in Simkl's catalog yet). Apps should:\n\n- Show \"we couldn't track: …\" UI for these\n- Offer manual ID-entry fallback\n- Don't infer success from the 201 status alone — branch on `not_found.movies.length === 0 && not_found.shows.length === 0 && not_found.episodes.length === 0`\n\n#### Errors\n\n`400 empty_field` if a per-item required field is missing. `400 wrong_parameter` for invalid enum values. Empty body `{}` returns 201 with zero counts (NOT 400) — that's a known asymmetry vs `/scrobble/start` which 400s on empty body.\n\n<Card title=\"Sync guide — full walkthrough\" icon=\"arrows-rotate\" href=\"/guides/sync\" horizontal>\n Initial-pull-then-delta-loop pattern, `date_from` semantics, deletion reconciliation, Trakt/Letterboxd migration recipes.\n</Card>\n\n#### When to use `/sync/history` vs `/sync/add-to-list`\n\n| Goal | Endpoint |\n|---|---|\n| User finished watching → mark watched + rate + memo | **`/sync/history`** (carries all three in one shape) |\n| User clicked \"Add to Plan to Watch\" button | **`/sync/add-to-list`** (status-only, no watch event) |\n| Backfill from Trakt/Letterboxd/IMDb (events with timestamps) | **`/sync/history`** with `watched_at` per item |\n| Bulk import a watchlist (no watch events) | **`/sync/add-to-list`** |\n| Remove an item from the user's library | **[`/sync/history/remove`](/api-reference/simkl/remove-from-history)** |\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
         "operationId": "post-sync-history",
         "parameters": [
           {
@@ -20131,23 +20273,25 @@
                   }
                 },
                 "rewatch_explicit_flag": {
-                  "description": "Set `is_rewatch: true` on the item AND pass `?allow_rewatch=yes` to force the rewatch path. The VIP response includes `rewatch_id` and `rewatch_status` in `added.statuses[].response`. **Pin the `rewatch_id` on every subsequent write for the same session** to keep multi-call writes from forking into separate sessions — see the [Rewatches guide](/guides/rewatches).",
-                  "summary": "Rewatch — explicit `is_rewatch: true` per-item flag on a SHOW (Simkl PRO / VIP)",
+                  "description": "`is_rewatch: true` plus `?allow_rewatch=yes` logs the item as a rewatch whether or not the server would detect one — the path backup / restore tools use. Pin the returned `rewatch_id` on every later write for the same session — see the [Rewatches guide](/guides/rewatches).",
+                  "summary": "Rewatch — explicit `is_rewatch: true` (Simkl PRO / VIP)",
                   "value": {
                     "shows": [
                       {
                         "ids": {
-                          "simkl": 17465
+                          "simkl": 13811
                         },
                         "is_rewatch": true,
                         "seasons": [
                           {
                             "episodes": [
                               {
-                                "number": 1
+                                "number": 1,
+                                "watched_at": "2021-05-01T20:00:00Z"
                               },
                               {
-                                "number": 2
+                                "number": 2,
+                                "watched_at": "2021-05-01T20:00:00Z"
                               }
                             ],
                             "number": 1
@@ -20158,32 +20302,32 @@
                   }
                 },
                 "rewatch_max_info": {
-                  "description": "Every per-item rewatch field set: `is_rewatch:true`, `rewatch_id` (to resume a specific session), `rewatch_status` (to explicitly close/complete/reactivate it), per-episode `watched_at`, plus the standard `rating` and `memo: {text, is_private}` fields. This is what a tracker app's *\"finished my rewatch\"* button would send.\n\nThe response echoes every field you set in `added.statuses[].request` AND surfaces the resulting `rewatch_id` + `rewatch_status` in `added.statuses[].response` (so you can confirm the session state Simkl ended up with — useful when you let the server pick the state via auto-transitions).",
-                  "summary": "Rewatch — maximum info (every rewatch field populated, all wired to a real session) (Simkl PRO / VIP)",
+                  "description": "`rewatch_id` picks the session, `rewatch_status: \"closed\"` ends it, and the episodes, `rating` and `memo` are recorded in the same call. The response confirms the session's state. On a show, `rewatch_status: \"completed\"` would be stored as `closed` too — only covering every aired episode completes a show session.",
+                  "summary": "Rewatch — every rewatch field: add episodes to a session and close it (Simkl PRO / VIP)",
                   "value": {
                     "shows": [
                       {
                         "ids": {
-                          "simkl": 17465
+                          "simkl": 2733977
                         },
                         "is_rewatch": true,
                         "memo": {
                           "is_private": false,
-                          "text": "Rewatched the Stark family arcs ahead of the new book."
+                          "text": "Second time through — the pilot holds up."
                         },
-                        "rating": 10,
-                        "rewatch_id": 7482,
-                        "rewatch_status": "completed",
+                        "rating": 9,
+                        "rewatch_id": 655494,
+                        "rewatch_status": "closed",
                         "seasons": [
                           {
                             "episodes": [
                               {
                                 "number": 3,
-                                "watched_at": "2026-05-16T19:00:00Z"
+                                "watched_at": "2021-04-02T20:00:00Z"
                               },
                               {
                                 "number": 4,
-                                "watched_at": "2026-05-16T20:00:00Z"
+                                "watched_at": "2021-04-03T20:00:00Z"
                               }
                             ],
                             "number": 1
@@ -20194,23 +20338,24 @@
                   }
                 },
                 "rewatch_with_allow_rewatch_query": {
-                  "description": "Without `?allow_rewatch=yes`, re-posting a watched episode is a no-op. WITH the query param (and a VIP account), the server creates a rewatch session and the episode counts again. The response includes `rewatch_id` (cache it for subsequent writes in this session) and `rewatch_status` (`active`/`completed`/`closed`).",
-                  "summary": "Rewatch — re-post episode with `?allow_rewatch=yes` on a previously-completed ANIME (Simkl PRO / VIP)",
+                  "description": "Every episode in the payload is already on the user's history, so with `?allow_rewatch=yes` the server logs them in a rewatch session — no flag needed. The response carries `rewatch_id` (send it on later writes for this session) and `rewatch_status`. `status` comes back as a number on show rewatch writes — see Rewatches above.",
+                  "summary": "Rewatch — re-post already-watched episodes with `?allow_rewatch=yes` (Simkl PRO / VIP)",
                   "value": {
                     "shows": [
                       {
                         "ids": {
-                          "simkl": 37089
+                          "simkl": 2733977
                         },
-                        "is_rewatch": true,
                         "seasons": [
                           {
                             "episodes": [
                               {
-                                "number": 1
+                                "number": 1,
+                                "watched_at": "2021-04-01T20:00:00Z"
                               },
                               {
-                                "number": 2
+                                "number": 2,
+                                "watched_at": "2021-04-01T20:00:00Z"
                               }
                             ],
                             "number": 1
@@ -20855,8 +21000,8 @@
                     }
                   },
                   "rewatch_explicit_flag": {
-                    "description": "Set `is_rewatch: true` on the item AND pass `?allow_rewatch=yes` to force the rewatch path. The VIP response includes `rewatch_id` and `rewatch_status` in `added.statuses[].response`. **Pin the `rewatch_id` on every subsequent write for the same session** to keep multi-call writes from forking into separate sessions — see the [Rewatches guide](/guides/rewatches).",
-                    "summary": "Rewatch — explicit `is_rewatch: true` per-item flag on a SHOW (Simkl PRO / VIP)",
+                    "description": "`is_rewatch: true` plus `?allow_rewatch=yes` logs the item as a rewatch whether or not the server would detect one — the path backup / restore tools use. Pin the returned `rewatch_id` on every later write for the same session — see the [Rewatches guide](/guides/rewatches).",
+                    "summary": "Rewatch — explicit `is_rewatch: true` (Simkl PRO / VIP)",
                     "value": {
                       "added": {
                         "episodes": 2,
@@ -20866,7 +21011,7 @@
                           {
                             "request": {
                               "ids": {
-                                "simkl": 17465
+                                "simkl": 13811
                               },
                               "is_rewatch": true,
                               "rating": null,
@@ -20874,10 +21019,10 @@
                             },
                             "response": {
                               "anime_type": null,
-                              "rewatch_id": 7482,
+                              "rewatch_id": 655496,
                               "rewatch_status": "active",
                               "simkl_type": "tv",
-                              "status": 3
+                              "status": 1
                             }
                           }
                         ]
@@ -20890,8 +21035,8 @@
                     }
                   },
                   "rewatch_max_info": {
-                    "description": "Every per-item rewatch field set: `is_rewatch:true`, `rewatch_id` (to resume a specific session), `rewatch_status` (to explicitly close/complete/reactivate it), per-episode `watched_at`, plus the standard `rating` and `memo: {text, is_private}` fields. This is what a tracker app's *\"finished my rewatch\"* button would send.\n\nThe response echoes every field you set in `added.statuses[].request` AND surfaces the resulting `rewatch_id` + `rewatch_status` in `added.statuses[].response` (so you can confirm the session state Simkl ended up with — useful when you let the server pick the state via auto-transitions).",
-                    "summary": "Rewatch — maximum info (every rewatch field populated, all wired to a real session) (Simkl PRO / VIP)",
+                    "description": "`rewatch_id` picks the session, `rewatch_status: \"closed\"` ends it, and the episodes, `rating` and `memo` are recorded in the same call. The response confirms the session's state. On a show, `rewatch_status: \"completed\"` would be stored as `closed` too — only covering every aired episode completes a show session.",
+                    "summary": "Rewatch — every rewatch field: add episodes to a session and close it (Simkl PRO / VIP)",
                     "value": {
                       "added": {
                         "episodes": 2,
@@ -20901,24 +21046,24 @@
                           {
                             "request": {
                               "ids": {
-                                "simkl": 17465
+                                "simkl": 2733977
                               },
                               "is_rewatch": true,
                               "memo": {
                                 "is_private": false,
-                                "text": "Rewatched the Stark family arcs ahead of the new book."
+                                "text": "Second time through — the pilot holds up."
                               },
-                              "rating": 10,
-                              "rewatch_id": 7482,
-                              "rewatch_status": "completed",
+                              "rating": 9,
+                              "rewatch_id": 655494,
+                              "rewatch_status": "closed",
                               "type": "show"
                             },
                             "response": {
                               "anime_type": null,
-                              "rewatch_id": 7482,
-                              "rewatch_status": "completed",
+                              "rewatch_id": 655494,
+                              "rewatch_status": "closed",
                               "simkl_type": "tv",
-                              "status": 3
+                              "status": 1
                             }
                           }
                         ]
@@ -20931,8 +21076,8 @@
                     }
                   },
                   "rewatch_with_allow_rewatch_query": {
-                    "description": "Without `?allow_rewatch=yes`, re-posting a watched episode is a no-op. WITH the query param (and a VIP account), the server creates a rewatch session and the episode counts again. The response includes `rewatch_id` (cache it for subsequent writes in this session) and `rewatch_status` (`active`/`completed`/`closed`).",
-                    "summary": "Rewatch — re-post episode with `?allow_rewatch=yes` on a previously-completed ANIME (Simkl PRO / VIP)",
+                    "description": "Every episode in the payload is already on the user's history, so with `?allow_rewatch=yes` the server logs them in a rewatch session — no flag needed. The response carries `rewatch_id` (send it on later writes for this session) and `rewatch_status`. `status` comes back as a number on show rewatch writes — see Rewatches above.",
+                    "summary": "Rewatch — re-post already-watched episodes with `?allow_rewatch=yes` (Simkl PRO / VIP)",
                     "value": {
                       "added": {
                         "episodes": 2,
@@ -20942,18 +21087,17 @@
                           {
                             "request": {
                               "ids": {
-                                "simkl": 37089
+                                "simkl": 2733977
                               },
-                              "is_rewatch": true,
                               "rating": null,
                               "type": "show"
                             },
                             "response": {
-                              "anime_type": "tv",
-                              "rewatch_id": 7484,
+                              "anime_type": null,
+                              "rewatch_id": 655494,
                               "rewatch_status": "active",
-                              "simkl_type": "anime",
-                              "status": 3
+                              "simkl_type": "tv",
+                              "status": 1
                             }
                           }
                         ]
@@ -21082,17 +21226,17 @@
           {
             "label": "rewatch_explicit_flag",
             "lang": "curl",
-            "source": "curl -X POST 'https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 17465\n      },\n      \"is_rewatch\": true,\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1\n            },\n            {\n              \"number\": 2\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+            "source": "curl -X POST 'https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 13811\n      },\n      \"is_rewatch\": true,\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1,\n              \"watched_at\": \"2021-05-01T20:00:00Z\"\n            },\n            {\n              \"number\": 2,\n              \"watched_at\": \"2021-05-01T20:00:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
           },
           {
             "label": "rewatch_with_allow_rewatch_query",
             "lang": "curl",
-            "source": "curl -X POST 'https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 37089,\n        \"mal\": 1,\n        \"anidb\": 23,\n        \"anilist\": 1\n      },\n      \"is_rewatch\": true,\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1\n            },\n            {\n              \"number\": 2\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+            "source": "curl -X POST 'https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2733977\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1,\n              \"watched_at\": \"2021-04-01T20:00:00Z\"\n            },\n            {\n              \"number\": 2,\n              \"watched_at\": \"2021-04-01T20:00:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
           },
           {
             "label": "rewatch_max_info",
             "lang": "curl",
-            "source": "curl -X POST 'https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 17465\n      },\n      \"is_rewatch\": true,\n      \"rewatch_id\": 7482,\n      \"rewatch_status\": \"completed\",\n      \"rating\": 10,\n      \"memo\": {\n        \"text\": \"Rewatched the Stark family arcs ahead of the new book.\",\n        \"is_private\": false\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 3,\n              \"watched_at\": \"2026-05-16T19:00:00Z\"\n            },\n            {\n              \"number\": 4,\n              \"watched_at\": \"2026-05-16T20:00:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+            "source": "curl -X POST 'https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2733977\n      },\n      \"is_rewatch\": true,\n      \"rewatch_id\": 655494,\n      \"rewatch_status\": \"closed\",\n      \"rating\": 9,\n      \"memo\": {\n        \"text\": \"Second time through — the pilot holds up.\",\n        \"is_private\": false\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 3,\n              \"watched_at\": \"2021-04-02T20:00:00Z\"\n            },\n            {\n              \"number\": 4,\n              \"watched_at\": \"2021-04-03T20:00:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
           },
           {
             "label": "history_partial_with_not_found",
@@ -21115,7 +21259,7 @@
     },
     "/sync/history/remove": {
       "post": {
-        "description": "Removes items from the user's watched history. **Body shape is identical to [`POST /sync/history`](/api-reference/simkl/add-to-history)** — the same `movies[]`, `shows[]`, and granularity rules apply.\n\n#### Granularity\n\nWhat you send determines what gets removed.\n\n**Movie or show with no `seasons` and no `episodes`** — the item is **removed from the user's library entirely** (any watch history AND the watchlist entry). Equivalent to the user clicking \"Remove from list\" on the title page.\n\n```json\n{ \"shows\": [{ \"ids\": {...} }] }\n```\n\n**Show with `seasons[]` entries that omit `episodes`** — every episode in those seasons is unmarked as watched. The show stays in the user's library.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"seasons\": [{ \"number\": 2 }] }] }\n```\n\n**Show with `seasons[].episodes[]`** — only the listed episodes are unmarked. The show stays in the user's library.\n\n```json\n{\n \"shows\": [{\n \"ids\": {...},\n \"seasons\": [{\n \"number\": 1,\n \"episodes\": [{ \"number\": 1 }, { \"number\": 2 }]\n }]\n }]\n}\n```\n\n**Show with top-level `episodes[]` shorthand** — treated as `seasons: [{ number: 1, episodes: [...] }]`. Convenient for single-season shows; otherwise prefer the explicit form.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"episodes\": [{ \"number\": 1 }] }] }\n```\n\n#### Response shape\n\nStatus: **201 Created**.\n\n```json\n{\n \"deleted\": {\n \"movies\": <number of movies removed>,\n \"shows\": <number of shows removed from library>,\n \"episodes\": <number of episodes unmarked>\n },\n \"not_found\": {\n \"movies\": [<items Simkl could not match>],\n \"shows\": [<items Simkl could not match>]\n }\n}\n```\n\n**`not_found` only has `movies` and `shows`** — there's no `not_found.episodes` array even when you tried to remove specific episodes. If the parent show isn't matchable, the show object lands in `not_found.shows` and no episodes are touched. If the show is matchable but a specific episode number doesn't exist, the call still counts as success and `episodes` in `deleted` reflects only the episodes that were actually unmarked.\n\n**Anime titles** go in `shows[]` (with anime-only IDs like `anidb` / `mal` / `anilist` inside each item's `ids` object). There is no top-level `anime[]` array on this endpoint — items sent under one are silently ignored. See [Anime under shows[]](/conventions/standard-media-objects#anime).\n\n<CardGroup cols={2}>\n <Card title=\"POST /sync/history\" icon=\"clock\" href=\"/api-reference/simkl/add-to-history\" horizontal>\n The mirror endpoint that adds history. Same body shape; this page is the removal side.\n </Card>\n <Card title=\"Sync guide — full walkthrough\" icon=\"arrows-rotate\" href=\"/guides/sync\" horizontal>\n Two-phase model (initial pull → activities-checked delta loop), deletion reconciliation, and reference implementations.\n </Card>\n</CardGroup>\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
+        "description": "Removes items from the user's watched history. **Body shape is identical to [`POST /sync/history`](/api-reference/simkl/add-to-history)** — the same `movies[]`, `shows[]`, and granularity rules apply.\n\n#### Granularity\n\nWhat you send determines what gets removed.\n\n**Movie or show with no `seasons` and no `episodes`** — the item is **removed from the user's library entirely** (any watch history AND the watchlist entry). Equivalent to the user clicking \"Remove from list\" on the title page.\n\n```json\n{ \"shows\": [{ \"ids\": {...} }] }\n```\n\n**Show with `seasons[]` entries that omit `episodes`** — every episode in those seasons is unmarked as watched. The show stays in the user's library.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"seasons\": [{ \"number\": 2 }] }] }\n```\n\n**Show with `seasons[].episodes[]`** — only the listed episodes are unmarked. The show stays in the user's library.\n\n```json\n{\n \"shows\": [{\n \"ids\": {...},\n \"seasons\": [{\n \"number\": 1,\n \"episodes\": [{ \"number\": 1 }, { \"number\": 2 }]\n }]\n }]\n}\n```\n\n**Show with top-level `episodes[]` shorthand** — treated as `seasons: [{ number: 1, episodes: [...] }]`. Convenient for single-season shows; otherwise prefer the explicit form.\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"episodes\": [{ \"number\": 1 }] }] }\n```\n\n**Item with a `rewatch_id`** — removes from that [rewatch session](/guides/rewatches) only; the original watch and the library entry are never touched. Without `seasons`, the whole session is deleted. With `seasons[]`, only those episodes leave the session, and if none are left the session is deleted too.\n\n```json\n{ \"movies\": [{ \"ids\": {...}, \"rewatch_id\": 655240 }] }\n```\n\n```json\n{ \"shows\": [{ \"ids\": {...}, \"rewatch_id\": 655242, \"seasons\": [{ \"number\": 1, \"episodes\": [{ \"number\": 2 }] }] }] }\n```\n\nTake the id from a [`GET /sync/all-items?allow_rewatch=yes`](/api-reference/simkl/get-all-items) row with `is_rewatch: true`, or from the response of the write that created the session. Removing a rewatch needs a Simkl PRO or VIP account, and the `rewatch_id` must belong to this user and this title — otherwise the item lands in `not_found` and nothing is removed. An item with `is_rewatch: true` but no `rewatch_id` lands in `not_found` too: it is never treated as a regular removal, so sending a rewatch row back can't wipe the title.\n\n#### Response shape\n\nStatus: **201 Created**.\n\n```json\n{\n  \"deleted\": {\n    \"movies\":           <movies removed from the library>,\n    \"shows\":            <shows removed from the library>,\n    \"episodes\":         <episodes unmarked>,\n    \"rewatches\":        <rewatch sessions deleted>,\n    \"rewatch_episodes\": <episodes removed from rewatch sessions>\n  },\n  \"not_found\": {\n    \"movies\":   [<items Simkl could not match>],\n    \"shows\":    [<items Simkl could not match>],\n    \"episodes\": [<a matched show, with only the episodes that don't exist>]\n  }\n}\n```\n\n**`not_found.episodes`** lists episodes that don't exist on a show Simkl did match: the show comes back with only those episode numbers in `seasons`. Episodes that exist but weren't marked watched aren't listed — they just don't count toward `deleted.episodes`. If the show itself can't be matched, it lands in `not_found.shows` and no episodes are touched.\n\n**Anime titles** can go in `shows[]` or a top-level `anime[]` array, with anime IDs like `mal` / `anidb` / `anilist` inside `ids` — both are treated the same, and anime is counted and reported under `shows`. See [Anime under shows[]](/conventions/standard-media-objects#anime).\n\n<CardGroup cols={2}>\n <Card title=\"POST /sync/history\" icon=\"clock\" href=\"/api-reference/simkl/add-to-history\" horizontal>\n The mirror endpoint that adds history. Same body shape; this page is the removal side.\n </Card>\n <Card title=\"Sync guide — full walkthrough\" icon=\"arrows-rotate\" href=\"/guides/sync\" horizontal>\n Two-phase model (initial pull → activities-checked delta loop), deletion reconciliation, and reference implementations.\n </Card>\n</CardGroup>\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
         "operationId": "post-sync-history-remove",
         "parameters": [
           {
@@ -21180,6 +21324,31 @@
                     ]
                   }
                 },
+                "episode_not_found": {
+                  "summary": "Episode that doesn't exist lands in `not_found.episodes`",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "simkl": 2733977
+                        },
+                        "seasons": [
+                          {
+                            "episodes": [
+                              {
+                                "number": 1
+                              },
+                              {
+                                "number": 99
+                              }
+                            ],
+                            "number": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
                 "not_found_unknown_id": {
                   "summary": "Unknown ID lands in `not_found` — partial success is normal",
                   "value": {
@@ -21225,6 +21394,42 @@
                         "ids": {
                           "simkl": 752138
                         }
+                      }
+                    ]
+                  }
+                },
+                "remove_rewatch_episodes": {
+                  "summary": "Remove episodes from a rewatch session",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "simkl": 2733977
+                        },
+                        "rewatch_id": 655242,
+                        "seasons": [
+                          {
+                            "episodes": [
+                              {
+                                "number": 2
+                              }
+                            ],
+                            "number": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "remove_rewatch_session": {
+                  "summary": "Remove a rewatch session — the original watch stays",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 752138
+                        },
+                        "rewatch_id": 655240
                       }
                     ]
                   }
@@ -21296,7 +21501,7 @@
                 }
               },
               "schema": {
-                "$ref": "#/components/schemas/HistoryRequest"
+                "$ref": "#/components/schemas/HistoryRemoveRequest"
               }
             }
           },
@@ -21313,9 +21518,12 @@
                       "deleted": {
                         "episodes": 0,
                         "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 1
                       },
                       "not_found": {
+                        "episodes": [],
                         "movies": [],
                         "shows": []
                       }
@@ -21327,9 +21535,45 @@
                       "deleted": {
                         "episodes": 1,
                         "movies": 1,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 0
                       },
                       "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      }
+                    }
+                  },
+                  "episode_not_found": {
+                    "summary": "Episode that doesn't exist lands in `not_found.episodes`",
+                    "value": {
+                      "deleted": {
+                        "episodes": 1,
+                        "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
+                        "shows": 0
+                      },
+                      "not_found": {
+                        "episodes": [
+                          {
+                            "ids": {
+                              "simkl": 2733977
+                            },
+                            "seasons": [
+                              {
+                                "episodes": [
+                                  {
+                                    "number": 99
+                                  }
+                                ],
+                                "number": 1
+                              }
+                            ]
+                          }
+                        ],
                         "movies": [],
                         "shows": []
                       }
@@ -21341,9 +21585,12 @@
                       "deleted": {
                         "episodes": 0,
                         "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 0
                       },
                       "not_found": {
+                        "episodes": [],
                         "movies": [
                           {
                             "ids": {
@@ -21362,9 +21609,12 @@
                       "deleted": {
                         "episodes": 0,
                         "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 1
                       },
                       "not_found": {
+                        "episodes": [],
                         "movies": [],
                         "shows": []
                       }
@@ -21376,9 +21626,12 @@
                       "deleted": {
                         "episodes": 0,
                         "movies": 1,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 0
                       },
                       "not_found": {
+                        "episodes": [],
                         "movies": [],
                         "shows": []
                       }
@@ -21393,6 +21646,40 @@
                         "movies": 1,
                         "rewatch_episodes": 0,
                         "rewatches": 0,
+                        "shows": 0
+                      },
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      }
+                    }
+                  },
+                  "remove_rewatch_episodes": {
+                    "summary": "Remove episodes from a rewatch session",
+                    "value": {
+                      "deleted": {
+                        "episodes": 0,
+                        "movies": 0,
+                        "rewatch_episodes": 1,
+                        "rewatches": 0,
+                        "shows": 0
+                      },
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      }
+                    }
+                  },
+                  "remove_rewatch_session": {
+                    "summary": "Remove a rewatch session — the original watch stays",
+                    "value": {
+                      "deleted": {
+                        "episodes": 0,
+                        "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 1,
                         "shows": 0
                       },
                       "not_found": {
@@ -21426,9 +21713,12 @@
                       "deleted": {
                         "episodes": 2,
                         "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 0
                       },
                       "not_found": {
+                        "episodes": [],
                         "movies": [],
                         "shows": []
                       }
@@ -21440,9 +21730,12 @@
                       "deleted": {
                         "episodes": 13,
                         "movies": 0,
+                        "rewatch_episodes": 0,
+                        "rewatches": 0,
                         "shows": 0
                       },
                       "not_found": {
+                        "episodes": [],
                         "movies": [],
                         "shows": []
                       }
@@ -21485,6 +21778,68 @@
         "summary": "Remove from History",
         "tags": [
           "Sync"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "remove_movie_entirely",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 53536\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_specific_episodes",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2090\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1\n            },\n            {\n              \"number\": 2\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_whole_season",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2090\n      },\n      \"seasons\": [\n        {\n          \"number\": 2\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_entire_show",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2090\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_rewatch_session",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 752138\n      },\n      \"rewatch_id\": 655240\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_rewatch_episodes",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2733977\n      },\n      \"rewatch_id\": 655242,\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 2\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "bulk_mixed",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 53536\n      }\n    }\n  ],\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2090\n      },\n      \"seasons\": [\n        {\n          \"number\": 3,\n          \"episodes\": [\n            {\n              \"number\": 1\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "not_found_unknown_id",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 99999991\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "episode_not_found",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2733977\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1\n            },\n            {\n              \"number\": 99\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "anime_under_shows",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Demon Slayer\",\n      \"ids\": {\n        \"simkl\": 831411,\n        \"mal\": \"38000\",\n        \"anidb\": \"14116\",\n        \"anilist\": \"101922\"\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_movie_history",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 752138\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "remove_show_episode",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 2090\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 1\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          }
         ],
         "x-mint": {
           "href": "/api-reference/simkl/remove-from-history",

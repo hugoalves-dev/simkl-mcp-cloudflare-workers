@@ -4611,6 +4611,8 @@ Both devices use the same `access_token` — the playback is stored per-user, no
 
 ![Simkl user dashboard showing 'NOW WATCHING' Fallout S02E07 'The Handoff' resumed at 46%, 27 minutes left](https://mintcdn.com/andrewmasyk/RbJc6mqlYX6FcPwH/images/watching-now-dashboard.webp?fit=max\&auto=format\&n=RbJc6mqlYX6FcPwH\&q=85\&s=a71e052e0bbc1f376f6dc58f9785517a)
 
+After Device B resumes, the title shows back in the "Now Watching" banner on the user dashboard — picking up at the saved `progress`.
+
 ## Endpoints
 
 > **[Get playbacks](/api-reference/simkl/get-playback-sessions)**
@@ -5021,6 +5023,8 @@ Pass as much data as you can (title, year, `ids`) so Simkl can detect the item r
 ## What each endpoint does
 
 ![Simkl user dashboard showing 'NOW WATCHING' Fallout S02E07 'The Handoff' with a 46% watched progress bar and 27 minutes left](https://mintcdn.com/andrewmasyk/RbJc6mqlYX6FcPwH/images/watching-now-dashboard.webp?fit=max\&auto=format\&n=RbJc6mqlYX6FcPwH\&q=85\&s=a71e052e0bbc1f376f6dc58f9785517a)
+
+The "Now Watching" banner on the user dashboard, fed by [`/scrobble/start`](/api-reference/simkl/scrobble-start) and [`/scrobble/checkin`](/api-reference/simkl/scrobble-checkin). The progress bar updates from the `progress` you send (start / pause / stop) or, for checkin, is extrapolated from the item runtime.
 
 | Endpoint | Effect |
 | - | - |
@@ -5439,16 +5443,28 @@ To read memos back, call `GET /sync/all-items?memos=yes` — see the [Sync guide
 | `status` | string | Set the watchlist status (`watching`/`plantowatch`/`hold`/`completed`/`dropped`) in the same call. Combine with `rating` to do "watched + rate + status" in one request. |
 | `rating` | int 1-10 | Rate the item alongside the watch event. Same effect as a separate `POST /sync/ratings` call. |
 | `memo` | `{ "text": string, "is_private": bool }` | User memo, max 140 chars. `is_private: false` shows the memo on the user's public profile + activity feed; `true` keeps it self-only. Read-back requires `/sync/all-items?memos=yes`. |
-| `is_rewatch` | bool | Force the rewatch path on this item even if the server can't auto-detect (used by backup/restore tools). Requires `?allow_rewatch=yes` query param to take effect. |
+| `is_rewatch` | bool | `true` logs the item as a rewatch even when the server wouldn't detect one (backup / restore); `false` never logs a rewatch. Needs `?allow_rewatch=yes` — see **Rewatches** below. |
+| `rewatch_id` | int | Add to this rewatch session — the id from an earlier response or a `/sync/all-items?allow_rewatch=yes` row. Needs `?allow_rewatch=yes`. |
+| `rewatch_status` | string | Set the session's state: `active`, `closed`, or for movies `completed`. Needs `?allow_rewatch=yes`. |
 | `use_tvdb_anime_seasons` | bool *(anime-only, optional)* | Default `false` (AniDB sequential — flat single-season). Set `true` to interpret `season`/`number` as TVDB per-season numbering. **Only needed when your source uses TVDB-style numbering AND the title is multi-season in TVDB** (e.g. Demon Slayer S2 Entertainment District). Single-season anime and AniDB-sequential inputs work without this flag. Use when syncing from Plex/Sonarr/Kodi/Jellyfin. |
 
 #### Rewatches
 
-Re-posting an already-watched episode is a **no-op by default** — the server detects the duplicate and skips. To insert a rewatch session, send `?allow_rewatch=yes` as a query parameter. The server then creates a separate rewatch row that doesn't double-count the original watch.
+Logging a rewatch needs `?allow_rewatch=yes` on the URL **and** a Simkl PRO or VIP account. Without either, re-posting something already watched changes nothing. With both, an item lands in a rewatch session when:
 
-**Simkl PRO / VIP only.** Free-tier callers with `?allow_rewatch=yes` get a silent no-op (`added: { movies: 0, shows: 0, episodes: 0 }`) that still consumes a rate-limit slot. Check `account.type` from [`GET /users/settings`](/api-reference/simkl/get-user-settings) at sign-in and gate the flag on `"pro"` / `"vip"`. Cache the value; refetch only when `activities.settings.all` from [`GET /sync/activities`](/api-reference/simkl/get-activities) bumps. Full pattern in [Rewatches guide → PRO / VIP gate](/guides/rewatches).
+- **a movie the user already completed** is posted again;
+- **every episode in the payload** is already on the user's history. A payload with any new episode is recorded as a normal watch and no rewatch is created, and a show sent without episodes is never treated as a rewatch;
+- or the item carries **`is_rewatch: true`** — the backup / restore path, which also starts a session on a show you haven't sent episodes for.
 
-For backup/restore tools that always want to insert (even when the auto-detect heuristic can't fire), set `is_rewatch: true` per-item AND pass the query param.
+`is_rewatch: false` turns rewatch handling off for that item, so rows copied back from [`GET /sync/all-items`](/api-reference/simkl/get-all-items) never create a session. A Plan to Watch item can't be rewatched. On a Free account the rewatch part is skipped silently — no `rewatch_id` comes back — while anything not yet watched is still recorded normally. Check `account.type` from [`GET /users/settings`](/api-reference/simkl/get-user-settings) before sending the flag; see [Rewatches guide → PRO / VIP gate](/guides/rewatches).
+
+The response carries `rewatch_id` and `rewatch_status` in `added.statuses[].response`, and a newly created session counts in `added.movies` / `added.shows`. Send that `rewatch_id` on later writes to keep adding to the same session. `rewatch_status` sets the session's state — `active`, `closed`, or for movies `completed`; on a show `completed` is stored as `closed`, because only a session covering every aired episode becomes `completed`. On a show, a state change sent without episodes also needs `is_rewatch: true`, or the server never reaches the session.
+
+**Two days apart.** A movie rewatch dated within 2 days of the original watch or of an earlier rewatch is ignored. So is an episode dated before its original watch, or within 2 days of it or of the same episode in another session. Ignored rewatches don't create a session and don't count in `added`.
+
+<Warning>
+**On show and anime rewatch writes, `response.status` is currently a number** — `1` watching, `2` plantowatch, `3` completed, `4` dropped, `5` hold — instead of the string every other write returns. Accept both.
+</Warning>
 
 #### Response: `added` and `not_found`
 
@@ -5464,7 +5480,8 @@ For backup/restore tools that always want to insert (even when the auto-detect h
  "response": {
  "status": "completed",
  "simkl_type": "tv" | "anime" | "movie",
- "anime_type": "tv" | "movie" | "ova" | null
+ "anime_type": "tv" | "movie" | "ova" | null,
+ "rewatch_id": <int>,  "rewatch_status": "active" | "completed" | "closed"   (rewatch writes only)
  }
  }
  ]
@@ -7382,27 +7399,42 @@ What you send determines what gets removed.
 { "shows": [{ "ids": {...}, "episodes": [{ "number": 1 }] }] }
 ```
 
+**Item with a `rewatch_id`** — removes from that [rewatch session](/guides/rewatches) only; the original watch and the library entry are never touched. Without `seasons`, the whole session is deleted. With `seasons[]`, only those episodes leave the session, and if none are left the session is deleted too.
+
+```json
+{ "movies": [{ "ids": {...}, "rewatch_id": 655240 }] }
+```
+
+```json
+{ "shows": [{ "ids": {...}, "rewatch_id": 655242, "seasons": [{ "number": 1, "episodes": [{ "number": 2 }] }] }] }
+```
+
+Take the id from a [`GET /sync/all-items?allow_rewatch=yes`](/api-reference/simkl/get-all-items) row with `is_rewatch: true`, or from the response of the write that created the session. Removing a rewatch needs a Simkl PRO or VIP account, and the `rewatch_id` must belong to this user and this title — otherwise the item lands in `not_found` and nothing is removed. An item with `is_rewatch: true` but no `rewatch_id` lands in `not_found` too: it is never treated as a regular removal, so sending a rewatch row back can't wipe the title.
+
 #### Response shape
 
 Status: **201 Created**.
 
 ```json
 {
- "deleted": {
- "movies": <number of movies removed>,
- "shows": <number of shows removed from library>,
- "episodes": <number of episodes unmarked>
- },
- "not_found": {
- "movies": [<items Simkl could not match>],
- "shows": [<items Simkl could not match>]
- }
+  "deleted": {
+    "movies":           <movies removed from the library>,
+    "shows":            <shows removed from the library>,
+    "episodes":         <episodes unmarked>,
+    "rewatches":        <rewatch sessions deleted>,
+    "rewatch_episodes": <episodes removed from rewatch sessions>
+  },
+  "not_found": {
+    "movies":   [<items Simkl could not match>],
+    "shows":    [<items Simkl could not match>],
+    "episodes": [<a matched show, with only the episodes that don't exist>]
+  }
 }
 ```
 
-**`not_found` only has `movies` and `shows`** — there's no `not_found.episodes` array even when you tried to remove specific episodes. If the parent show isn't matchable, the show object lands in `not_found.shows` and no episodes are touched. If the show is matchable but a specific episode number doesn't exist, the call still counts as success and `episodes` in `deleted` reflects only the episodes that were actually unmarked.
+**`not_found.episodes`** lists episodes that don't exist on a show Simkl did match: the show comes back with only those episode numbers in `seasons`. Episodes that exist but weren't marked watched aren't listed — they just don't count toward `deleted.episodes`. If the show itself can't be matched, it lands in `not_found.shows` and no episodes are touched.
 
-**Anime titles** go in `shows[]` (with anime-only IDs like `anidb` / `mal` / `anilist` inside each item's `ids` object). There is no top-level `anime[]` array on this endpoint — items sent under one are silently ignored. See [Anime under shows[]](/conventions/standard-media-objects#anime).
+**Anime titles** can go in `shows[]` or a top-level `anime[]` array, with anime IDs like `mal` / `anidb` / `anilist` inside `ids` — both are treated the same, and anime is counted and reported under `shows`. See [Anime under shows[]](/conventions/standard-media-objects#anime).
 
 <CardGroup cols={2}>
  <Card title="POST /sync/history" icon="clock" href="/api-reference/simkl/add-to-history" horizontal>
@@ -11949,6 +11981,8 @@ Notes on the moving parts:
 >
 > [Open](https://simkl.com)
 >
+> Four drop-in attribution patterns — pick whichever fits your UI or create your own
+>
 > ```html Minimal rating pill (PNG) theme={"theme":{"light":"github-light","dark":"vesper"}}
 > <a href="https://simkl.com/movies/53536/terminator-3-rise-of-the-machines"
 >    style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid currentColor; border-radius: 999px; text-decoration: none; color: inherit;">
@@ -12185,6 +12219,8 @@ Use the **filter** in the right rail to narrow this changelog by tag.
 
 **2026-10-18**
 
+Search all types at once
+
 New feature
 
 **Search movies, TV and anime in one request**
@@ -12198,6 +12234,8 @@ GET /search/all?q=batman
 Results mix movies, TV shows and anime in one list, so read `endpoint_type` on each item (`movies`, `tv` or `anime`). Paging, `extended=full` and every `sort` work the same as with the other types. If your app shows only one kind of title, keep using `movie`, `tv` or `anime` — you get only that type, and the paging counts cover only those matches.
 
 **2026-10-14**
+
+Finale markers on TV episodes
 
 New feature
 
@@ -12215,6 +12253,8 @@ New feature
 It's the same field, with the same values, as [`finale_type` in the calendar files](/api-reference/calendar#param-finale-type). Specials can carry it too. Anime episodes don't have it — [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) omits the key.
 
 **2026-10-09**
+
+Original language and trailer types on title pages, search sorting, scrobble threshold
 
 New feature
 
@@ -12236,6 +12276,8 @@ Add `?min_progress=` (50–100) to [`/scrobble/stop`](/api-reference/simkl/scrob
 
 **2026-10-07**
 
+Trending by genre, and genres fixed in trending, DVD, calendar and list data
+
 New feature
 
 **Trending by genre**
@@ -12254,6 +12296,8 @@ Fix
 In the [trending](/api-reference/trending), DVD and [calendar](/api-reference/calendar) files and [`GET /lists/{id}`](/api-reference/simkl/get-list), the `genres` array now lists only genres of the title's own type. Before, some titles carried genres from another type: a false "Action" on 43 non-action movies in the month list, and repeats such as "Action, Action" or "Comedy, Comedy". Anime titles no longer show "Animation".
 
 **2026-10-03**
+
+Episode runtimes, similar titles, list collections and roles, audience counts
 
 New feature
 
@@ -12280,6 +12324,8 @@ Every episode now has a `runtime` in whole minutes, or `null` when none is on fi
 [Trending and DVD files](/api-reference/trending) and [calendar v2](/api-reference/calendar) `metadata` now include `watching` and `completed` — all-time counts of users with the title in each list. On trending files, `watched` still counts only the file's timeframe; use `watching` + `completed` for a title's overall audience.
 
 **2026-09-18**
+
+Custom lists read API — beta, PRO and VIP
 
 Major launchNew feature
 
@@ -12318,6 +12364,8 @@ This block is returned to **AUTH V1 apps too**, even though the list endpoints t
 Being beta, the response shape may still change; anything that would break a client gets announced here. Full detail in the [Custom Lists guide](/guides/custom-lists), the [API overview](/api-reference/lists), and [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps) for the polling pattern.
 
 **2026-09-18**
+
+AUTH V2 is here — V1 retires around April 2027
 
 New featureMigration required
 
@@ -12408,6 +12456,8 @@ See [Tokens and refresh](/api-reference/oauth2-tokens) for the refresh grant and
 
 **2026-09-10**
 
+Rewatches in scrobble: ?allow\_rewatch=yes on stop and checkin
+
 New feature
 
 **Rewatches now work while scrobbling**
@@ -12426,6 +12476,8 @@ Don't **Never send the flag on [`/scrobble/start`](/api-reference/simkl/scrobble
 Full walkthrough, including the four gates to check before enabling and the 2-day gap between watches, in the [**Rewatches guide, Scrobble section**](/guides/rewatches#scrobble) and the [Scrobble guide](/guides/scrobble#rewatches).
 
 **2026-07-21**
+
+Calendar data files v2 — migrate by 1 Feb 2027
 
 Breaking
 
@@ -12453,6 +12505,8 @@ The [Calendar page](/api-reference/calendar) has the full field reference and a 
 
 **2026-05-25**
 
+Trending SDK with live preview
+
 Docs
 
 **Trending SDK with live preview**
@@ -12469,6 +12523,8 @@ Scroll to **"Try it live"** on [the trending page](/api-reference/trending) for 
 
 **2026-05-22**
 
+Rewatches API
+
 Major launch
 
 **Rewatches via `?allow_rewatch=yes`**
@@ -12481,6 +12537,8 @@ Major launch
 Walkthrough, state-machine rules, and ready-made code for simkl.com-style UI patterns in the new [**Rewatches guide**](/guides/rewatches). Quick mention also in the [Sync guide → Record a rewatch](/guides/sync#common-write-operations) and [Mark as watched → Record a rewatch](/guides/mark-as-watched#record-a-rewatch) accordions.
 
 **2026-05-22**
+
+API Analytics: live per-app request log
 
 Major launch
 
@@ -12508,6 +12566,8 @@ Full reference at [API Analytics](/debug/api-analytics).
 
 **2026-05-22**
 
+Docs revamp: new home at api.simkl.org
+
 Docs
 
 **Docs revamp**
@@ -12529,6 +12589,8 @@ What's new:
 
 **2026-04-22**
 
+Required app identification
+
 Breaking
 
 **`app-name` and `app-version` are now required**
@@ -12543,6 +12605,8 @@ See the updated [Quickstart](/quickstart) and [Headers and conventions](/convent
 
 **2026-03-10**
 
+API terminology: List → Watchlist
+
 Docs
 
 **Renamed in the docs: "List" → "Watchlist"**
@@ -12554,6 +12618,8 @@ Simkl's website introduced **Custom Lists** — user-created collections of titl
 A dedicated Custom Lists API may ship in a future release.
 
 **2026-02-10**
+
+Trending data files
 
 New feature
 
@@ -12570,6 +12636,8 @@ We've published trending data as static JSON on `data.simkl.in` — no API key r
 See the full file index in [Trending data files](/api-reference/trending).
 
 **2026-01-31**
+
+New endpoint: /scrobble/checkin
 
 New feature
 
@@ -12588,6 +12656,8 @@ Use cases: cinema apps, live-TV trackers, social "watching now" status updates. 
 
 **2026-01-15**
 
+PIN flow polling clarified
+
 Improvement
 
 **PIN poll response — two distinct shapes**
@@ -12597,6 +12667,8 @@ The `/oauth/pin/{USER_CODE}` polling response now returns one of two explicit JS
 See [PIN authentication](/api-reference/pin) for the response schemas.
 
 **2025-10-08**
+
+Scrobble and Playback APIs launch
 
 Major launch
 
@@ -12615,6 +12687,8 @@ Note: only **one** playback is stored per show/movie. Starting a new episode rep
 
 **2025-08-15**
 
+Calendar files expanded
+
 New feature
 
 **Monthly archive endpoints**
@@ -12622,6 +12696,8 @@ New feature
 The [Calendar JSON](/api-reference/calendar) now includes per-month archives for the last 12 months at the URL pattern `https://data.simkl.in/calendar/{YEAR}/{MONTH}/{tv|anime|movie_release}.json`. The current month regenerates every 6 hours; previous months once a day.
 
 **2025-06-01**
+
+Image proxy via wsrv.nl
 
 Docs
 
@@ -12632,6 +12708,8 @@ We now recommend serving Simkl image paths through [wsrv.nl](https://wsrv.nl), a
 See [Images](/conventions/images) for the URL pattern and size codes. Examples append `&q=90` for origin-equivalent quality (wsrv's default `&q=80` reduces filesize and quality).
 
 **2025-05-29**
+
+runtime field on /sync/all-items
 
 Improvement
 
@@ -12646,6 +12724,8 @@ Improvement
 ```
 
 **2025-02-25**
+
+simkl\_type and anime\_type in /sync/history response
 
 Improvement
 
@@ -12664,6 +12744,8 @@ The per-item `response` object inside `added.statuses` now includes `simkl_type`
 Useful when you're sending titles by TMDB ID and need to know how Simkl classified the item — e.g., a TMDB movie that Simkl resolved as an anime movie. Also handy for clients that store `simkl_type` locally so they can later reconcile deletions across types.
 
 **2025-02-05**
+
+/sync/history: status field + use\_tvdb\_anime\_seasons
 
 Improvement
 
@@ -14019,13 +14101,23 @@ Wide background art — the cinematic still you typically use behind the title o
 
 [![\_medium](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_medium.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_medium.webp\&q=90)
 
+`_medium` — 1920 × 1080, full HD
+
 [![\_mobile](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_mobile.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_mobile.webp\&q=90)
+
+`_mobile` — 960 × 540
 
 [![\_w](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_w.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_w.webp\&q=90)
 
+`_w` — 600 × 338
+
 [![\_d](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_d.jpg\&q=90)](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_d.jpg\&q=90)
 
+`_d.jpg` — original size, darker, smaller filesize. JPG only — the one fanart size that isn't `.webp`.
+
 [![\_s48](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_s48.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_s48.webp\&q=90)
+
+`_s48` — 48 × 27, blur-up placeholder
 
 **Reference table**
 
@@ -14043,9 +14135,15 @@ Wide background art — the cinematic still you typically use behind the title o
 
 [![\_w](https://wsrv.nl/?url=https://simkl.in/episodes/26/265319260301d2ee2_w.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/episodes/26/265319260301d2ee2_w.webp\&q=90)
 
+`_w` — 600 × 338
+
 [![\_c](https://wsrv.nl/?url=https://simkl.in/episodes/26/265319260301d2ee2_c.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/episodes/26/265319260301d2ee2_c.webp\&q=90)
 
+`_c` — 210 × 118
+
 [![\_m](https://wsrv.nl/?url=https://simkl.in/episodes/26/265319260301d2ee2_m.webp\&q=90)](https://wsrv.nl/?url=https://simkl.in/episodes/26/265319260301d2ee2_m.webp\&q=90)
+
+`_m` — 112 × 63
 
 **Reference table**
 
@@ -14099,11 +14197,19 @@ When a `poster`, `fanart`, or `episode` field is `null` (or the path is empty), 
 
 [![default placeholder](https://wsrv.nl/?url=https://simkl.in/poster_no_pic.png)](https://wsrv.nl/?url=https://simkl.in/poster_no_pic.png)
 
+default — full size
+
 [![\_c placeholder](https://wsrv.nl/?url=https://simkl.in/poster_no_pic_c.png)](https://wsrv.nl/?url=https://simkl.in/poster_no_pic_c.png)
+
+\_c — 170 × 250
 
 [![\_c grey placeholder](https://wsrv.nl/?url=https://simkl.in/poster_no_pic_c_grey.png)](https://wsrv.nl/?url=https://simkl.in/poster_no_pic_c_grey.png)
 
+\_c grey
+
 [![\_s placeholder](https://wsrv.nl/?url=https://simkl.in/poster_no_pic_s.png)](https://wsrv.nl/?url=https://simkl.in/poster_no_pic_s.png)
+
+\_s — 40 × 57
 
 | URL | Use for | File size | Example |
 | - | - | - | - |
@@ -16905,7 +17011,7 @@ A **rewatch** is a separate viewing session for an item the user already complet
 
 > [!NOTE]
 >
-> **Simkl PRO / VIP only.** Free-tier callers with `?allow_rewatch=yes` get a silent no-op on `POST /sync/history` — the request still consumes a rate-limit slot but returns `added: { movies: 0, shows: 0, episodes: 0 }`. [`POST /scrobble/stop`](/api-reference/simkl/scrobble-stop) is the exception: it answers `rewatch_status: "pro_required"`, so you can read the reason off the response. Either way, **gate the flag behind the user's plan instead of sending it blindly:**
+> **Simkl PRO / VIP only.** Free-tier callers with `?allow_rewatch=yes` get no rewatch on `POST /sync/history`, silently: no `rewatch_id` comes back, and re-posting an already-watched item returns `added: { movies: 0, shows: 0, episodes: 0 }` while still costing a rate-limit slot. [`POST /scrobble/stop`](/api-reference/simkl/scrobble-stop) is the exception: it answers `rewatch_status: "pro_required"`, so you can read the reason off the response. Either way, **gate the flag behind the user's plan instead of sending it blindly:**
 >
 > 1. **On sign-in (or first launch)**, call [`GET /users/settings`](/api-reference/simkl/get-user-settings) once and read `account.type` — one of `"free"`, `"pro"`, or `"vip"`. Cache it locally.
 > 2. **Don't refetch on every poll.** User settings are set-and-forget. Watch `activities.settings.all` from [`GET /sync/activities`](/api-reference/simkl/get-activities) (you're already polling it for the sync delta — see the [Sync guide](/guides/sync)); when that timestamp bumps, refetch `/users/settings` once to pick up plan upgrades, downgrades, timezone changes, etc.
@@ -16924,6 +17030,10 @@ A **rewatch** is a separate viewing session for an item the user already complet
 > **[POST /scrobble/stop](/api-reference/simkl/scrobble-stop)**
 >
 > For players. `?allow_rewatch=yes` on a stop with `progress` ≥ 80, or on a check-in. Never on `/scrobble/start`.
+
+> **[POST /sync/history/remove](/api-reference/simkl/remove-from-history)**
+>
+> Delete a session, or episodes from it, by its `rewatch_id`. The original watch stays.
 
 ## Adding a rewatch toggle to your app
 
@@ -17017,9 +17127,11 @@ Response echoes `rewatch_id` and `rewatch_status` inside `added.statuses[].respo
 
 The server always tries the regular write first. If the regular write would actually mark new data, that takes precedence — no rewatch is created. A write lands in a rewatch session when **any** of these holds:
 
-1. **The item is already Completed and the regular add is a no-op** (movies: user already finished it; shows: payload has no episodes and the show is Completed).
-2. **You included episodes and every one is already on the user's history** — i.e. the regular write would change nothing.
+1. **A movie the user already completed is posted again.**
+2. **You included episodes and every one is already on the user's history** — i.e. the regular write would change nothing. A show sent without episodes is never treated as a rewatch on its own.
 3. **You passed `is_rewatch: true`** on the item.
+
+`is_rewatch: false` does the opposite: that item never becomes a rewatch, which keeps canonical rows copied back from `/sync/all-items` from creating sessions.
 
 `is_rewatch: true` does **not** bypass the regular-first logic. If the write tries to add a date that already exists in canonical history, it's still rejected. The flag's main use is to create an empty rewatch session on a Completed item your UI explicitly marked as *"starting a rewatch"* — without writing any episodes yet.
 
@@ -17164,7 +17276,7 @@ if (['active', 'completed', 'closed'].includes(res.rewatch_status)) {
 | - | - | - |
 | `is_rewatch` | bool | Trigger rewatch logic explicitly. See [When does a write become a rewatch?](#when-does-a-write-become-a-rewatch) for what overrides what. |
 | `rewatch_id` | int | Resume a specific session. Use the value from a previous response. Without it, the server picks the item's active session if one exists, else creates a new session. |
-| `rewatch_status` | string | Explicitly set session state — `active`, `closed`, or (movies only) `completed`. See [Session states](#session-states) for the full state machine. |
+| `rewatch_status` | string | Explicitly set session state — `active`, `closed`, or (movies only) `completed`. On a show, send it with `is_rewatch: true` when the write has no episodes, or the server never reaches the session. See [Session states](#session-states) for the full state machine. |
 | `watched_at` | string (ISO-8601) | Standard per-item timestamp. Also serves as the session's start date. |
 | `last_watched_at` | string (ISO-8601) | Primarily a **response** field from `GET /sync/all-items` (the session's most recent watch event). Rarely set on writes. |
 
@@ -17188,7 +17300,7 @@ A session is in exactly one of three states. For TV / anime, `completed` is **se
 
 ## The 2-day gap
 
-Any two watch events on the **same item** (movie or individual episode) must be at least 2 days apart, or the second write collapses into the first session. *It's a rewatch, not a rewind* 😄.
+Any two watch events on the **same item** (movie or individual episode) must be at least 2 days apart, or the second write is ignored — no session is created and nothing counts in `added`. An episode rewatch dated before the original watch is ignored too. *It's a rewatch, not a rewind* 😄.
 
 The gap is **per-item**, not per-show. Watching S1E1 on Monday and S1E2 on Tuesday is fine — those are different items. The rule only fires when the *same* episode is written twice within 48h.
 
@@ -17347,11 +17459,15 @@ A few things to notice in the example above:
 >
 > All three are `POST /sync/history?allow_rewatch=yes`:
 >
-> * **Reactivate** an older session — `rewatch_id: N, rewatch_status: "active"`. The previously-active session for the item auto-closes.
+> * **Reactivate** an older session — `is_rewatch: true, rewatch_id: N, rewatch_status: "active"`. The previously-active session for the item auto-closes.
 > * **Start new** — write the first episode, or `is_rewatch: true` for an empty session on a Completed item.
-> * **Close** — `rewatch_id: N, rewatch_status: "closed"`. Keeps `watched_episodes_count`; resumable by another write to the same `rewatch_id`. No-op on a `completed` session — reactivate first.
+> * **Close** — `is_rewatch: true, rewatch_id: N, rewatch_status: "closed"`. Keeps `watched_episodes_count`; resumable by another write to the same `rewatch_id`. No-op on a `completed` session — reactivate first.
+>
+> Without `is_rewatch: true`, a show write that carries no episodes never reaches the session, so these changes silently do nothing.
 >
 > **Pin `rewatch_id` on every write after the first.** Without it, finished sessions need `last_watched_at` to pinpoint which row to resume — otherwise the server creates a new row. (The singleton `active` session is always resumable by bare `is_rewatch: true`.)
+>
+> To **delete** a session, send its `rewatch_id` to [`POST /sync/history/remove`](/api-reference/simkl/remove-from-history); add `seasons` to remove only those episodes from it.
 
 > **Rewatch history list — '×3 sessions' panel**
 >
@@ -17384,7 +17500,7 @@ A few things to notice in the example above:
 
 > **Same episode written twice within 48h**
 >
-> Second write collapses into the same session. `watched_episodes_count` doesn't increment; `last_watched_at` updates to the latest value. Intentional — see [The 2-day gap](#the-2-day-gap).
+> The second write is ignored — the episode isn't added to the session again and `watched_episodes_count` doesn't increment. Intentional — see [The 2-day gap](#the-2-day-gap).
 
 > **Conflict-split on same episode, different dates**
 >
@@ -17448,6 +17564,8 @@ If you only need a "Mark as watched" button without real-time progress reporting
 > Seeking and scrubbing need **no call either**. Update your local `progress` variable and let the next real user event carry it.
 
 ![Simkl user dashboard showing 'NOW WATCHING' Fallout S02E07 'The Handoff' with a 46% watched progress bar and 27 minutes left](https://mintcdn.com/andrewmasyk/RbJc6mqlYX6FcPwH/images/watching-now-dashboard.webp?fit=max\&auto=format\&n=RbJc6mqlYX6FcPwH\&q=85\&s=a71e052e0bbc1f376f6dc58f9785517a)
+
+The "Now Watching" banner on the user dashboard. The progress bar updates live — for [`/scrobble/start`](/api-reference/simkl/scrobble-start) it reflects the most recent `progress` you sent; for [`/scrobble/checkin`](/api-reference/simkl/scrobble-checkin) Simkl extrapolates from the item runtime.
 
 ## The lifecycle at a glance
 
@@ -18897,11 +19015,11 @@ Real users do unusual things, clients have bugs, and networks drop. The behaviou
 >
 > **Limits to plan for:**
 >
-> * **Plan gate.** Only Simkl PRO / VIP accounts record rewatches. Free-tier callers get a silent no-op even with `?allow_rewatch=yes`. Check `account.type` from [`POST /users/settings`](/api-reference/simkl/get-user-settings) at sign-in, cache it, and refetch only when `activities.settings.all` bumps — that timestamp moves on plan upgrades / downgrades and any other profile update. Don't fire `?allow_rewatch=yes` from a free-tier client; the request consumes a rate-limit slot regardless.
+> * **Plan gate.** Only Simkl PRO / VIP accounts record rewatches. Free-tier callers get no rewatch even with `?allow_rewatch=yes` — silently, with no `rewatch_id` in the response. Check `account.type` from [`POST /users/settings`](/api-reference/simkl/get-user-settings) at sign-in, cache it, and refetch only when `activities.settings.all` bumps — that timestamp moves on plan upgrades / downgrades and any other profile update. Don't fire `?allow_rewatch=yes` from a free-tier client; the request consumes a rate-limit slot regardless.
 >
 > * **Up to 50 rewatches per item** (movie, show, or anime).
 >
-> * **2-day minimum gap between watch events on the same item.** Movies *and* individual episodes — a new rewatch closer than 48 hours to the previous watch of the same item collapses into the same session. *It's a rewatch, not a rewind* 😄. Re-watching *different* episodes back-to-back is fine.
+> * **2-day minimum gap between watch events on the same item.** Movies *and* individual episodes — a new rewatch closer than 48 hours to the previous watch of the same item is ignored. *It's a rewatch, not a rewind* 😄. Re-watching *different* episodes back-to-back is fine.
 >
 > > [!NOTE]
 > >
@@ -18912,11 +19030,11 @@ Real users do unusual things, clients have bugs, and networks drop. The behaviou
 > > * **DST transitions.** Naive datetime libraries miscalculate by an hour twice a year, in the days surrounding the spring-forward / fall-back boundary. Same buffer covers them.
 > > * **Clock drift on offline-capable apps.** Mobile, set-top, and console clients that batch writes after coming back online often back-date events using the *current* device clock minus a rough offset, not the actual playback time. Multi-hour drift is common.
 > > * **Scrobble pause/resume noise.** Some media players re-fire `/scrobble/start` and `/scrobble/stop` around a pause (bathroom break, doorbell, phone call). Without a gap, the resume reads like a second viewing.
-> > * **Multi-device duplicates.** A user's phone, TV, and home-theatre receiver can all see the same file open and each report a play event. Same item, near-identical timestamps — the gap collapses them into one session.
-> > * **Network retry storms.** A flaky connection causes a client to retry `POST /sync/history` several times for one watch event. The gap collapses the retries instead of pretending each retry was a separate rewatch.
+> > * **Multi-device duplicates.** A user's phone, TV, and home-theatre receiver can all see the same file open and each report a play event. Same item, near-identical timestamps — the gap ignores all but the first.
+> > * **Network retry storms.** A flaky connection causes a client to retry `POST /sync/history` several times for one watch event. The gap ignores the retries instead of pretending each retry was a separate rewatch.
 > > * **Importer re-runs.** Users importing history from another source often re-run the import to catch missed items, re-submitting the same `watched_at` values. Without the gap, every re-run inflates the rewatch count.
 > > * **Background play.** A TV left on for noise can auto-loop the same episode, or a chromecast can re-cast the same title on idle. The user isn't really rewatching it.
-> > * **Buggy progress reporting.** A media player that miscalculates `progress` can hit 80%+ multiple times during a single play (especially on seeks), each of which clients sometimes translate into a fresh `POST /sync/history`. The gap collapses these.
+> > * **Buggy progress reporting.** A media player that miscalculates `progress` can hit 80%+ multiple times during a single play (especially on seeks), each of which clients sometimes translate into a fresh `POST /sync/history`. The gap ignores these.
 > >
 > > Without the gap, a single heavy user could accumulate dozens of phantom rewatch sessions per evening — breaking aggregate stats (*"you've watched this 47 times this week"*), inflating storage, and turning the rewatch history list on simkl.com into unreadable noise. The 48-hour rule isn't there to be restrictive — it's there to make rewatch tracking reliable for the user, regardless of how clients handle timestamps.
 >
