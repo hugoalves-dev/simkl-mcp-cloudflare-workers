@@ -23,6 +23,7 @@ describe('rewatch MCP tools', () => {
 
       expect(registered.has('simkl_start_rewatch')).toBe(true);
       expect(registered.has('simkl_update_rewatch')).toBe(true);
+      expect(registered.has('simkl_delete_rewatch')).toBe(true);
       expect(registered.has('simkl_get_rewatches')).toBe(true);
       expect(Object.keys(registered.get('simkl_get_rewatches')!.definition.inputSchema).sort()).toEqual(['mediaType', 'status']);
       expect(registered.get('simkl_start_rewatch')!.definition.inputSchema.ids.safeParse({}).success).toBe(false);
@@ -37,6 +38,48 @@ describe('rewatch MCP tools', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  test('deletion reports no-change and not-found separately and requires an explicit session ID', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app' });
+    const writes: Array<{ endpoint: string; body: any }> = [];
+    client.request = async (endpoint: string, options: any) => {
+      if (endpoint === '/users/settings') return { account: { type: 'pro' } } as any;
+      writes.push({ endpoint, body: options.body });
+      return writes.length === 1
+        ? { deleted: { rewatches: 0 }, not_found: { movies: [], shows: [], episodes: [] } } as any
+        : { deleted: { rewatches: 0 }, not_found: { movies: [], shows: [{ ids: { simkl: 5 } }], episodes: [] } } as any;
+    };
+    const registered = new Map<string, { definition: any; handler: (args: any) => Promise<any> }>();
+    const server = { registerTool(name: string, definition: any, handler: (args: any) => Promise<any>) { registered.set(name, { definition, handler }); } };
+    registerRewatchTools(server as any, new RewatchService(client, () => 'token'));
+    const tool = registered.get('simkl_delete_rewatch')!;
+    expect(tool.definition.annotations.destructiveHint).toBe(true);
+    expect(tool.definition.inputSchema.rewatch_id.safeParse(0).success).toBe(false);
+    expect(tool.definition.inputSchema.seasons.safeParse([{ number: 1 }]).success).toBe(false);
+
+    const noChange = await tool.handler({ mediaType: 'movies', ids: { simkl: 8 }, rewatch_id: 43 });
+    expect(JSON.parse(noChange.content[0].text).outcome).toBe('no_change');
+    const notFound = await tool.handler({ mediaType: 'shows', ids: { simkl: 5 }, rewatch_id: 44 });
+    expect(JSON.parse(notFound.content[0].text).outcome).toBe('not_found');
+    expect(writes).toEqual([
+      { endpoint: '/sync/history/remove', body: { movies: [{ ids: { simkl: 8 }, rewatch_id: 43 }] } },
+      { endpoint: '/sync/history/remove', body: { shows: [{ ids: { simkl: 5 }, rewatch_id: 44 }] } },
+    ]);
+  });
+
+  test('preserves numeric list status separately from a non-success rewatch_status', async () => {
+    const client = new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app' });
+    client.request = async (endpoint: string) => endpoint === '/users/settings'
+      ? { account: { type: 'pro' } } as any
+      : { added: { statuses: [{ response: { status: 3, simkl_type: 'anime', rewatch_id: 7, rewatch_status: 'too_soon' } }] } } as any;
+    const registered = new Map<string, (args: any) => Promise<any>>();
+    registerRewatchTools({ registerTool(name: string, _definition: any, handler: (args: any) => Promise<any>) { registered.set(name, handler); } } as any, new RewatchService(client, () => 'token'));
+    const response = await registered.get('simkl_start_rewatch')!({ mediaType: 'anime', ids: { mal: 8 } });
+    const result = JSON.parse(response.content[0].text);
+    expect(result.added.statuses[0].response.status).toBe(3);
+    expect(result.added.statuses[0].response.rewatch_id).toBe(7);
+    expect(result.added.statuses[0].response.rewatch_status).toBe('too_soon');
   });
 
   test('reports a duplicate stop as MCP success and preserves the upstream watch date', async () => {

@@ -1278,7 +1278,7 @@
                       ],
                       "ratings": {
                         "simkl": {
-                          "rating": 9.0,
+                          "rating": 9,
                           "votes": 4200
                         },
                         "mal": {
@@ -1286,7 +1286,7 @@
                           "votes": 3700000
                         },
                         "imdb": {
-                          "rating": 9.0,
+                          "rating": 9,
                           "votes": 410000
                         }
                       }
@@ -2096,11 +2096,11 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
           "400": {
             "$ref": "#/components/responses/UnauthorizedClient"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "tags": [
@@ -2172,6 +2172,9 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/UnauthorizedClient"
+          },
           "401": {
             "description": "Invalid code will give you a 401 error",
             "headers": {},
@@ -2194,9 +2197,6 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
-          },
-          "400": {
-            "$ref": "#/components/responses/UnauthorizedClient"
           }
         },
         "tags": [
@@ -3367,7 +3367,7 @@
                   "summary": "Movie — IMDB + TMDB only (no Simkl ID known yet)",
                   "description": "Tracker apps importing from third-party catalogs (Trakt, Plex, Letterboxd) often have IMDB and/or TMDB IDs but no Simkl ID yet. Send any combination — Simkl resolves to the canonical record and echoes back the full ID set in the response so you can cache the Simkl ID for next time.",
                   "value": {
-                    "progress": 25.0,
+                    "progress": 25,
                     "movie": {
                       "title": "Oppenheimer",
                       "year": 2023,
@@ -3393,7 +3393,7 @@
                   "summary": "TV episode — full show IDs + episode season/number + progress",
                   "description": "Standard TV check-in. Send every show ID you have (Simkl + IMDB + TMDB + TVDB) plus `title` and `year`, and the `episode` block with `season` + `number`. Simkl maps season/number to the canonical episode on its side.",
                   "value": {
-                    "progress": 5.0,
+                    "progress": 5,
                     "show": {
                       "title": "The Last of Us",
                       "year": 2023,
@@ -3460,7 +3460,7 @@
                   "summary": "Anime episode — by `episode.ids.anidb` (Taiga-style)",
                   "description": "AniDB episode IDs are unique across the anime catalog — pass `episode.ids.anidb` to identify the exact episode regardless of season/number ambiguity. Works the same way as `episode.ids.tvdb` does for TV, just for AniDB-sourced players like Taiga or anime-only trackers.",
                   "value": {
-                    "progress": 47.0,
+                    "progress": 47,
                     "anime": {
                       "title": "Cowboy Bebop",
                       "year": 1998,
@@ -3558,7 +3558,7 @@
                     "value": {
                       "id": 10916896,
                       "action": "checkin",
-                      "progress": 25.0,
+                      "progress": 25,
                       "movie": {
                         "title": "Oppenheimer",
                         "year": 2023,
@@ -3597,7 +3597,7 @@
                     "value": {
                       "id": 10916896,
                       "action": "checkin",
-                      "progress": 5.0,
+                      "progress": 5,
                       "show": {
                         "title": "The Last of Us",
                         "year": 2023,
@@ -3675,7 +3675,7 @@
                     "value": {
                       "id": 10916896,
                       "action": "checkin",
-                      "progress": 47.0,
+                      "progress": 47,
                       "anime": {
                         "title": "Cowboy Bebop",
                         "year": 1998,
@@ -3822,30 +3822,6 @@
           },
           {
             "$ref": "#/components/parameters/UserAgentHeader"
-          },
-          {
-            "name": "allow_rewatch",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "yes",
-                "no"
-              ],
-              "default": "no"
-            },
-            "description": "Opt into rewatch tracking. When `yes` **and** the account is Simkl **PRO** or **VIP**, a `/scrobble/stop` with `progress` ≥ 80 on an already-completed item records a separate rewatch session instead of being a no-op, and the response gains `rewatch_id` + `rewatch_status`. Below 80 the stop is a pause, so nothing is marked and no rewatch fields are returned.\n\n**Send this on `/scrobble/stop` only.** The flag is accepted here for consistency, but on `/scrobble/start` and `/scrobble/checkin` it applies to the user's *previous* outstanding playback rather than the item in this request, and nothing in the response reports that. See the `/scrobble/stop` description for the full rule.\n\n**Also supported on [`POST /scrobble/checkin`](/api-reference/simkl/scrobble-checkin)**, where the opt-in is stored on the check-in and applied later, when the check-in matures into a watch. The check-in response carries no rewatch fields because nothing has happened yet.\n\n**Read the [Rewatches guide](/guides/rewatches) before enabling this.** Gate it behind explicit user intent, a dedicated \"Rewatch\" button, never on automatic scrobble events, and expose a per-user *Track rewatches* toggle in your app settings that defaults to off. Used carelessly it pollutes the user's history stats and rewatches panel with phantom sessions.",
-            "examples": {
-              "default_off": {
-                "summary": "Default - rewatch tracking off. What every app should send unless the user explicitly asked to log a rewatch.",
-                "value": "no"
-              },
-              "explicit_rewatch": {
-                "summary": "User tapped \"Rewatch\" and the account is PRO/VIP - only meaningful on /scrobble/stop with progress >= 80",
-                "value": "yes"
-              }
-            }
           }
         ],
         "requestBody": {
@@ -3963,30 +3939,6 @@
           },
           {
             "$ref": "#/components/parameters/UserAgentHeader"
-          },
-          {
-            "name": "allow_rewatch",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "yes",
-                "no"
-              ],
-              "default": "no"
-            },
-            "description": "Opt into rewatch tracking. When `yes` **and** the account is Simkl **PRO** or **VIP**, a `/scrobble/stop` with `progress` ≥ 80 on an already-completed item records a separate rewatch session instead of being a no-op, and the response gains `rewatch_id` + `rewatch_status`. Below 80 the stop is a pause, so nothing is marked and no rewatch fields are returned.\n\n**Send this on `/scrobble/stop` only.** The flag is accepted here for consistency, but on `/scrobble/start` and `/scrobble/checkin` it applies to the user's *previous* outstanding playback rather than the item in this request, and nothing in the response reports that. See the `/scrobble/stop` description for the full rule.\n\n**Also supported on [`POST /scrobble/checkin`](/api-reference/simkl/scrobble-checkin)**, where the opt-in is stored on the check-in and applied later, when the check-in matures into a watch. The check-in response carries no rewatch fields because nothing has happened yet.\n\n**Read the [Rewatches guide](/guides/rewatches) before enabling this.** Gate it behind explicit user intent, a dedicated \"Rewatch\" button, never on automatic scrobble events, and expose a per-user *Track rewatches* toggle in your app settings that defaults to off. Used carelessly it pollutes the user's history stats and rewatches panel with phantom sessions.",
-            "examples": {
-              "default_off": {
-                "summary": "Default - rewatch tracking off. What every app should send unless the user explicitly asked to log a rewatch.",
-                "value": "no"
-              },
-              "explicit_rewatch": {
-                "summary": "User tapped \"Rewatch\" and the account is PRO/VIP - only meaningful on /scrobble/stop with progress >= 80",
-                "value": "yes"
-              }
-            }
           },
           {
             "name": "min_progress",
@@ -10626,7 +10578,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/HistoryRequest"
+                "$ref": "#/components/schemas/HistoryRemoveRequest"
               },
               "examples": {
                 "remove_movie_entirely": {
@@ -18973,18 +18925,32 @@
       },
       "HistoryRequest": {
         "type": "object",
-        "description": "Body for `/sync/history` and `/sync/history/remove`. Items go under `movies[]`, `shows[]`, or `anime[]` — Simkl resolves anime titles correctly under either `shows[]` or `anime[]`, so match the field to your data type when known.",
+        "description": "Body for `/sync/history`. Items go under movies[], shows[], or anime[]. Each item may include is_rewatch, rewatch_id, and rewatch_status.",
         "properties": {
           "movies": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Movie"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Movie"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRewatchFields"
+                }
+              ]
             }
           },
           "shows": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Show"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRewatchFields"
+                }
+              ]
             }
           },
           "episodes": {
@@ -18998,7 +18964,14 @@
           "anime": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Show"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRewatchFields"
+                }
+              ]
             },
             "description": "Array of anime entries (same shape as `shows[]`)."
           }
@@ -19244,16 +19217,30 @@
             "type": "object",
             "properties": {
               "status": {
-                "type": "string",
-                "enum": [
-                  "watching",
-                  "plantowatch",
-                  "hold",
-                  "dropped",
-                  "completed",
-                  "removed"
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "watching",
+                      "plantowatch",
+                      "hold",
+                      "dropped",
+                      "completed",
+                      "removed"
+                    ]
+                  },
+                  {
+                    "type": "integer",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
                 ],
-                "description": "Resulting list status."
+                "description": "Resulting list status. Show/anime rewatch writes may return numeric status codes: 1 watching, 2 plantowatch, 3 completed, 4 dropped, 5 hold."
               },
               "simkl_type": {
                 "type": "string",
@@ -19340,17 +19327,29 @@
                 "type": "integer",
                 "description": "Number of individual episodes unmarked as watched. The parent show stays in the user's library.",
                 "example": 4
+              },
+              "rewatches": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of rewatch sessions deleted."
+              },
+              "rewatch_episodes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of episodes removed from rewatch sessions."
               }
             },
             "required": [
               "movies",
               "shows",
-              "episodes"
+              "episodes",
+              "rewatches",
+              "rewatch_episodes"
             ]
           },
           "not_found": {
             "type": "object",
-            "description": "Per-type lists of input items Simkl could not match. **There is no `not_found.episodes` array** — even when you targeted specific episodes, only the parent movie/show object lands here if the lookup failed.",
+            "description": "Items Simkl could not match; episodes contains matched shows with only requested episode numbers that do not exist.",
             "properties": {
               "movies": {
                 "type": "array",
@@ -19365,11 +19364,19 @@
                   "type": "object"
                 },
                 "description": "Input show/anime objects Simkl could not match."
+              },
+              "episodes": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "A matched show per entry, with only requested episode numbers that do not exist."
               }
             },
             "required": [
               "movies",
-              "shows"
+              "shows",
+              "episodes"
             ]
           }
         },
@@ -22518,6 +22525,94 @@
                   "example": "movies"
                 }
               }
+            }
+          }
+        }
+      },
+      "HistoryRewatchFields": {
+        "type": "object",
+        "properties": {
+          "is_rewatch": {
+            "type": "boolean",
+            "description": "`true` logs this item as a rewatch even when the server would not detect one; `false` never logs a rewatch. Needs `?allow_rewatch=yes` and a PRO / VIP account."
+          },
+          "rewatch_id": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 655494,
+            "description": "Add to this rewatch session; must belong to this user and title."
+          },
+          "rewatch_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "completed"
+            ],
+            "description": "Set the session state. `completed` is supported for movies; show completion is determined by episode coverage."
+          }
+        }
+      },
+      "HistoryRemoveRewatchTarget": {
+        "type": "object",
+        "properties": {
+          "rewatch_id": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 655240,
+            "description": "Remove from this rewatch session only. Without seasons delete the session; with seasons remove only those episodes."
+          }
+        }
+      },
+      "HistoryRemoveRequest": {
+        "type": "object",
+        "description": "Body for `/sync/history/remove` with optional rewatch_id to remove from a rewatch session only.",
+        "properties": {
+          "movies": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Movie"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRemoveRewatchTarget"
+                }
+              ]
+            }
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRemoveRewatchTarget"
+                }
+              ]
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Show"
+                },
+                {
+                  "$ref": "#/components/schemas/HistoryRemoveRewatchTarget"
+                }
+              ]
+            }
+          },
+          "episodes": {
+            "type": "array",
+            "description": "Top-level convenience array for marking episode-level history without nesting. The server wraps each entry into a synthetic single-season show. Each item carries the same shape as items under `shows[].seasons[].episodes[]` plus the parent `show` reference.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
             }
           }
         }

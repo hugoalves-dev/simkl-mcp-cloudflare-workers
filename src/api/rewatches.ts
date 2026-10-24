@@ -29,6 +29,10 @@ export interface RewatchUpdateInput extends RewatchItemInput {
   rewatch_status?: RewatchStatus;
 }
 
+export interface RewatchDeleteInput extends RewatchItemInput {
+  rewatch_id: number;
+}
+
 export class RewatchPlanError extends Error {
   constructor(message: string) {
     super(message);
@@ -91,10 +95,25 @@ export class RewatchService {
     }
     const item = this.toItem(input);
     const token = await this.requireEligiblePlan();
+    item.is_rewatch = true;
     item.rewatch_id = input.rewatch_id;
     if (input.rewatch_status) item.rewatch_status = input.rewatch_status;
     return this.writeRequest('/sync/history', {
       method: 'POST', token, query: { allow_rewatch: 'yes' },
+      body: { [mediaKeys[input.mediaType]]: [item] },
+    });
+  }
+
+  async delete(input: RewatchDeleteInput): Promise<any> {
+    this.validateId(input.rewatch_id);
+    if (input.mediaType === 'movies' && input.seasons !== undefined) {
+      throw new Error('season and episode removal is only available for shows and anime');
+    }
+    const item = this.toItem(input);
+    const token = await this.requireEligiblePlan();
+    item.rewatch_id = input.rewatch_id;
+    return this.writeRequest('/sync/history/remove', {
+      method: 'POST', token,
       body: { [mediaKeys[input.mediaType]]: [item] },
     });
   }

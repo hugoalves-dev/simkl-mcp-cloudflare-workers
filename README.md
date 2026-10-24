@@ -133,12 +133,14 @@ commit no longer matches `main` skip deployment, including retries of old runs.
 Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) accept `date: today | tomorrow | DD-MM-YYYY` and optional `timeZone` (IANA, for example `America/Sao_Paulo`). **Default: UTC** for backwards compatibility. Results are filtered by the requested **local calendar day**, respecting daylight saving time. Returned airing timestamps remain in UTC (`Z`).
 
 - **User**: `simkl_get_user_stats`, `simkl_my_stats`
-- **Rewatches**: `simkl_start_rewatch`, `simkl_update_rewatch`, `simkl_get_rewatches`, and `simkl_stop_watching` with optional explicit rewatch intent
+- **Rewatches**: `simkl_start_rewatch`, `simkl_update_rewatch`, `simkl_delete_rewatch`, `simkl_get_rewatches`, and `simkl_stop_watching` with optional explicit rewatch intent
 - **Resources**: `watchlist/{type}/{status}`, `trending/{type}/{interval}`
 
 ### Rewatch sessions
 
 Rewatch tracking requires Simkl PRO or VIP. Start a session only when the user explicitly asks to rewatch an existing title; the MCP checks the account plan before writing. Keep the returned `rewatch_id` and provide it on every `simkl_update_rewatch` call. For shows and anime, Simkl marks a session completed when all aired regular episodes have been recorded; movies can be explicitly closed or completed.
+
+`simkl_delete_rewatch` requires the exact session `rewatch_id` and media IDs. Omit `seasons` to delete that session, or provide season and episode numbers to remove only those episodes from it. This leaves the original watch and library entry intact. Use `simkl_remove_from_history` for canonical history removal; it may also remove the library entry.
 
 `simkl_get_rewatches` keeps canonical and rewatch rows distinguishable and requests full episode progress and watch timestamps. Choose `all` or one media type and a watch status. Supply `date_from` for incremental reads. Set `initial_sync=true` only for the first full read.
 
