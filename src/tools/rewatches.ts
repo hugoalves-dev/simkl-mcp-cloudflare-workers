@@ -12,10 +12,21 @@ const ids = z.record(z.string(), z.union([z.string(), z.number()])).refine(
 );
 const episode = z.object({ number: z.number().int().positive(), watched_at: z.string().datetime().optional() }).passthrough();
 const season = z.object({ number: z.number().int().nonnegative(), episodes: z.array(episode).optional() }).passthrough();
+const rewatchDeleteSeason = z.object({ number: z.number().int().nonnegative(), episodes: z.array(episode).min(1) }).strict();
 const date = z.string().datetime();
 
 function jsonResult(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
+}
+
+function rewatchDeleteResult(value: any, partial: boolean) {
+  const deletedCount = partial ? value?.deleted?.rewatch_episodes : value?.deleted?.rewatches;
+  const notFound = value?.not_found;
+  const hasNotFound = ['movies', 'shows', 'episodes'].some(key => Array.isArray(notFound?.[key]) && notFound[key].length > 0);
+  const outcome = typeof deletedCount === 'number' && deletedCount > 0
+    ? 'deleted'
+    : hasNotFound ? 'not_found' : 'no_change';
+  return { ...value, outcome };
 }
 
 function rewatchErrorResult(error: unknown, mutation = false) {
@@ -79,6 +90,31 @@ export function registerRewatchTools(server: McpServer, service: RewatchService,
         ...(args.watched_at ? { watched_at: args.watched_at } : {}),
         ...(args.seasons ? { seasons: args.seasons } : {}),
       }));
+    } catch (error) { return rewatchErrorResult(error, true); }
+  });
+
+  server.registerTool('simkl_delete_rewatch', {
+    description: 'Delete one explicitly identified rewatch session without changing the original watch or library entry. Requires PRO/VIP and the session rewatch_id. Supply seasons with episode numbers to remove only those rewatched episodes; omit seasons to delete the whole session.',
+    inputSchema: {
+      mediaType,
+      ids,
+      rewatch_id: z.number().int().positive(),
+      seasons: z.array(rewatchDeleteSeason).min(1).optional(),
+    },
+    annotations: { destructiveHint: true },
+  }, async args => {
+    try {
+      const result = await service.delete({
+        mediaType: args.mediaType as RewatchWriteMediaType,
+        ids: args.ids,
+        rewatch_id: args.rewatch_id,
+        ...(args.seasons ? { seasons: args.seasons } : {}),
+      });
+      if (afterLibraryWrite) {
+        try { await afterLibraryWrite(); }
+        catch { throw new Error('Upstream write succeeded, but library cache invalidation failed'); }
+      }
+      return jsonResult(rewatchDeleteResult(result, args.seasons !== undefined));
     } catch (error) { return rewatchErrorResult(error, true); }
   });
 

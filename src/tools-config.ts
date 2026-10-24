@@ -107,7 +107,7 @@ export const toolsWhitelist: ToolConfig[] = [
     template: (_: any, args: any) => `added to watchlist: ${(args.movie || args.show || args.anime)?.title}`
   }},
   { path: '/sync/history', method: 'post', batchArrayFields: ['movies', 'shows', 'anime', 'episodes'], legacyEpisodeAlias: true, description: 'Add one or more items to history in a single request using movies[], shows[], anime[], and/or episodes[]. The legacy single episode argument remains supported.', responseFormat: { 'type': 'json' }},
-  { path: '/sync/history/remove', method: 'post', batchArrayFields: ['movies', 'shows', 'anime', 'episodes'], legacyEpisodeAlias: true, description: 'Remove one or more items from history in a single request using movies[], shows[], anime[], and/or episodes[]. The legacy single episode argument remains supported.', responseFormat: { 'type': 'json' }},
+  { path: '/sync/history/remove', method: 'post', batchArrayFields: ['movies', 'shows', 'anime', 'episodes'], legacyEpisodeAlias: true, description: 'Remove canonical watch history or library entries using movies[], shows[], anime[], and/or episodes[]. This can remove the original watch and watchlist entry. To delete only a rewatch session while preserving canonical history, use simkl_delete_rewatch with its required rewatch_id.', responseFormat: { 'type': 'json' }},
   { path: '/sync/ratings', method: 'post', responseFormat: { 'type': 'json' }},
   { path: '/sync/ratings/remove', method: 'post', responseFormat: { 'type': 'json' }},
 

@@ -81,11 +81,39 @@ function extractPathParams(path: string): string[] {
   return Array.from(matches, m => m[1]);
 }
 
-function convertSchemaToZod(schema: any, depth = 0): string {
-  if (!schema || depth > 5) return 'z.unknown()';
+function expandSchema(schema: any, seen = new Set<string>(), depth = 0): any {
+  if (!schema || typeof schema !== 'object' || depth > 16) return {};
+  let result: any = {};
+  if (schema.$ref) {
+    if (seen.has(schema.$ref)) return { type: 'object' };
+    const target = resolveLocalReference(schema);
+    const nextSeen = new Set(seen).add(schema.$ref);
+    result = expandSchema(target, nextSeen, depth + 1);
+  }
+  if (Array.isArray(schema.allOf)) {
+    for (const part of schema.allOf) {
+      const expanded = expandSchema(part, new Set(seen), depth + 1);
+      result = {
+        ...result,
+        ...expanded,
+        properties: { ...(result.properties || {}), ...(expanded.properties || {}) },
+        required: [...new Set([...(result.required || []), ...(expanded.required || [])])],
+      };
+    }
+  }
+  const { $ref: _ref, allOf: _allOf, ...siblings } = schema;
+  result = {
+    ...result,
+    ...siblings,
+    ...(result.properties || siblings.properties ? { properties: { ...(result.properties || {}), ...(siblings.properties || {}) } } : {}),
+    ...(result.required || siblings.required ? { required: [...new Set([...(result.required || []), ...(siblings.required || [])])] } : {}),
+  };
+  return result;
+}
 
-  // handle references
-  if (schema.$ref) return 'z.unknown()';
+function convertSchemaToZod(inputSchema: any, depth = 0): string {
+  if (!inputSchema || depth > 16) return 'z.unknown()';
+  const schema = expandSchema(inputSchema);
 
   // handle arrays
   if (schema.type === 'array') {
@@ -102,7 +130,7 @@ function convertSchemaToZod(schema: any, depth = 0): string {
         return `${key}: ${zodType}${required ? '' : '.optional()'}`;
       })
       .join(', ');
-    return `z.object({ ${props} }).partial().passthrough()`;
+    return `z.object({ ${props} }).passthrough()`;
   }
 
   // handle primitives
@@ -112,8 +140,8 @@ function convertSchemaToZod(schema: any, depth = 0): string {
 
   switch (schema.type) {
     case 'string': return 'z.string()';
-    case 'number':
-    case 'integer': return 'z.number()';
+    case 'number': return 'z.number()';
+    case 'integer': return `z.number().int()${schema.minimum === undefined ? '' : `.min(${schema.minimum})`}${schema.maximum === undefined ? '' : `.max(${schema.maximum})`}`;
     case 'boolean': return 'z.boolean()';
     case 'object': return 'z.object({}).passthrough()';
     default: return 'z.unknown()';

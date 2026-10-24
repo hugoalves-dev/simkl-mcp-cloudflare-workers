@@ -49,6 +49,17 @@ describe('RewatchService', () => {
     expect(response).toHaveProperty('added.statuses.0.response.rewatch_id', 42);
   });
 
+  test('deletes only a pinned rewatch session or the selected session episodes', async () => {
+    const service = createService();
+    await service.delete({ mediaType: 'shows', ids: { simkl: 21 }, rewatch_id: 42, seasons: [{ number: 2, episodes: [{ number: 3 }] }] });
+    const write = requests.find(request => request.url.pathname === '/sync/history/remove')!;
+    expect(JSON.parse(String(write.init.body))).toEqual({ shows: [{ ids: { simkl: 21 }, rewatch_id: 42, seasons: [{ number: 2, episodes: [{ number: 3 }] }] }] });
+    expect(write.url.searchParams.has('allow_rewatch')).toBe(false);
+    await expect(service.delete({ mediaType: 'movies', ids: { simkl: 21 }, rewatch_id: 0 })).rejects.toThrow(/rewatch_id/);
+    await expect(service.delete({ mediaType: 'movies', ids: { simkl: 21 }, rewatch_id: 42, seasons: [] })).rejects.toThrow(/shows and anime/);
+    expect(requests.filter(request => request.url.pathname === '/sync/history/remove')).toHaveLength(1);
+  });
+
   test('serializes anime history in the anime collection', async () => {
     const service = createService();
     await service.start({ mediaType: 'anime', ids: { mal: 4246 }, seasons: [{ number: 1 }] });
@@ -61,7 +72,7 @@ describe('RewatchService', () => {
     await expect(service.update({ mediaType: 'shows', ids: { simkl: 5 }, rewatch_id: 42, rewatch_status: 'active', watched_at: '2026-01-02T00:00:00Z', seasons: [{ number: 1, episodes: [{ number: 2, watched_at: '2026-01-02T00:00:00Z' }] }] })).resolves.toBeDefined();
     const write = requests.find(request => request.url.pathname === '/sync/history')!;
     expect(JSON.parse(String(write.init.body)).shows[0]).toEqual({
-      ids: { simkl: 5 }, rewatch_id: 42, rewatch_status: 'active', watched_at: '2026-01-02T00:00:00Z',
+      ids: { simkl: 5 }, is_rewatch: true, rewatch_id: 42, rewatch_status: 'active', watched_at: '2026-01-02T00:00:00Z',
       seasons: [{ number: 1, episodes: [{ number: 2, watched_at: '2026-01-02T00:00:00Z' }] }],
     });
     await expect(service.update({ mediaType: 'shows', ids: { simkl: 5 }, rewatch_id: 42, rewatch_status: 'completed' })).rejects.toThrow(/can only be set for movies/);
@@ -75,8 +86,8 @@ describe('RewatchService', () => {
     }
     const writes = requests.filter(request => request.url.pathname === '/sync/history');
     expect(writes.map(request => JSON.parse(String(request.init.body)).movies[0])).toEqual([
-      { ids: { simkl: 5 }, rewatch_id: 42, rewatch_status: 'closed' },
-      { ids: { simkl: 5 }, rewatch_id: 42, rewatch_status: 'completed' },
+      { ids: { simkl: 5 }, is_rewatch: true, rewatch_id: 42, rewatch_status: 'closed' },
+      { ids: { simkl: 5 }, is_rewatch: true, rewatch_id: 42, rewatch_status: 'completed' },
     ]);
   });
 
@@ -233,7 +244,7 @@ describe('RewatchService', () => {
     expect(requests.filter(request => request.url.pathname === '/sync/history')).toHaveLength(1);
   });
 
-  test('routes start, update, and stop through the injected serialized writer', async () => {
+  test('routes start, update, delete, and stop through the injected serialized writer', async () => {
     const writes: Array<{ path: string; options: any }> = [];
     const service = new RewatchService(
       new SimklClient({ baseUrl: 'https://api.simkl.com', clientId: 'app-id' }),
@@ -243,10 +254,11 @@ describe('RewatchService', () => {
     );
     await service.start({ mediaType: 'movies', ids: { simkl: 1 } });
     await service.update({ mediaType: 'movies', ids: { simkl: 1 }, rewatch_id: 42 });
+    await service.delete({ mediaType: 'movies', ids: { simkl: 1 }, rewatch_id: 42 });
     await service.stop({ body: { progress: 95 } });
-    expect(writes.map(write => write.path)).toEqual(['/sync/history', '/sync/history', '/scrobble/stop']);
+    expect(writes.map(write => write.path)).toEqual(['/sync/history', '/sync/history', '/sync/history/remove', '/scrobble/stop']);
     expect(writes.every(write => write.options.method === 'POST' && write.options.token === token)).toBe(true);
-    expect(requests.map(request => request.url.pathname)).toEqual(['/users/settings', '/users/settings']);
+    expect(requests.map(request => request.url.pathname)).toEqual(['/users/settings', '/users/settings', '/users/settings']);
   });
 
   test('shared settings provider is reused across sessions and reacts to plan changes', async () => {
