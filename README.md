@@ -7,7 +7,7 @@ Support for this independent project is entirely optional.
 An independently maintained [Model Context Protocol (MCP)](https://modelcontextprotocol.io/docs/getting-started/intro) server for [Simkl](https://simkl.com), built with **TypeScript, Bun, and Cloudflare Workers**. Search, discover, and track movies, TV shows, and anime from MCP-compatible clients.
 
 > [!IMPORTANT]
-> **Unofficial, independent community project.** This MCP server is developed, hosted, and maintained by [@vitorhugo-dotnet](https://github.com/vitorhugo-dotnet), **not by Simkl**. There is **no official affiliation, partnership, sponsorship, endorsement, or support from Simkl**. Originally based on [srevinsaju/simkl-mcp](https://github.com/srevinsaju/simkl-mcp), this repository is maintained separately, with its own technical direction, releases, and roadmap. It is **not an upstream mirror** or an official continuation of the original project, and is not endorsed by its original maintainer.
+> **Unofficial, independent community project.** This MCP server is developed, hosted, and maintained by [@hugoalves-dev](https://github.com/hugoalves-dev), **not by Simkl**. There is **no official affiliation, partnership, sponsorship, endorsement, or support from Simkl**. Originally based on [srevinsaju/simkl-mcp](https://github.com/srevinsaju/simkl-mcp), this repository is maintained separately, with its own technical direction, releases, and roadmap. It is **not an upstream mirror** or an official continuation of the original project, and is not endorsed by its original maintainer.
 
 ## Public MCP server
 
@@ -18,7 +18,7 @@ An independently maintained [Model Context Protocol (MCP)](https://modelcontextp
 - **Landing page and capability catalog:** https://mcp-simkl.hugojava.dev/
 - **Health check:** https://mcp-simkl.hugojava.dev/health
 
-Point a compatible MCP client at the `/mcp` URL and complete Simkl OAuth authorization. This deployment is operated by [@vitorhugo-dotnet](https://github.com/vitorhugo-dotnet); **it is not an official Simkl-hosted or Simkl-endorsed integration**.
+Point a compatible MCP client at the `/mcp` URL and complete Simkl OAuth authorization. This deployment is operated by [@hugoalves-dev](https://github.com/hugoalves-dev); **it is not an official Simkl-hosted or Simkl-endorsed integration**.
 
 ```json
 {
@@ -46,7 +46,7 @@ Point a compatible MCP client at the `/mcp` URL and complete Simkl OAuth authori
 
 This project prioritizes a **TypeScript/Bun implementation deployed on Cloudflare Workers**, rather than requiring a separately operated server or Kubernetes cluster. It is developed independently of the original repository; upstream features, architectural changes, and release schedules are not automatically inherited.
 
-For issues and contributions specific to this implementation, use this repository's [issues](https://github.com/vitorhugo-dotnet/simkl-mcp-cloudflare-workers/issues) and [pull requests](https://github.com/vitorhugo-dotnet/simkl-mcp-cloudflare-workers/pulls).
+For issues and contributions specific to this implementation, use this repository's [issues](https://github.com/hugoalves-dev/simkl-mcp-cloudflare-workers/issues) and [pull requests](https://github.com/hugoalves-dev/simkl-mcp-cloudflare-workers/pulls).
 
 ## Why Cloudflare Workers?
 
