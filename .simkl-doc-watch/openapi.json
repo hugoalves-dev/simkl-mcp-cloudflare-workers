@@ -1471,42 +1471,79 @@
           "application/json": {
             "example": [
               {
+                "anime": {
+                  "anime_type": "tv",
+                  "ids": {
+                    "anidb": "17617",
+                    "anilist": "154587",
+                    "imdb": "tt22248376",
+                    "kitsu": "46474",
+                    "mal": "52991",
+                    "simkl": 1990194,
+                    "slug": "sousou-no-frieren",
+                    "tmdb": "209867",
+                    "traktslug": "frieren-beyond-journey-s-end",
+                    "tvdb": "424536",
+                    "tvdbslug": "sousou-no-frieren"
+                  },
+                  "title": "Frieren: Beyond Journey's End",
+                  "year": 2023
+                },
                 "episode": {
-                  "episode": 5,
+                  "number": 3,
                   "season": 1,
-                  "title": "Episode 5",
-                  "tvdb_number": 5,
+                  "title": "Killing Magic",
+                  "tvdb_number": 3,
                   "tvdb_season": 1
                 },
-                "id": 123,
-                "paused_at": "2024-01-15T10:30:00.000Z",
-                "progress": 45.5,
+                "id": 61873794,
+                "paused_at": "2026-10-28T05:22:13Z",
+                "progress": 63,
+                "type": "episode"
+              },
+              {
+                "episode": {
+                  "number": 2,
+                  "season": 1,
+                  "title": "Blood, Sweat, and Fears"
+                },
+                "id": 61873788,
+                "paused_at": "2026-10-28T05:22:12Z",
+                "progress": 22.25,
                 "show": {
                   "ids": {
-                    "imdb": "tt0903747",
-                    "simkl": 12345,
-                    "slug": "breaking-bad",
-                    "tmdb": "1429"
+                    "imdb": "tt36064406",
+                    "simkl": 2733977,
+                    "slug": "coven-academy",
+                    "tmdb": "298505",
+                    "traktslug": "coven-academy",
+                    "tvdb": "461356",
+                    "tvdbslug": "coven-academy"
                   },
-                  "title": "Breaking Bad",
-                  "year": 2008
+                  "title": "Coven Academy",
+                  "year": 2026
                 },
                 "type": "episode"
               },
               {
-                "id": 124,
+                "id": 61873782,
                 "movie": {
                   "ids": {
-                    "imdb": "tt1375666",
-                    "simkl": 67890,
-                    "slug": "inception",
-                    "tmdb": "27205"
+                    "imdb": "tt6751668",
+                    "letterboxd": "parasite-2019",
+                    "mdlslug": "23429-parasite",
+                    "simkl": 752138,
+                    "slug": "parasite",
+                    "tmdb": "496243",
+                    "traktslug": "parasite-2019",
+                    "tvdb": "41517",
+                    "tvdbslug": "parasite-2019"
                   },
-                  "title": "Inception",
-                  "year": 2010
+                  "title": "Parasite",
+                  "year": 2019
                 },
-                "paused_at": "2024-01-15T11:15:00.000Z",
-                "progress": 75,
+                "paused_at": "2026-10-28T05:22:11Z",
+                "progress": 41.5,
                 "type": "movie"
               }
             ],
@@ -3418,6 +3455,366 @@
           "ids"
         ],
         "title": "Calendar entry",
+        "type": "object"
+      },
+      "CalendarV2Entry": {
+        "description": "One airing or release.",
+        "properties": {
+          "date": {
+            "description": "Air or release time, **always UTC** with a trailing `Z`. Convert to the user's timezone for display.",
+            "example": "2026-11-05T22:00:00Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "episode": {
+            "$ref": "#/components/schemas/CalendarV2Episode"
+          },
+          "finale_type": {
+            "description": "Marks finale episodes so you can badge them:\n\n- `1` — mid-season finale\n- `2` — season finale\n- `3` — series finale\n- `null` — not a finale. Type 4 null — the episode isn't marked as one. See [Null and missing values](/conventions/null-values). Always `null` on movies.",
+            "enum": [
+              1,
+              2,
+              3,
+              null
+            ],
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "simkl_id": {
+            "description": "Simkl ID of the title. The join key into `metadata`, whose keys are strings.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "simkl_id",
+          "date",
+          "finale_type"
+        ],
+        "type": "object"
+      },
+      "CalendarV2Episode": {
+        "description": "**Episodes only.** Absent (Type 2) on movie releases, and on anime movies in the anime file.",
+        "properties": {
+          "episode": {
+            "description": "Episode number: within the season on TV, sequential on anime.",
+            "type": "integer"
+          },
+          "runtime": {
+            "description": "Type 4 null — no runtime on file for this episode. See [Null and missing values](/conventions/null-values). Runtime in whole minutes. Absent from archived months generated before this field existed.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "season": {
+            "description": "Season number. **Always present on TV.** On anime it appears only on specials, as `0` — regular anime episodes are numbered sequentially with no season.",
+            "type": "integer"
+          },
+          "title": {
+            "description": "Type 4 null — no title on file. See [Null and missing values](/conventions/null-values). Episode title. Untitled episodes usually carry a generated label such as `Episode 8` instead.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "description": "Absolute simkl.com URL for the episode.",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "episode",
+          "title",
+          "url"
+        ],
+        "type": "object"
+      },
+      "CalendarV2File": {
+        "description": "Every v2 calendar file, rolling or monthly, all three types. `calendar` is the schedule, one entry per airing in date order. `metadata` holds one record per title, keyed by `simkl_id` **as a string**. A show airing twelve times appears twelve times in `calendar` and once in `metadata`. Every `simkl_id` in `calendar` has a `metadata` record, and there are no extra records.",
+        "properties": {
+          "calendar": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarV2Entry"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CalendarV2Title"
+            },
+            "description": "Title records keyed by `simkl_id` as a string (`\"513266\"`). Join with `metadata[String(entry.simkl_id)]`.",
+            "propertyNames": {
+              "pattern": "^[0-9]+$"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "calendar",
+          "metadata"
+        ],
+        "title": "Calendar v2 file",
+        "type": "object"
+      },
+      "CalendarV2Rating": {
+        "properties": {
+          "rating": {
+            "description": "Type 4 null — no votes yet. See [Null and missing values](/conventions/null-values). Average rating, 0–10.",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "votes": {
+            "description": "Type 4 null — no votes yet. See [Null and missing values](/conventions/null-values). Number of votes.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "CalendarV2Title": {
+        "description": "One title in `metadata`. **Sparse records:** a title Simkl hasn't finished enriching carries only `title`, `url`, `poster`, `ids`, `release_date`, `rank` and `ratings`; every other key is absent (Type 2). They occur in TV and movie files, so read everything outside that set defensively.",
+        "properties": {
+          "alt_titles": {
+            "description": "Localized and alternate titles.",
+            "items": {
+              "properties": {
+                "lang": {
+                  "description": "Simkl language code — **not** ISO 639.",
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "Kind of title, such as `official` or `original`. Treat as an open set.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "anime_type": {
+            "description": "**Anime only.** Format, such as `tv`, `ona`, `movie`, `ova` or `special`.",
+            "type": "string"
+          },
+          "completed": {
+            "description": "Users with the title in Completed. Absent from archived months generated before this field existed.",
+            "type": "integer"
+          },
+          "country": {
+            "description": "Type 4 null — no country on file. See [Null and missing values](/conventions/null-values). Lower-case two-letter code (`us`, `jp`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "drop_rate": {
+            "description": "Share of users who dropped the title, as a display string (`\"4.7%\"`). `\"-\"` when there isn't enough data.",
+            "type": "string"
+          },
+          "dvd_date": {
+            "description": "Type 4 null — no home-release date on file. See [Null and missing values](/conventions/null-values). **Movies only.** Home-release date in **`MM/DD/YYYY`** format, unlike `release_date`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fanart": {
+            "description": "Type 4 null — no backdrop on file. See [Null and missing values](/conventions/null-values). Backdrop path fragment, same rules as `poster`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "genres": {
+            "description": "Genre names (`[\"Comedy\", \"Game Show\"]`).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ids": {
+            "additionalProperties": true,
+            "description": "Simkl and external IDs. Always `simkl_id` and `slug`; other keys appear only when the title has that link, including slug keys for other sites. Read the keys you need and ignore the rest.",
+            "properties": {
+              "anidb": {
+                "type": "string"
+              },
+              "anilist": {
+                "type": "string"
+              },
+              "imdb": {
+                "description": "Type 4 null — no IMDb link on file (sparse records only). See [Null and missing values](/conventions/null-values).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kitsu": {
+                "type": "string"
+              },
+              "mal": {
+                "description": "Type 4 null — no MyAnimeList link on file (sparse records only). See [Null and missing values](/conventions/null-values).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "simkl_id": {
+                "type": "integer"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "tmdb": {
+                "description": "Type 4 null — no TMDB link on file (sparse records only). See [Null and missing values](/conventions/null-values).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tvdb": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "simkl_id",
+              "slug"
+            ],
+            "type": "object"
+          },
+          "network": {
+            "description": "Type 4 null — no network on file. See [Null and missing values](/conventions/null-values). **TV and anime only.** Broadcaster or streaming service.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "original_language": {
+            "description": "Type 4 null — no language on file. See [Null and missing values](/conventions/null-values). Lower-case two-letter code (`en`, `ja`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_to_watch": {
+            "description": "Type 4 null — no count yet. See [Null and missing values](/conventions/null-values). Users with the title on their watchlist.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "poster": {
+            "description": "Type 4 null — no poster on file. See [Null and missing values](/conventions/null-values). Image path fragment — see [Image conventions](/conventions/images).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rank": {
+            "description": "Type 4 null — not ranked yet. See [Null and missing values](/conventions/null-values). Simkl popularity rank; lower is more popular. Most movie records are unranked.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ratings": {
+            "description": "Aggregate ratings by source. `simkl` is always present; the second source is `imdb` on TV and movies, `mal` on anime.",
+            "properties": {
+              "imdb": {
+                "$ref": "#/components/schemas/CalendarV2Rating"
+              },
+              "mal": {
+                "$ref": "#/components/schemas/CalendarV2Rating"
+              },
+              "simkl": {
+                "$ref": "#/components/schemas/CalendarV2Rating"
+              }
+            },
+            "required": [
+              "simkl"
+            ],
+            "type": "object"
+          },
+          "release_date": {
+            "description": "Type 4 null — release date unknown. See [Null and missing values](/conventions/null-values). The title's first-ever release — the airing itself is `calendar[].date`. Normally ISO 8601 UTC (`2015-07-28T21:00:00Z`); a few records carry a date only (`2026-07-13`), so parse both.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime": {
+            "description": "Type 4 null — no runtime on file. See [Null and missing values](/conventions/null-values). Display string (`\"47m\"`, `\"2h 7m\"`). For whole minutes per episode use `calendar[].episode.runtime`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Type 4 null — no status on file (rare). See [Null and missing values](/conventions/null-values). Release or airing status: usually `ongoing`, `ended`, `premiere` or `soon`. Other values appear rarely, so treat it as an open set.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "Display title.",
+            "type": "string"
+          },
+          "title_romaji": {
+            "description": "Type 4 null — no romanized title on file. See [Null and missing values](/conventions/null-values). **Anime only.**",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total_episodes": {
+            "description": "Type 4 null — no episode count on file. See [Null and missing values](/conventions/null-values). **TV and anime only.** Episodes on file across all seasons.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "trailer": {
+            "description": "Type 4 null — no trailer on file. See [Null and missing values](/conventions/null-values). YouTube video ID: `https://www.youtube.com/watch?v={trailer}`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "description": "Link to the title on simkl.com. Normally root-relative (`/tv/513266/taskmaster`) — prefix `https://simkl.com`. Sparse records carry an absolute URL, so check before prefixing.",
+            "type": "string"
+          },
+          "watched": {
+            "description": "Type 4 null — no count yet, usually an unreleased title. See [Null and missing values](/conventions/null-values). Users with the title in Watching or Completed.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "watching": {
+            "description": "Users with the title in Watching. Absent from archived months generated before this field existed.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "poster",
+          "ids",
+          "release_date",
+          "rank",
+          "ratings"
+        ],
         "type": "object"
       },
       "ChangesResponse": {
@@ -5610,34 +6007,107 @@
         },
         "type": "object"
       },
+      "PlaybackEpisode": {
+        "description": "**Episodes only** — absent on movie sessions.",
+        "properties": {
+          "number": {
+            "description": "Episode number.",
+            "type": "integer"
+          },
+          "season": {
+            "type": "integer"
+          },
+          "title": {
+            "description": "Episode title, or `Episode N` when none is on file.",
+            "type": "string"
+          },
+          "tvdb_number": {
+            "description": "**Anime only.** TVDB episode number.",
+            "type": "integer"
+          },
+          "tvdb_season": {
+            "description": "**Anime only.** TVDB season of this episode.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season",
+          "number",
+          "title"
+        ],
+        "type": "object"
+      },
       "PlaybackSession": {
-        "description": "A saved (paused) playback session.",
+        "description": "A saved (paused) playback session. Exactly one of `movie`, `show` or `anime` is present.",
         "properties": {
           "anime": {
-            "$ref": "#/components/schemas/Anime"
+            "$ref": "#/components/schemas/PlaybackTitle"
           },
           "episode": {
-            "$ref": "#/components/schemas/Episode"
+            "$ref": "#/components/schemas/PlaybackEpisode"
           },
           "id": {
-            "description": "Internal playback session ID. Use to delete via DELETE /sync/playback/{id}.",
+            "description": "Playback session ID. Use it to delete via `DELETE /sync/playback/{id}`.",
             "type": "integer"
           },
           "movie": {
-            "$ref": "#/components/schemas/Movie"
+            "$ref": "#/components/schemas/PlaybackTitle"
+          },
+          "paused_at": {
+            "description": "When the session was paused (UTC).",
+            "format": "date-time",
+            "type": "string"
           },
           "progress": {
-            "description": "Saved progress percentage 0–100.",
+            "description": "Saved progress percentage, 0–100.",
             "type": "number"
           },
           "show": {
-            "$ref": "#/components/schemas/Show"
+            "$ref": "#/components/schemas/PlaybackTitle"
           },
-          "watched_at": {
-            "format": "date-time",
+          "type": {
+            "description": "`episode` for TV and anime, `movie` for movies.",
+            "enum": [
+              "movie",
+              "episode"
+            ],
             "type": "string"
           }
         },
+        "required": [
+          "id",
+          "progress",
+          "paused_at",
+          "type"
+        ],
+        "type": "object"
+      },
+      "PlaybackTitle": {
+        "description": "The paused movie, or the show / anime the paused episode belongs to.",
+        "properties": {
+          "anime_type": {
+            "description": "**Anime only** (`tv`, `movie`, `ova`, `ona`, `special`, `music video`). Absent on movies and TV.",
+            "type": "string"
+          },
+          "ids": {
+            "$ref": "#/components/schemas/Ids"
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "description": "Type 4 null — no release year on file. See [Null and missing values](/conventions/null-values).",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "year",
+          "ids"
+        ],
         "type": "object"
       },
       "PremieresNewItem": {
@@ -7881,7 +8351,7 @@
   "paths": {
     "/anime/airing": {
       "get": {
-        "description": "Currently airing anime — same data that powers the [Simkl anime calendar](https://simkl.com/anime/airing/). No `access_token` required.\n\nSame shape and parameters as [`/tv/airing`](/api-reference/simkl/get-tv-airing) but for the anime catalog: each item includes an `anime_type` field (`tv`, `ona`, `ova`, `movie`, `special`, `music`), and the `episode` block omits `season` (anime numbering is single-season — AniDB sequential).\n\n<Warning>\n**Prefer the cached calendar endpoints for high-traffic use cases.** `/anime/airing` is **uncached** — every request hits the origin. For widgets, mobile-app home screens, or anything that fetches this on app launch / wake / timer, use the CDN-cached [Calendar data files](/api-reference/calendar) on `data.simkl.in` — `/calendar/anime.json` (rolling window: yesterday + next 33 days) or `/calendar/{year}/{month}/anime.json` (monthly archive) serve the same per-day airing data, edge-cached so most requests don't even reach origin. Reserve `/anime/airing` for ad-hoc queries by a specific date that the calendar files don't pre-bake.\n\nBoth forms still need the standard URL params on every request — `client_id`, `app-name`, `app-version` (and the `User-Agent` header) — same as every other Simkl endpoint. See [Headers and required parameters](/conventions/headers).\n</Warning>\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `date` | `today` | `today`, `tomorrow`, or `DD-MM-YYYY`. Bogus values silently fall back to `today`. |\n| `sort` | `time` | `time`, `rank`, `popularity`. Bogus values silently fall back to `time`. |\n\n#### Item shape\n\n```json\n{\n \"title\": \"string\",\n \"year\": \"integer | null\",\n \"date\": \"ISO-8601 string with -05:00 offset | null\",\n \"poster\": \"string (relative path; prepend https://simkl.in/posters/ + size)\",\n \"rank\": \"integer | null\",\n \"url\": \"string (relative simkl.com URL)\",\n \"ids\": {\n \"simkl_id\": \"integer\",\n \"slug\": \"string\"\n },\n \"episode\": {\n \"episode\": \"integer\",\n \"url\": \"string\"\n },\n \"anime_type\": \"tv | ona | ova | movie | special | music\"\n}\n```\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `date` | Catalog has no `Airs_Time` on file for this episode (older / low-data titles) | [Type 4](/conventions/null-values#type-4) |\n| `rank` | Item not yet ranked, or rank value >= 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n| `episode.season` | Always omitted on anime — single-season AniDB numbering. | [Type 2](/conventions/null-values#type-2) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` — invalid `date`/`sort` values silently fall back to defaults. No `404` — empty result is `[]` with status `200`.\n\n> For broader catalog browsing, see [Anime by genre](/api-reference/simkl/get-anime-genres).",
+        "description": "Currently airing anime — same data that powers the [Simkl anime calendar](https://simkl.com/anime/airing/). No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).\n\nSame shape and parameters as [`/tv/airing`](/api-reference/simkl/get-tv-airing) but for the anime catalog: each item includes an `anime_type` field (`tv`, `ona`, `ova`, `movie`, `special`, `music`), and the `episode` block omits `season` (anime numbering is single-season — AniDB sequential).\n\n<Warning>\n**Prefer the cached calendar endpoints for high-traffic use cases.** `/anime/airing` is **uncached** — every request hits the origin. For widgets, mobile-app home screens, or anything that fetches this on app launch / wake / timer, use the CDN-cached [Calendar data files](/api-reference/calendar) on `data.simkl.in` — `/calendar/anime.json` (rolling window: yesterday + next 33 days) or `/calendar/{year}/{month}/anime.json` (monthly archive) serve the same per-day airing data, edge-cached so most requests don't even reach origin. Reserve `/anime/airing` for ad-hoc queries by a specific date that the calendar files don't pre-bake.\n\nBoth forms still need the standard URL params on every request — `client_id`, `app-name`, `app-version` (and the `User-Agent` header) — same as every other Simkl endpoint. See [Headers and required parameters](/conventions/headers).\n</Warning>\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `date` | `today` | `today`, `tomorrow`, or `DD-MM-YYYY`. Bogus values silently fall back to `today`. |\n| `sort` | `time` | `time`, `rank`, `popularity`. Bogus values silently fall back to `time`. |\n\n#### Item shape\n\n```json\n{\n \"title\": \"string\",\n \"year\": \"integer | null\",\n \"date\": \"ISO-8601 string with -05:00 offset | null\",\n \"poster\": \"string (relative path; prepend https://simkl.in/posters/ + size)\",\n \"rank\": \"integer | null\",\n \"url\": \"string (relative simkl.com URL)\",\n \"ids\": {\n \"simkl_id\": \"integer\",\n \"slug\": \"string\"\n },\n \"episode\": {\n \"episode\": \"integer\",\n \"url\": \"string\"\n },\n \"anime_type\": \"tv | ona | ova | movie | special | music\"\n}\n```\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `date` | Catalog has no `Airs_Time` on file for this episode (older / low-data titles) | [Type 4](/conventions/null-values#type-4) |\n| `rank` | Item not yet ranked, or rank value >= 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n| `episode.season` | Always omitted on anime — single-season AniDB numbering. | [Type 2](/conventions/null-values#type-2) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` — invalid `date`/`sort` values silently fall back to defaults. No `404` — empty result is `[]` with status `200`.\n\n> For broader catalog browsing, see [Anime by genre](/api-reference/simkl/get-anime-genres).",
         "operationId": "get-anime-airing-date",
         "parameters": [
           {
@@ -8046,6 +8516,21 @@
             "description": "OK",
             "headers": {}
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
+          },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
           },
@@ -8072,7 +8557,7 @@
     },
     "/anime/best/{filter}": {
       "get": {
-        "description": "Top-rated anime. Mirrors the [Simkl Best Anime](https://simkl.com/anime/best-anime/) pages. No `access_token` required.\n\nSame behavior as [`/tv/best/{filter}`](/api-reference/simkl/get-best-tv) with one difference: items carry `ratings.mal` instead of `ratings.imdb`. Items do **not** carry `anime_type` here — for format-aware browsing use [`GET /anime/genres/...`](/api-reference/simkl/get-anime-genres).\n\nPick a bucket via the `{filter}` path segment:\n\n| Filter | What you get |\n|---|---|\n| `all` | All-time top-rated. |\n| `year` | Top-rated for the current year. |\n| `month` | Top-rated for the current month. |\n| `voted` | Most-voted titles (sorted by total MAL votes). Items also include a `votes` count. |\n| `watched` | Most-watched this month. Items also include a `watched` count. |\n\nUnknown filter values fall back to `all`.\n\nOptionally narrow by `type=all`, `tv`, `movies`, `ovas`, `onas`, or `music`. Unknown values are ignored.\n\n<Note>\n**60 items, no pagination.** The endpoint always returns up to 60 items in one call. The `page` and `limit` query parameters are accepted but ignored. For paginated browsing use [`GET /anime/genres/...`](/api-reference/simkl/get-anime-genres).\n</Note>\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nUnknown `filter` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
+        "description": "Top-rated anime. Mirrors the [Simkl Best Anime](https://simkl.com/anime/best-anime/) pages. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).\n\nSame behavior as [`/tv/best/{filter}`](/api-reference/simkl/get-best-tv) with one difference: items carry `ratings.mal` instead of `ratings.imdb`. Items do **not** carry `anime_type` here — for format-aware browsing use [`GET /anime/genres/...`](/api-reference/simkl/get-anime-genres).\n\nPick a bucket via the `{filter}` path segment:\n\n| Filter | What you get |\n|---|---|\n| `all` | All-time top-rated. |\n| `year` | Top-rated for the current year. |\n| `month` | Top-rated for the current month. |\n| `voted` | Most-voted titles (sorted by total MAL votes). Items also include a `votes` count. |\n| `watched` | Most-watched this month. Items also include a `watched` count. |\n\nUnknown filter values fall back to `all`.\n\nOptionally narrow by `type=all`, `tv`, `movies`, `ovas`, `onas`, or `music`. Unknown values are ignored.\n\n<Note>\n**60 items, no pagination.** The endpoint always returns up to 60 items in one call. The `page` and `limit` query parameters are accepted but ignored. For paginated browsing use [`GET /anime/genres/...`](/api-reference/simkl/get-anime-genres).\n</Note>\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nUnknown `filter` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
         "operationId": "get-best-anime",
         "parameters": [
           {
@@ -8208,6 +8693,21 @@
               }
             },
             "description": "OK — array of items, or bare `null` when a `?type=` filter zeroes the result set."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -8426,7 +8926,7 @@
     },
     "/anime/genres/{genre}/{type}/{network}/{year}/{sort}": {
       "get": {
-        "description": "<Warning>\n**Not for TV / console / 10-foot apps.** The V1 genre-browse endpoints return a thin per-item shape (`title`, `year`, `poster`, `ids`, `ratings`, `rank`). Building a TV-app grid that shows overview text, full ratings, networks, runtimes, recommendations, or trailers would force one per-item refetch against the detail endpoint per visible card. **Wait for the V2 Beta API**, which returns the richer per-item shape TV-app surfaces need in a single call. If you're targeting TV / console / streaming-box clients, please hold off integrating these endpoints.\n</Warning>\n\n<Tip>\n**Just need this month's most watched titles in a genre? Use the [trending genre files](/api-reference/trending#by-genre-this-month) instead.** They are free: they don't count against any [rate limit](/resources/rate-limits#what-does-not-count) or a user's daily allowance, and they need no user token. Every call to this endpoint does count — against the user's daily allowance under [AUTH V2](/api-reference/auth-v2), where it also needs a user token, or your app's allowance under AUTH V1.\n\nA genre file is one cached request with no paging, and every item comes in the full trending shape (overview, trailer, ratings, runtime) rather than the thin shape above. Call this endpoint only for what the files don't cover: other sorts, the country / network / year filters, or anything beyond this month.\n</Tip>\n\nBrowse anime filtered by genre, type, network, year, and sort order. Path is `/anime/genres/{genre}/{type}/{network}/{year}/{sort}` — all segments **required** (use `all` as the wildcard).\n\nThis is the **5-segment** variant (no `country` segment — anime is dominated by Japanese productions, country filtering isn't useful here).\n\n| Path param | Values |\n|---|---|\n| `genre` | `all`, `action`, `adventure`, `comedy`, `drama`, `ecchi`, `educational`, `fantasy`, `gag-humor`, `gore`, `harem`, `historical`, `horror`, `idol`, `isekai`, `josei`, `kids`, `magic`, `martial-arts`, `mecha`, `military`, `music`, `mystery`, `mythology`, `parody`, `psychological`, `racing`, `reincarnation`, `romance`, `samurai`, `school`, `sci-fi`, `seinen`, `shoujo`, `shoujo-ai`, `shounen`, `shounen-ai`, `slice-of-life`, `space`, `sports`, `strategy-game`, `super-power`, `supernatural`, `thriller`, `vampire`, `yaoi`, `yuri` |\n| `type` | `all`, `tv`, `movies`, `ovas`, `onas`, `specials`, `music` |\n| `network` | `all` or a network slug (`tv-tokyo`, `crunchyroll`, …) |\n| `year` | `all`, single year, or decade |\n| `sort` | `popular-this-week`, `popular-this-month`, `popular-all-time`, `rank`, `release-date`, `voted`, `watched` |\n\nItems carry an additional `anime_type` field (`tv` / `movie` / `ova` / `ona` / `special` / `music`).\n\n#### Pagination\n\n| Param | Default | Notes |\n|---|---|---|\n| `page` | `1` | Hard-capped server-side at `20`. Higher values clamp silently. |\n| `limit` | `60` | Hard-capped server-side at `60`. Higher values clamp silently. Returned `X-Pagination-Limit` reflects the clamped value. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\n#### Silent fallbacks\n\nBad path segments DO NOT return errors:\n\n| Bad input | What happens |\n|---|---|\n| Unknown `genre` slug (`zzz`) | Top-level response is `null` (NOT `[]`). |\n| Unknown `year` (e.g. `zzz`) | Silently treated as `all` — full result set. |\n| Unknown `sort` (`zzzsortzzz`) | Silently treated as default sort order. |\n| Unknown `country` / `network` | Silently treated as `all`. |\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` or `404` — bad segments fall back silently or return `null`.\n",
+        "description": "<Warning>\n**Not for TV / console / 10-foot apps.** The V1 genre-browse endpoints return a thin per-item shape (`title`, `year`, `poster`, `ids`, `ratings`, `rank`). Building a TV-app grid that shows overview text, full ratings, networks, runtimes, recommendations, or trailers would force one per-item refetch against the detail endpoint per visible card. **Wait for the V2 Beta API**, which returns the richer per-item shape TV-app surfaces need in a single call. If you're targeting TV / console / streaming-box clients, please hold off integrating these endpoints.\n</Warning>\n\n<Tip>\n**Just need this month's most watched titles in a genre? Use the [trending genre files](/api-reference/trending#by-genre-this-month) instead.** They are free: they don't count against any [rate limit](/resources/rate-limits#what-does-not-count) or a user's daily allowance, and they need no user token. Every call to this endpoint does count — against the user's daily allowance under [AUTH V2](/api-reference/auth-v2), where it also needs a user token, or your app's allowance under AUTH V1.\n\nA genre file is one cached request with no paging, and every item comes in the full trending shape (overview, trailer, ratings, runtime) rather than the thin shape above. Call this endpoint only for what the files don't cover: other sorts, the country / network / year filters, or anything beyond this month.\n</Tip>\n\nBrowse anime filtered by genre, type, network, year, and sort order. Path is `/anime/genres/{genre}/{type}/{network}/{year}/{sort}` — all segments **required** (use `all` as the wildcard).\n\nThis is the **5-segment** variant (no `country` segment — anime is dominated by Japanese productions, country filtering isn't useful here).\n\n| Path param | Values |\n|---|---|\n| `genre` | `all`, `action`, `adventure`, `comedy`, `drama`, `ecchi`, `educational`, `fantasy`, `gag-humor`, `gore`, `harem`, `historical`, `horror`, `idol`, `isekai`, `josei`, `kids`, `magic`, `martial-arts`, `mecha`, `military`, `music`, `mystery`, `mythology`, `parody`, `psychological`, `racing`, `reincarnation`, `romance`, `samurai`, `school`, `sci-fi`, `seinen`, `shoujo`, `shoujo-ai`, `shounen`, `shounen-ai`, `slice-of-life`, `space`, `sports`, `strategy-game`, `super-power`, `supernatural`, `thriller`, `vampire`, `yaoi`, `yuri` |\n| `type` | `all`, `tv`, `movies`, `ovas`, `onas`, `specials`, `music` |\n| `network` | `all` or a network slug (`tv-tokyo`, `crunchyroll`, …) |\n| `year` | `all`, single year, or decade |\n| `sort` | `popular-this-week`, `popular-this-month`, `popular-all-time`, `rank`, `release-date`, `voted`, `watched` |\n\nItems carry an additional `anime_type` field (`tv` / `movie` / `ova` / `ona` / `special` / `music`).\n\n#### Pagination\n\n| Param | Default | Notes |\n|---|---|---|\n| `page` | `1` | Hard-capped server-side at `20`. Higher values clamp silently. |\n| `limit` | `60` | Hard-capped server-side at `60`. Higher values clamp silently. Returned `X-Pagination-Limit` reflects the clamped value. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\n#### Silent fallbacks\n\nBad path segments DO NOT return errors:\n\n| Bad input | What happens |\n|---|---|\n| Unknown `genre` slug (`zzz`) | Top-level response is `null` (NOT `[]`). |\n| Unknown `year` (e.g. `zzz`) | Silently treated as `all` — full result set. |\n| Unknown `sort` (`zzzsortzzz`) | Silently treated as default sort order. |\n| Unknown `country` / `network` | Silently treated as `all`. |\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` or `404` — bad segments fall back silently or return `null`.\n",
         "operationId": "get-anime-genres",
         "parameters": [
           {
@@ -8611,6 +9111,21 @@
               }
             }
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
+          },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
           },
@@ -8652,7 +9167,7 @@
     },
     "/anime/premieres/{param}": {
       "get": {
-        "description": "Anime premieres — recently aired or upcoming new anime. Mirrors the [Simkl Anime Premieres](https://simkl.com/anime/premieres/) page. No `access_token` required.\n\nPass `new` for anime that already aired (newest first), or `soon` for anime airing in the next few weeks (soonest first). Any path value other than `new` is treated as `soon`.\n\nThe two shapes differ slightly: items in the `new` response include `rank` and `ratings`; items in the `soon` response don't carry those fields at all (the title hasn't aired enough to be ranked or rated yet). Every item carries an `anime_type` field (`tv` / `ona` / `ova` / `movie` / `special` / `music`).\n\nSame behavior as [`/tv/premieres`](/api-reference/simkl/get-tv-premieres) but **without the US/CA filter** — the anime catalog is served globally. Dates use a `+09:00` offset (Japan time).\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `type` | (any) | Optional. `all`, `tv`, `movies`, `ovas`, `onas`, or `music`. Anything else is ignored. |\n| `page` | `1` | 1 to 20. Higher values are reduced to 20. |\n| `limit` | `60` | 1 to 60. Higher values are reduced to 60. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\nThe full per-item shape is in the **Response** panel on the right.\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nBogus `param` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
+        "description": "Anime premieres — recently aired or upcoming new anime. Mirrors the [Simkl Anime Premieres](https://simkl.com/anime/premieres/) page. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).\n\nPass `new` for anime that already aired (newest first), or `soon` for anime airing in the next few weeks (soonest first). Any path value other than `new` is treated as `soon`.\n\nThe two shapes differ slightly: items in the `new` response include `rank` and `ratings`; items in the `soon` response don't carry those fields at all (the title hasn't aired enough to be ranked or rated yet). Every item carries an `anime_type` field (`tv` / `ona` / `ova` / `movie` / `special` / `music`).\n\nSame behavior as [`/tv/premieres`](/api-reference/simkl/get-tv-premieres) but **without the US/CA filter** — the anime catalog is served globally. Dates use a `+09:00` offset (Japan time).\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `type` | (any) | Optional. `all`, `tv`, `movies`, `ovas`, `onas`, or `music`. Anything else is ignored. |\n| `page` | `1` | 1 to 20. Higher values are reduced to 20. |\n| `limit` | `60` | 1 to 60. Higher values are reduced to 60. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\nThe full per-item shape is in the **Response** panel on the right.\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nBogus `param` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
         "operationId": "get-anime-premieres",
         "parameters": [
           {
@@ -8763,6 +9278,21 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -9176,9 +9706,653 @@
         }
       }
     },
+    "/calendar/v2/{type}.json": {
+      "get": {
+        "description": "Rolling calendar of episode airings (TV, anime) or releases (movies), from yesterday through the next 33 days. Use it for \"airing next\" lists; for month grids use the monthly file.\n\nOne object with two keys: `calendar`, the schedule in date order, and `metadata`, one record per title keyed by `simkl_id` **as a string**. Join each entry with `metadata[String(entry.simkl_id)]`.\n\n**Update cadence:** regenerated every 6 hours. **CDN cache TTL: 5 hours** (`Cache-Control: max-age=18000`). The edge ignores query strings, so `?nocache=…` won't bust the cache; use `If-None-Match: <ETag>` for `304 Not Modified` revalidation.\n\nNo user token, on AUTH V1 or V2. Still send the standard URL params (`client_id`, `app-name`, `app-version`) and the `User-Agent` header — the project-wide convention, even though `data.simkl.in` ignores them. See [Headers and required parameters](/conventions/headers).\n\n#### Per-type variations\n\n| File | `calendar[]` | `metadata{}` adds |\n|---|---|---|\n| `tv.json` | `episode` with `season` | `total_episodes`, `network` |\n| `anime.json` | `episode` without `season`, except specials (`season: 0`). Anime movies have no `episode`. | `title_romaji`, `anime_type`, `total_episodes`, `network` |\n| `movie_release.json` | no `episode` | `dvd_date` (`MM/DD/YYYY`) |\n\nEvery `calendar[].date` is UTC with a trailing `Z`. `metadata.release_date` is the title's first-ever release, not the airing. Full field guide: [Calendar data files](/api-reference/calendar).",
+        "operationId": "get-calendar-v2-rolling",
+        "parameters": [
+          {
+            "description": "`tv` = TV episode airings. `anime` = anime episode airings. `movie_release` = movie releases.",
+            "example": "tv",
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "tv",
+                "anime",
+                "movie_release"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "calendar_v2_anime_rolling": {
+                    "description": "A real `anime.json` trimmed to one title. No `season` on regular anime episodes; `title_romaji` and `anime_type` in `metadata`.",
+                    "summary": "Anime — Steel Ball Run: JoJo's Bizarre Adventure",
+                    "value": {
+                      "calendar": [
+                        {
+                          "date": "2026-10-30T08:00:00Z",
+                          "episode": {
+                            "episode": 7,
+                            "runtime": 25,
+                            "title": "Episode 7",
+                            "url": "https://simkl.com/anime/2754038/steel-ball-run-jojo-no-kimyou-na-bouken/episode-7/"
+                          },
+                          "finale_type": null,
+                          "simkl_id": 2754038
+                        },
+                        {
+                          "date": "2026-11-06T08:00:00Z",
+                          "episode": {
+                            "episode": 8,
+                            "runtime": 25,
+                            "title": "Episode 8",
+                            "url": "https://simkl.com/anime/2754038/steel-ball-run-jojo-no-kimyou-na-bouken/episode-8/"
+                          },
+                          "finale_type": null,
+                          "simkl_id": 2754038
+                        }
+                      ],
+                      "metadata": {
+                        "2754038": {
+                          "alt_titles": [
+                            {
+                              "lang": 25,
+                              "name": "スティール・ボール・ラン ジョジョの奇妙な冒険",
+                              "type": "official"
+                            }
+                          ],
+                          "anime_type": "ona",
+                          "completed": 0,
+                          "country": "jp",
+                          "drop_rate": "1%",
+                          "fanart": null,
+                          "genres": [
+                            "Action",
+                            "Adventure",
+                            "Historical",
+                            "Mystery",
+                            "Racing",
+                            "Seinen",
+                            "Shounen",
+                            "Supernatural"
+                          ],
+                          "ids": {
+                            "anidb": "19287",
+                            "anilist": "190327",
+                            "imdb": "tt38268282",
+                            "kitsu": "49847",
+                            "mal": "61469",
+                            "simkl_id": 2754038,
+                            "slug": "steel-ball-run-jojo-no-kimyou-na-bouken",
+                            "tmdb": "45790",
+                            "traktslug": "jojo-s-bizarre-adventure",
+                            "tvdb": "262954"
+                          },
+                          "network": null,
+                          "original_language": "ja",
+                          "plan_to_watch": 1098,
+                          "poster": "20/207739233364b91148",
+                          "rank": 9,
+                          "ratings": {
+                            "mal": {
+                              "rating": 9,
+                              "votes": 112473
+                            },
+                            "simkl": {
+                              "rating": 9.03,
+                              "votes": 390
+                            }
+                          },
+                          "release_date": "2026-03-19T08:00:00Z",
+                          "runtime": "50m",
+                          "status": "ongoing",
+                          "title": "Steel Ball Run: JoJo's Bizarre Adventure",
+                          "title_romaji": "Steel Ball Run: JoJo no Kimyou na Bouken",
+                          "total_episodes": 12,
+                          "trailer": "93QIhAbxmdc",
+                          "url": "/anime/2754038/steel-ball-run-jojo-no-kimyou-na-bouken",
+                          "watched": 3514,
+                          "watching": 3523
+                        }
+                      }
+                    }
+                  },
+                  "calendar_v2_movies_rolling": {
+                    "description": "A real `movie_release.json` trimmed to one title. No `episode`; `dvd_date` in `metadata`.",
+                    "summary": "Movie — Being Heumann",
+                    "value": {
+                      "calendar": [
+                        {
+                          "date": "2026-11-06T05:00:00Z",
+                          "finale_type": null,
+                          "simkl_id": 2040719
+                        }
+                      ],
+                      "metadata": {
+                        "2040719": {
+                          "alt_titles": [
+                            {
+                              "lang": 16,
+                              "name": "Siendo Heumann",
+                              "type": "official"
+                            },
+                            {
+                              "lang": 18,
+                              "name": "Być człowiekiem: historia Judy Heumann",
+                              "type": "official"
+                            }
+                          ],
+                          "completed": 0,
+                          "country": "us",
+                          "drop_rate": "-",
+                          "dvd_date": "11/12/2026",
+                          "fanart": "20/20876273549d4346fd",
+                          "genres": [
+                            "Drama",
+                            "History"
+                          ],
+                          "ids": {
+                            "imdb": "tt15095848",
+                            "letterboxd": "being-heumann-1",
+                            "simkl_id": 2040719,
+                            "slug": "being-heumann",
+                            "tmdb": "1050981",
+                            "traktslug": "being-heumann-845830",
+                            "tvdb": "377317",
+                            "tvdbslug": "being-heumann"
+                          },
+                          "original_language": "en",
+                          "plan_to_watch": 83,
+                          "poster": "20/207178452e081703b2",
+                          "rank": 50106,
+                          "ratings": {
+                            "imdb": {
+                              "rating": 7.1,
+                              "votes": 192
+                            },
+                            "simkl": {
+                              "rating": null,
+                              "votes": null
+                            }
+                          },
+                          "release_date": "2026-11-06T16:00:00Z",
+                          "runtime": "2h 7m",
+                          "status": "soon",
+                          "title": "Being Heumann",
+                          "trailer": "CQp2pUXLvJk",
+                          "url": "/movies/2040719/being-heumann",
+                          "watched": null,
+                          "watching": 0
+                        }
+                      }
+                    }
+                  },
+                  "calendar_v2_tv_rolling": {
+                    "description": "A real `tv.json` trimmed to one title: two airings (the second a season finale) and the show's `metadata` record.",
+                    "summary": "TV — Taskmaster",
+                    "value": {
+                      "calendar": [
+                        {
+                          "date": "2026-10-29T21:00:00Z",
+                          "episode": {
+                            "episode": 9,
+                            "runtime": 47,
+                            "season": 22,
+                            "title": "A Very Televisual Torso",
+                            "url": "https://simkl.com/tv/513266/taskmaster/season-22/episode-9/"
+                          },
+                          "finale_type": null,
+                          "simkl_id": 513266
+                        },
+                        {
+                          "date": "2026-11-05T22:00:00Z",
+                          "episode": {
+                            "episode": 10,
+                            "runtime": 47,
+                            "season": 22,
+                            "title": "The Final: Big, Clumsy Emu Steps",
+                            "url": "https://simkl.com/tv/513266/taskmaster/season-22/episode-10/"
+                          },
+                          "finale_type": 2,
+                          "simkl_id": 513266
+                        }
+                      ],
+                      "metadata": {
+                        "513266": {
+                          "alt_titles": [
+                            {
+                              "lang": 22,
+                              "name": "Таскмастер",
+                              "type": "official"
+                            }
+                          ],
+                          "completed": 0,
+                          "country": "gb",
+                          "drop_rate": "4.7%",
+                          "fanart": "64/64125345df7e3d50d",
+                          "genres": [
+                            "Comedy",
+                            "Game Show"
+                          ],
+                          "ids": {
+                            "imdb": "tt4934214",
+                            "simkl_id": 513266,
+                            "slug": "taskmaster",
+                            "tmdb": "63404",
+                            "traktslug": "taskmaster",
+                            "tvdb": "298905",
+                            "tvdbslug": "taskmaster"
+                          },
+                          "network": "U&Dave",
+                          "original_language": "en",
+                          "plan_to_watch": 685,
+                          "poster": "11/1160244295c78877f3",
+                          "rank": 80,
+                          "ratings": {
+                            "imdb": {
+                              "rating": 9,
+                              "votes": 32845
+                            },
+                            "simkl": {
+                              "rating": 8.8,
+                              "votes": 497
+                            }
+                          },
+                          "release_date": "2015-07-28T21:00:00Z",
+                          "runtime": "47m",
+                          "status": "ongoing",
+                          "title": "Taskmaster",
+                          "total_episodes": 202,
+                          "trailer": "Ahhr6gHoVp0",
+                          "url": "/tv/513266/taskmaster",
+                          "watched": 4569,
+                          "watching": 4584
+                        }
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarV2File"
+                }
+              }
+            },
+            "description": "The calendar file.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Cloudflare edge cache TTL. `max-age=18000` (5 hours) for calendar files; `max-age=3600` (1 hour) for trending + DVD files.",
+                "schema": {
+                  "example": "max-age=18000",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Entity tag. Often weak (`W/\"...\"`). Use with `If-None-Match` for `304 Not Modified` revalidation.",
+                "schema": {
+                  "example": "W/\"6a0a3d32-244523\"",
+                  "type": "string"
+                }
+              },
+              "Expires": {
+                "description": "Absolute expiry timestamp computed from `Cache-Control`. Use either header — both reflect the same TTL.",
+                "schema": {
+                  "example": "Mon, 18 May 2026 03:12:02 GMT",
+                  "format": "http-date",
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Timestamp the file was last regenerated by the build pipeline.",
+                "schema": {
+                  "example": "Sun, 17 May 2026 22:12:02 GMT",
+                  "format": "http-date",
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Always `Accept-Encoding` — content-encoding (gzip/br) varies the cache key.",
+                "schema": {
+                  "example": "Accept-Encoding",
+                  "type": "string"
+                }
+              },
+              "cf-cache-status": {
+                "description": "Cloudflare cache decision. `HIT` = served from edge cache. `MISS` = forwarded to origin, fresh fetch. `EXPIRED` = stale-but-served while edge refreshes in background. Devs can ignore this header in most cases — it's informational.",
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "EXPIRED",
+                    "DYNAMIC",
+                    "BYPASS"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "text/html": {
+                "example": "<html>\n<head><title>404 Not Found</title></head>\n<body>\n<center><h1>404 Not Found</h1></center>\n<hr><center>openresty</center>\n</body>\n</html>\n",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No such file: an unknown `type`, a zero-padded `month`, or a month outside the published range. The body is an HTML page from the edge, not JSON — treat any non-2xx as no data."
+          }
+        },
+        "security": [],
+        "servers": [
+          {
+            "description": "Simkl static-data CDN.",
+            "url": "https://data.simkl.in"
+          }
+        ],
+        "summary": "Calendar v2 (rolling 33-day window)",
+        "tags": [
+          "CDN data files"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "calendar_v2_tv_rolling",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://data.simkl.in/calendar/v2/tv.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          },
+          {
+            "label": "calendar_v2_anime_rolling",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://data.simkl.in/calendar/v2/anime.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          },
+          {
+            "label": "calendar_v2_movies_rolling",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://data.simkl.in/calendar/v2/movie_release.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/calendar",
+          "metadata": {
+            "sidebarTitle": "Calendar v2 (rolling)"
+          }
+        }
+      }
+    },
+    "/calendar/v2/{year}/{month}/{type}.json": {
+      "get": {
+        "description": "One calendar month of episode airings (TV, anime) or releases (movies), in the same shape as the rolling file.\n\n#### Path\n\n`/calendar/v2/{year}/{month}/{type}.json`\n\n| Segment | Format | Notes |\n|---|---|---|\n| `year` | 4-digit integer | e.g. `2026` |\n| `month` | 1–12 | **No zero-padding.** `/calendar/v2/2026/5/tv.json` works; `/calendar/v2/2026/05/tv.json` returns **404**. |\n| `type` | `tv` / `anime` / `movie_release` | |\n\n#### Which months exist\n\n| Months | Regenerated |\n|---|---|\n| Current month and the next 3 | Every 6 hours. Future months hold only what is already scheduled. |\n| Previous 12 months | Every 24 hours |\n| Older, back to July 2024 | Archived — no longer regenerated |\n\nAny other month returns **404**. Archived months generated before `episode.runtime`, `watching` and `completed` existed lack those keys.\n\n**CDN cache TTL: 5 hours** (`Cache-Control: max-age=18000`). The edge ignores query strings, so `?nocache=…` won't bust the cache; use `If-None-Match: <ETag>` for `304 Not Modified` revalidation.\n\nNo user token, on AUTH V1 or V2. Still send the standard URL params (`client_id`, `app-name`, `app-version`) and the `User-Agent` header — the project-wide convention, even though `data.simkl.in` ignores them. See [Headers and required parameters](/conventions/headers).\n\n#### Per-type variations\n\n| File | `calendar[]` | `metadata{}` adds |\n|---|---|---|\n| `tv.json` | `episode` with `season` | `total_episodes`, `network` |\n| `anime.json` | `episode` without `season`, except specials (`season: 0`). Anime movies have no `episode`. | `title_romaji`, `anime_type`, `total_episodes`, `network` |\n| `movie_release.json` | no `episode` | `dvd_date` (`MM/DD/YYYY`) |\n\nEvery `calendar[].date` is UTC with a trailing `Z`. `metadata.release_date` is the title's first-ever release, not the airing. Full field guide: [Calendar data files](/api-reference/calendar).",
+        "operationId": "get-calendar-v2-monthly",
+        "parameters": [
+          {
+            "description": "Four-digit year.",
+            "example": 2026,
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "minimum": 2024,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Month, 1–12, **without zero-padding** — `05` returns 404.",
+            "example": 10,
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "maximum": 12,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`tv` / `anime` / `movie_release` — same as the rolling file.",
+            "example": "tv",
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "tv",
+                "anime",
+                "movie_release"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "calendar_v2_monthly_tv": {
+                    "description": "A real monthly `tv.json` trimmed to one title: two airings and the show's `metadata` record.",
+                    "summary": "TV — The Legend of Hanuman, path 2026/10",
+                    "value": {
+                      "calendar": [
+                        {
+                          "date": "2026-10-22T18:30:00Z",
+                          "episode": {
+                            "episode": 1,
+                            "runtime": 22,
+                            "season": 7,
+                            "title": "Weapons of Will",
+                            "url": "https://simkl.com/tv/1535318/the-legend-of-hanuman/season-7/episode-1/"
+                          },
+                          "finale_type": null,
+                          "simkl_id": 1535318
+                        },
+                        {
+                          "date": "2026-10-22T18:30:00Z",
+                          "episode": {
+                            "episode": 8,
+                            "runtime": 20,
+                            "season": 7,
+                            "title": "Rudra Avatar",
+                            "url": "https://simkl.com/tv/1535318/the-legend-of-hanuman/season-7/episode-8/"
+                          },
+                          "finale_type": 2,
+                          "simkl_id": 1535318
+                        }
+                      ],
+                      "metadata": {
+                        "1535318": {
+                          "alt_titles": [],
+                          "completed": 0,
+                          "country": "in",
+                          "drop_rate": "4.1%",
+                          "fanart": "11/11663724c224637813",
+                          "genres": [
+                            "Action",
+                            "Adventure",
+                            "Animation",
+                            "Family",
+                            "Fantasy"
+                          ],
+                          "ids": {
+                            "imdb": "tt13854248",
+                            "simkl_id": 1535318,
+                            "slug": "the-legend-of-hanuman",
+                            "tmdb": "117736",
+                            "traktslug": "the-legend-of-hanuman",
+                            "tvdb": "396081",
+                            "tvdbslug": "the-legend-of-hanuman"
+                          },
+                          "network": "JioHotstar",
+                          "original_language": "hi",
+                          "plan_to_watch": 201,
+                          "poster": "10/108946204f6c343d14",
+                          "rank": 47,
+                          "ratings": {
+                            "imdb": {
+                              "rating": 9.1,
+                              "votes": 14143
+                            },
+                            "simkl": {
+                              "rating": 8.17,
+                              "votes": 35
+                            }
+                          },
+                          "release_date": "2021-01-28T18:30:00Z",
+                          "runtime": "22m",
+                          "status": "ongoing",
+                          "title": "The Legend of Hanuman",
+                          "total_episodes": 60,
+                          "trailer": "Af49v6rUXmQ",
+                          "url": "/tv/1535318/the-legend-of-hanuman",
+                          "watched": 615,
+                          "watching": 616
+                        }
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarV2File"
+                }
+              }
+            },
+            "description": "The calendar file for that month.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Cloudflare edge cache TTL. `max-age=18000` (5 hours) for calendar files; `max-age=3600` (1 hour) for trending + DVD files.",
+                "schema": {
+                  "example": "max-age=18000",
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Entity tag. Often weak (`W/\"...\"`). Use with `If-None-Match` for `304 Not Modified` revalidation.",
+                "schema": {
+                  "example": "W/\"6a0a3d32-244523\"",
+                  "type": "string"
+                }
+              },
+              "Expires": {
+                "description": "Absolute expiry timestamp computed from `Cache-Control`. Use either header — both reflect the same TTL.",
+                "schema": {
+                  "example": "Mon, 18 May 2026 03:12:02 GMT",
+                  "format": "http-date",
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Timestamp the file was last regenerated by the build pipeline.",
+                "schema": {
+                  "example": "Sun, 17 May 2026 22:12:02 GMT",
+                  "format": "http-date",
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Always `Accept-Encoding` — content-encoding (gzip/br) varies the cache key.",
+                "schema": {
+                  "example": "Accept-Encoding",
+                  "type": "string"
+                }
+              },
+              "cf-cache-status": {
+                "description": "Cloudflare cache decision. `HIT` = served from edge cache. `MISS` = forwarded to origin, fresh fetch. `EXPIRED` = stale-but-served while edge refreshes in background. Devs can ignore this header in most cases — it's informational.",
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "EXPIRED",
+                    "DYNAMIC",
+                    "BYPASS"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "text/html": {
+                "example": "<html>\n<head><title>404 Not Found</title></head>\n<body>\n<center><h1>404 Not Found</h1></center>\n<hr><center>openresty</center>\n</body>\n</html>\n",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No such file: an unknown `type`, a zero-padded `month`, or a month outside the published range. The body is an HTML page from the edge, not JSON — treat any non-2xx as no data."
+          }
+        },
+        "security": [],
+        "servers": [
+          {
+            "description": "Simkl static-data CDN.",
+            "url": "https://data.simkl.in"
+          }
+        ],
+        "summary": "Calendar v2 (monthly)",
+        "tags": [
+          "CDN data files"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "calendar_v2_monthly_tv",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://data.simkl.in/calendar/v2/2026/10/tv.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          },
+          {
+            "label": "calendar_v2_monthly_anime",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://data.simkl.in/calendar/v2/2026/10/anime.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          },
+          {
+            "label": "calendar_v2_monthly_movies",
+            "lang": "Shell",
+            "source": "curl -H \"User-Agent: my-app-name/1.0\" \\\n  \"https://data.simkl.in/calendar/v2/2026/10/movie_release.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\""
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/calendar",
+          "metadata": {
+            "sidebarTitle": "Calendar v2 (monthly)"
+          }
+        }
+      }
+    },
     "/calendar/{type}.json": {
       "get": {
-        "description": "Rolling **34-day calendar** of episode airings (TV / anime) or theatrical releases (movies): yesterday + the next ~33 days. The same data that powers the Simkl Calendar widget on simkl.com.\n\nUse this for \"what's airing now and next\" UIs. For wider grid views (previous / current / next month), use the [monthly archive](/api-reference/calendar) variant instead.\n\n**Update cadence:** regenerated every 6 hours by the build pipeline. **CDN cache TTL: 5 hours** (`Cache-Control: max-age=18000`). The Cloudflare edge ignores query strings — appending `?nocache=…` won't bust the cache. Use `If-None-Match: <ETag>` for `304 Not Modified` revalidation if you want to skip the body transfer.\n\nStill send the standard URL params (`client_id`, `app-name`, `app-version`) and the `User-Agent` header on every request — same project-wide convention, even though `data.simkl.in` ignores them. See [Headers and required parameters](/conventions/headers).\n\n#### Per-type variations\n\n| File | Item shape |\n|---|---|\n| `/calendar/tv.json` | TV episode airings. Each item has `episode.season` + `episode.episode`. |\n| `/calendar/anime.json` | Anime episode airings. `episode.season` omitted (AniDB sequential numbering). `anime_type` present. |\n| `/calendar/movie_release.json` | Movie premieres. No `episode` block. |\n\n#### Date conventions\n\n| Field | Format | Meaning |\n|---|---|---|\n| `date` | ISO 8601 with TZ offset (e.g. `2026-05-16T00:00:00-05:00`) | The actual airing/release timestamp for the calendar entry. Use this for sorting and display. |\n| `release_date` | `YYYY-MM-DD` | The original premiere date of the title (not the per-episode date). |",
+        "deprecated": true,
+        "description": "<Warning>\n**Deprecated — use [`GET /calendar/v2/{type}.json`](/api-reference/calendar) instead.** This v1 file keeps regenerating until **1 February 2027**, then stops updating permanently and serves stale data.\n</Warning>\n\nRolling **34-day calendar** of episode airings (TV / anime) or theatrical releases (movies): yesterday + the next ~33 days. The same data that powers the Simkl Calendar widget on simkl.com.\n\nUse this for \"what's airing now and next\" UIs. For wider grid views (previous / current / next month), use the [monthly archive](/api-reference/calendar) variant instead.\n\n**Update cadence:** regenerated every 6 hours by the build pipeline. **CDN cache TTL: 5 hours** (`Cache-Control: max-age=18000`). The Cloudflare edge ignores query strings — appending `?nocache=…` won't bust the cache. Use `If-None-Match: <ETag>` for `304 Not Modified` revalidation if you want to skip the body transfer.\n\nStill send the standard URL params (`client_id`, `app-name`, `app-version`) and the `User-Agent` header on every request — same project-wide convention, even though `data.simkl.in` ignores them. See [Headers and required parameters](/conventions/headers).\n\n#### Per-type variations\n\n| File | Item shape |\n|---|---|\n| `/calendar/tv.json` | TV episode airings. Each item has `episode.season` + `episode.episode`. |\n| `/calendar/anime.json` | Anime episode airings. `episode.season` omitted (AniDB sequential numbering). `anime_type` present. |\n| `/calendar/movie_release.json` | Movie premieres. No `episode` block. |\n\n#### Date conventions\n\n| Field | Format | Meaning |\n|---|---|---|\n| `date` | ISO 8601 with TZ offset (e.g. `2026-05-16T00:00:00-05:00`) | The actual airing/release timestamp for the calendar entry. Use this for sorting and display. |\n| `release_date` | `YYYY-MM-DD` | The original premiere date of the title (not the per-episode date). |",
         "operationId": "get-calendar-rolling",
         "parameters": [
           {
@@ -9381,7 +10555,7 @@
             "url": "https://data.simkl.in"
           }
         ],
-        "summary": "Calendar (rolling 33-day window)",
+        "summary": "Calendar v1 (rolling 34-day window, deprecated)",
         "tags": [
           "CDN data files"
         ],
@@ -9405,14 +10579,15 @@
         "x-mint": {
           "href": "/api-reference/calendar",
           "metadata": {
-            "sidebarTitle": "Calendar (rolling)"
+            "sidebarTitle": "Calendar v1 (rolling, deprecated)"
           }
         }
       }
     },
     "/calendar/{year}/{month}/{type}.json": {
       "get": {
-        "description": "Per-month archive of TV episodes / anime episodes / movie releases. Use for **wider calendar grid views** (e.g. a 3-month strip showing previous / current / next month) and **historical lookups**.\n\n**Update cadence:** the current month is regenerated every 6 hours; the previous 12 months every 24 hours; archives older than 12 months are immutable (rarely change). **CDN cache TTL: 5 hours** (same as the rolling file). The Cloudflare edge ignores query strings.\n\nSame item shape as the [rolling-window file](/api-reference/calendar) — see that page for the per-type field tables and the `date` vs `release_date` distinction.\n\nStill send the standard URL params (`client_id`, `app-name`, `app-version`) and the `User-Agent` header on every request — same project-wide convention, even though `data.simkl.in` ignores them. See [Headers and required parameters](/conventions/headers).\n\n#### Path\n\n`/calendar/{year}/{month}/{type}.json`\n\n| Segment | Format | Notes |\n|---|---|---|\n| `year` | 4-digit integer | e.g. `2026`. |\n| `month` | 1–12 integer | **Bare integer, NO zero-padding.** `/calendar/2026/5/tv.json` works; `/calendar/2026/05/tv.json` returns **404**. Common gotcha for clients using `f\"{month:02d}\"` or `str(month).zfill(2)` — strip the padding before building the path. |\n| `type` | `tv` / `anime` / `movie_release` | Same enum as the rolling file. |",
+        "deprecated": true,
+        "description": "<Warning>\n**Deprecated — use [`GET /calendar/v2/{year}/{month}/{type}.json`](/api-reference/calendar) instead.** This v1 file keeps regenerating until **1 February 2027**, then stops updating permanently and serves stale data.\n</Warning>\n\nPer-month archive of TV episodes / anime episodes / movie releases. Use for **wider calendar grid views** (e.g. a 3-month strip showing previous / current / next month) and **historical lookups**.\n\n**Update cadence:** the current month is regenerated every 6 hours; the previous 12 months every 24 hours; archives older than 12 months are immutable (rarely change). **CDN cache TTL: 5 hours** (same as the rolling file). The Cloudflare edge ignores query strings.\n\nSame item shape as the [rolling-window file](/api-reference/calendar) — see that page for the per-type field tables and the `date` vs `release_date` distinction.\n\nStill send the standard URL params (`client_id`, `app-name`, `app-version`) and the `User-Agent` header on every request — same project-wide convention, even though `data.simkl.in` ignores them. See [Headers and required parameters](/conventions/headers).\n\n#### Path\n\n`/calendar/{year}/{month}/{type}.json`\n\n| Segment | Format | Notes |\n|---|---|---|\n| `year` | 4-digit integer | e.g. `2026`. |\n| `month` | 1–12 integer | **Bare integer, NO zero-padding.** `/calendar/2026/5/tv.json` works; `/calendar/2026/05/tv.json` returns **404**. Common gotcha for clients using `f\"{month:02d}\"` or `str(month).zfill(2)` — strip the padding before building the path. |\n| `type` | `tv` / `anime` / `movie_release` | Same enum as the rolling file. |",
         "operationId": "get-calendar-monthly",
         "parameters": [
           {
@@ -9583,7 +10758,7 @@
             "url": "https://data.simkl.in"
           }
         ],
-        "summary": "Calendar (monthly archive)",
+        "summary": "Calendar v1 (monthly archive, deprecated)",
         "tags": [
           "CDN data files"
         ],
@@ -9607,7 +10782,7 @@
         "x-mint": {
           "href": "/api-reference/calendar",
           "metadata": {
-            "sidebarTitle": "Calendar (monthly)"
+            "sidebarTitle": "Calendar v1 (monthly, deprecated)"
           }
         }
       }
@@ -9752,6 +10927,21 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -11245,7 +12435,7 @@
     },
     "/movies/genres/{genre}/{type}/{country}/{year}/{sort}": {
       "get": {
-        "description": "<Warning>\n**Not for TV / console / 10-foot apps.** The V1 genre-browse endpoints return a thin per-item shape (`title`, `year`, `poster`, `ids`, `ratings`, `rank`). Building a TV-app grid that shows overview text, full ratings, networks, runtimes, recommendations, or trailers would force one per-item refetch against the detail endpoint per visible card. **Wait for the V2 Beta API**, which returns the richer per-item shape TV-app surfaces need in a single call. If you're targeting TV / console / streaming-box clients, please hold off integrating these endpoints.\n</Warning>\n\n<Tip>\n**Just need this month's most watched titles in a genre? Use the [trending genre files](/api-reference/trending#by-genre-this-month) instead.** They are free: they don't count against any [rate limit](/resources/rate-limits#what-does-not-count) or a user's daily allowance, and they need no user token. Every call to this endpoint does count — against the user's daily allowance under [AUTH V2](/api-reference/auth-v2), where it also needs a user token, or your app's allowance under AUTH V1.\n\nA genre file is one cached request with no paging, and every item comes in the full trending shape (overview, trailer, ratings, runtime) rather than the thin shape above. Call this endpoint only for what the files don't cover: other sorts, the country / network / year filters, or anything beyond this month.\n</Tip>\n\nBrowse movies filtered by genre, country, year, and sort order. Path is `/movies/genres/{genre}/{type}/{country}/{year}/{sort}` — all segments **required** (use `all` as the wildcard).\n\nThe `type` segment is reserved — always pass the literal value `movies`.\n\n| Path param | Values |\n|---|---|\n| `genre` | `all`, `action`, `adventure`, `animation`, `comedy`, `crime`, `documentary`, `drama`, `erotica`, `family`, `fantasy`, `history`, `horror`, `music`, `mystery`, `romance`, `science-fiction`, `thriller`, `tv-movie`, `war`, `western` |\n| `type` | `movies` (literal) |\n| `country` | `all` or ISO 3166-1 alpha-2 (`us`, `gb`, `jp`, …) |\n| `year` | `all`, single year (`2019`), or decade (`2010s`, `2000s`) |\n| `sort` | `popular-this-week`, `popular-this-month`, `popular-all-time`, `rank`, `release-date`, `voted`, `watched` |\n\nItems always carry `ids.tmdb` — the discover query filters out movies without a TMDB-linked record.\n\n#### Pagination\n\n| Param | Default | Notes |\n|---|---|---|\n| `page` | `1` | Hard-capped server-side at `20`. Higher values clamp silently. |\n| `limit` | `60` | Hard-capped server-side at `60`. Higher values clamp silently. Returned `X-Pagination-Limit` reflects the clamped value. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\n#### Silent fallbacks\n\nBad path segments DO NOT return errors:\n\n| Bad input | What happens |\n|---|---|\n| Unknown `genre` slug (`zzz`) | Top-level response is `null` (NOT `[]`). |\n| Unknown `year` (e.g. `zzz`) | Silently treated as `all` — full result set. |\n| Unknown `sort` (`zzzsortzzz`) | Silently treated as default sort order. |\n| Unknown `country` / `network` | Silently treated as `all`. |\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` or `404` — bad segments fall back silently or return `null`.\n",
+        "description": "<Warning>\n**Not for TV / console / 10-foot apps.** The V1 genre-browse endpoints return a thin per-item shape (`title`, `year`, `poster`, `ids`, `ratings`, `rank`). Building a TV-app grid that shows overview text, full ratings, networks, runtimes, recommendations, or trailers would force one per-item refetch against the detail endpoint per visible card. **Wait for the V2 Beta API**, which returns the richer per-item shape TV-app surfaces need in a single call. If you're targeting TV / console / streaming-box clients, please hold off integrating these endpoints.\n</Warning>\n\n<Tip>\n**Just need this month's most watched titles in a genre? Use the [trending genre files](/api-reference/trending#by-genre-this-month) instead.** They are free: they don't count against any [rate limit](/resources/rate-limits#what-does-not-count) or a user's daily allowance, and they need no user token. Every call to this endpoint does count — against the user's daily allowance under [AUTH V2](/api-reference/auth-v2), where it also needs a user token, or your app's allowance under AUTH V1.\n\nA genre file is one cached request with no paging, and every item comes in the full trending shape (overview, trailer, ratings, runtime) rather than the thin shape above. Call this endpoint only for what the files don't cover: other sorts, the country / network / year filters, or anything beyond this month.\n</Tip>\n\nBrowse movies filtered by genre, country, year, and sort order. Path is `/movies/genres/{genre}/{type}/{country}/{year}/{sort}` — all segments **required** (use `all` as the wildcard).\n\nThe `type` segment is reserved — always pass the literal value `movies`.\n\n| Path param | Values |\n|---|---|\n| `genre` | `all`, `action`, `adventure`, `animation`, `comedy`, `crime`, `documentary`, `drama`, `erotica`, `family`, `fantasy`, `history`, `horror`, `music`, `mystery`, `romance`, `science-fiction`, `thriller`, `tv-movie`, `war`, `western` |\n| `type` | `movies` (literal) |\n| `country` | `all` or ISO 3166-1 alpha-2 (`us`, `gb`, `jp`, …) |\n| `year` | `all`, single year (`2019`), or decade (`2010s`, `2000s`) |\n| `sort` | `popular-this-week`, `popular-this-month`, `popular-all-time`, `rank`, `release-date`, `voted`, `watched` |\n\nItems always carry `ids.tmdb` — the discover query filters out movies without a TMDB-linked record.\n\n#### Pagination\n\n| Param | Default | Notes |\n|---|---|---|\n| `page` | `1` | Hard-capped server-side at `20`. Higher values clamp silently. |\n| `limit` | `60` | Hard-capped server-side at `60`. Higher values clamp silently. Returned `X-Pagination-Limit` reflects the clamped value. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\n#### Silent fallbacks\n\nBad path segments DO NOT return errors:\n\n| Bad input | What happens |\n|---|---|\n| Unknown `genre` slug (`zzz`) | Top-level response is `null` (NOT `[]`). |\n| Unknown `year` (e.g. `zzz`) | Silently treated as `all` — full result set. |\n| Unknown `sort` (`zzzsortzzz`) | Silently treated as default sort order. |\n| Unknown `country` / `network` | Silently treated as `all`. |\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` or `404` — bad segments fall back silently or return `null`.\n",
         "operationId": "get-movies-genres",
         "parameters": [
           {
@@ -11452,6 +12642,21 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -12613,7 +13818,7 @@
     },
     "/ratings/{type}": {
       "get": {
-        "description": "<Note>\n**This endpoint returns Simkl's *community* ratings** (the public average + droprate + vote counts) for every item in the user's watchlist — not the user's own 1-10 scores. If you want **the user's own ratings**, every [`GET /sync/all-items`](/api-reference/simkl/get-all-items) response already carries `user_rating` (1-10 or `null`) per item — filter that client-side. For server-side filtering by score (e.g. \"give me only items I rated 9 or 10\"), see [`GET /sync/ratings/:type/:rating`](/api-reference/simkl/get-user-ratings).\n</Note>\n\nBulk Simkl-rating lookup for items across the user's watchlist. Useful for ranking the user's library against community ratings (e.g. \"what's the highest-community-rated movie in my Plan-to-Watch?\").\n\nReturns an array of `{id, simkl: {rating, votes, droprate}}` for every item in the requested watchlist statuses. Pair with [`GET /movies/{id}`](/api-reference/simkl/get-movie) / [`GET /tv/{id}`](/api-reference/simkl/get-tv-show) / [`GET /anime/{id}`](/api-reference/simkl/get-anime) (Cloudflare-cached) when you need the full record for any individual item.\n\n#### Path\n\n| Segment | Values | Notes |\n|---|---|---|\n| `type` | `movies`, `tv`, `anime`, `all` | Required. Use `/ratings/all` to get every type in one response. |\n\n#### Query\n\n| Param | Required | Notes |\n|---|---|---|\n| `user_watchlist` | yes | Comma-separated list of watchlist statuses to include. Any of `watching`, `plantowatch`, `hold`, `completed`, `dropped`. Use `1` (or any non-empty value) as a shorthand for \"all statuses\". Without this param the request silently falls through to a different code path and returns `200 null` — always supply it. |\n| `fields` | no | Comma-separated extra blocks to include alongside the default `simkl` block. See the *Fields values* table below. |\n\n#### Fields values\n\n| `fields` value | Adds |\n|---|---|\n| `simkl` *(default)* | `simkl: {rating, votes, droprate}` per item. |\n| `ext` | `imdb: {rating, votes}` and/or `mal: {rating, votes, rank}` (only the providers Simkl has on file for the title). |\n| `rank` | `rank` integer — Simkl's catalog rank for the item. |\n| `release_status` | Human-readable release status (e.g. `Ended`, `Continuing`). |\n| `year` | `release_year` integer. |\n| `link` | Canonical Simkl URL for the item. |\n\nCombine multiple with commas: `fields=simkl,ext,year,rank`. Unknown values (including `reactions` and `has_trailer`, which are valid on the hidden single-item rating endpoint but **not** here) are silently ignored.\n\n#### Auth\n\nRequires `Authorization: Bearer <access_token>` plus the standard `client_id` / `app-name` / `app-version` URL params.\n\nFor the user's **own** ratings (the 1-10 scores they've assigned), use [`GET /sync/ratings/:type/:rating`](/api-reference/simkl/get-user-ratings) instead — that's the user-rated-by-them endpoint, this one is community-rating-of-everything-in-their-list.\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
+        "description": "<Note>\n**This endpoint returns Simkl's *community* ratings** (the public average + droprate + vote counts) for every item in the user's watchlist — not the user's own 1-10 scores. If you want **the user's own ratings**, every [`GET /sync/all-items`](/api-reference/simkl/get-all-items) response already carries `user_rating` (1-10 or `null`) per item — filter that client-side. For server-side filtering by score (e.g. \"give me only items I rated 9 or 10\"), see [`GET /sync/ratings/:type/:rating`](/api-reference/simkl/get-user-ratings).\n</Note>\n\nBulk Simkl-rating lookup for items across the user's watchlist. Useful for ranking the user's library against community ratings (e.g. \"what's the highest-community-rated movie in my Plan-to-Watch?\").\n\nReturns an array of `{id, simkl: {rating, votes, droprate}}` for every item in the requested watchlist statuses. Pair with [`GET /movies/{id}`](/api-reference/simkl/get-movie) / [`GET /tv/{id}`](/api-reference/simkl/get-tv-show) / [`GET /anime/{id}`](/api-reference/simkl/get-anime) (Cloudflare-cached) when you need the full record for any individual item.\n\n#### Path\n\n| Segment | Values | Notes |\n|---|---|---|\n| `type` | `movies`, `tv`, `anime`, `all` | Required. Use `/ratings/all` to get every type in one response. |\n\n#### Query\n\n| Param | Required | Notes |\n|---|---|---|\n| `user_watchlist` | yes | Comma-separated list of watchlist statuses to include. Any of `watching`, `plantowatch`, `hold`, `completed`, `dropped`. Use `1` (or any non-empty value) as a shorthand for \"all statuses\". Without this param the request silently falls through to a different code path and returns `200 null` — always supply it. |\n| `fields` | no | Comma-separated extra blocks to include alongside the default `simkl` block. See the *Fields values* table below. |\n\n#### Fields values\n\n| `fields` value | Adds |\n|---|---|\n| `simkl` *(default)* | `simkl: {rating, votes, droprate}` per item. |\n| `ext` | `imdb: {rating, votes}` and/or `mal: {rating, votes, rank}` (only the providers Simkl has on file for the title). |\n| `rank` | `rank` integer — Simkl's catalog rank for the item. |\n| `release_status` | Release status, lower-case: `released` (movies), `ended`, `returning series` (TV) or `ongoing` (anime). Titles not out yet: `upcoming`, `planned`, `in production`, `post production`, `rumored` or `canceled`. |\n| `year` | `release_year` integer. |\n| `link` | Canonical Simkl URL for the item. |\n\nCombine multiple with commas: `fields=simkl,ext,year,rank`. Unknown values (including `reactions` and `has_trailer`, which are valid on the hidden single-item rating endpoint but **not** here) are silently ignored.\n\n#### Auth\n\nRequires `Authorization: Bearer <access_token>` plus the standard `client_id` / `app-name` / `app-version` URL params.\n\nFor the user's **own** ratings (the 1-10 scores they've assigned), use [`GET /sync/ratings/:type/:rating`](/api-reference/simkl/get-user-ratings) instead — that's the user-rated-by-them endpoint, this one is community-rating-of-everything-in-their-list.\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
         "operationId": "get-ratings-type",
         "parameters": [
           {
@@ -12712,7 +13917,7 @@
             }
           },
           {
-            "description": "- A comma-separated list of additional fields to include in the response.\n - `simkl` – returns the Simkl rating and votes.\n - `ext` – includes external ratings such as IMDB or MAL if available.\n - `rank` – returns the rank within the Simkl service for that media type (movie, tv, anime).\n - `release_status` – includes the release status of the item.\n - `year` – includes the year of release.\n - Example: `fields=rank,droprate,simkl,ext,year`",
+            "description": "- A comma-separated list of additional fields to include in the response.\n - `simkl` – returns the Simkl rating and votes.\n - `ext` – includes external ratings such as IMDB or MAL if available.\n - `rank` – returns the rank within the Simkl service for that media type (movie, tv, anime).\n - `release_status` – includes the release status of the item.\n - `year` – includes the year of release.\n - `link` – includes the title's simkl.com URL.\n - Example: `fields=rank,simkl,ext,year`. `droprate` is not a field of its own — it comes inside `simkl`.",
             "examples": {
               "active_library_csv": {
                 "summary": "Active library only (CSV: plantowatch + watching + completed)",
@@ -12746,14 +13951,8 @@
             "in": "query",
             "name": "fields",
             "schema": {
-              "enum": [
-                "simkl",
-                "ext",
-                "rank",
-                "release_status",
-                "year",
-                "link"
-              ],
+              "default": "simkl",
+              "example": "simkl,ext,year",
               "type": "string"
             }
           },
@@ -12909,7 +14108,7 @@
                     ]
                   },
                   "full_metadata_bundle": {
-                    "description": "`GET /ratings/all?user_watchlist=1&fields=simkl,ext,year,rank,droprate,link,release_status`\n\nEvery supported `fields=` value at once: `simkl`, `ext` (imdb/mal), `year` (release_year), `rank`, `droprate`, `link` (canonical Simkl URL), `release_status` (human-readable e.g. `Ended`, `Continuing`). Useful for one-shot UIs that render the full row without a follow-up detail call.",
+                    "description": "`GET /ratings/all?user_watchlist=1&fields=simkl,ext,year,rank,droprate,link,release_status`\n\nEvery supported `fields=` value at once: `simkl`, `ext` (imdb/mal), `year` (release_year), `rank`, `droprate`, `link` (canonical Simkl URL), `release_status` (lower-case, e.g. `ended`, `returning series`). Useful for one-shot UIs that render the full row without a follow-up detail call.",
                     "summary": "Full metadata: every optional field at once",
                     "value": [
                       {
@@ -13047,59 +14246,141 @@
                   }
                 },
                 "schema": {
+                  "description": "Type 3 null — nothing in the user's list matches `{type}` and `user_watchlist`: the body is `null`, not `[]`. See [Null and missing values](/conventions/null-values).",
                   "items": {
+                    "description": "One title in the user's list. Only `id` is always present; every other key appears only when its `fields` option is sent.",
                     "properties": {
                       "id": {
-                        "type": "number"
+                        "description": "Simkl ID.",
+                        "type": "integer"
                       },
                       "imdb": {
-                        "$ref": "#/components/schemas/ExternalRating"
+                        "description": "Only with `fields=ext`, and only when an IMDb rating is on file (Type 2 otherwise).",
+                        "properties": {
+                          "rating": {
+                            "description": "Type 4 null — no votes on file. See [Null and missing values](/conventions/null-values). IMDb rating, 0–10.",
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "votes": {
+                            "description": "Type 4 null — no votes on file. See [Null and missing values](/conventions/null-values). IMDb votes.",
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          }
+                        },
+                        "type": "object"
                       },
                       "link": {
+                        "description": "simkl.com URL with slug. Only with `fields=link`.",
                         "type": "string"
                       },
                       "mal": {
-                        "$ref": "#/components/schemas/RankedExternalRating"
+                        "description": "Only with `fields=ext`, and only when a MyAnimeList rating is on file (Type 2 otherwise).",
+                        "properties": {
+                          "rank": {
+                            "description": "Type 4 null — not ranked on MyAnimeList. See [Null and missing values](/conventions/null-values). MyAnimeList rank.",
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "rating": {
+                            "description": "Type 4 null — no votes on file. See [Null and missing values](/conventions/null-values). MyAnimeList score, 0–10.",
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "votes": {
+                            "description": "Type 4 null — no votes on file. See [Null and missing values](/conventions/null-values). MyAnimeList votes.",
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          }
+                        },
+                        "type": "object"
                       },
                       "rank": {
-                        "type": "number"
+                        "description": "Type 4 null — not ranked yet. See [Null and missing values](/conventions/null-values). Simkl rank within the media type. Only with `fields=rank`.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
                       },
                       "release_status": {
+                        "description": "Lower-case release status. `released` is movies only; `returning series` is TV and `ongoing` anime for titles still airing; `ended` for finished shows and anime. Titles not out yet: `upcoming`, `planned`, `in production`, `post production`, `rumored`, `canceled`. Only with `fields=release_status`.",
+                        "enum": [
+                          "released",
+                          "ended",
+                          "returning series",
+                          "ongoing",
+                          "upcoming",
+                          "planned",
+                          "in production",
+                          "post production",
+                          "rumored",
+                          "canceled"
+                        ],
                         "type": "string"
                       },
                       "release_year": {
-                        "type": "number"
+                        "description": "Type 4 null — no release year on file. See [Null and missing values](/conventions/null-values). Only with `fields=year`.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
                       },
                       "simkl": {
+                        "description": "Simkl rating. Sent by default — `fields` defaults to `simkl` — and absent when your `fields` list leaves it out.",
                         "properties": {
                           "droprate": {
-                            "type": "string"
+                            "description": "Type 4 null — nobody has the title in a list yet. See [Null and missing values](/conventions/null-values). Share of users who dropped it (`\"3%\"`).",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "rating": {
-                            "type": "number"
+                            "description": "Type 4 null — no votes yet. See [Null and missing values](/conventions/null-values). Average rating, 0–10.",
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           },
                           "votes": {
-                            "type": "number"
+                            "description": "Type 4 null — no votes yet. See [Null and missing values](/conventions/null-values). Number of votes.",
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
                           }
                         },
                         "type": "object"
                       },
                       "type": {
+                        "description": "Only when `{type}` is `all`.",
+                        "enum": [
+                          "movie",
+                          "tv",
+                          "anime"
+                        ],
                         "type": "string"
                       }
                     },
                     "required": [
-                      "id",
-                      "type",
-                      "link",
-                      "release_status",
-                      "release_year",
-                      "rank",
-                      "simkl"
+                      "id"
                     ],
                     "type": "object"
                   },
-                  "type": "array"
+                  "type": [
+                    "array",
+                    "null"
+                  ]
                 }
               }
             },
@@ -15067,6 +16348,21 @@
             "description": "OK",
             "headers": {}
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
+          },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
           },
@@ -15520,6 +16816,21 @@
             "description": "Array of matching catalog records — `[]` when no record matches the supplied IDs. There is no `404` for unknown IDs; an empty array is the not-found shape (Type 3 null — see [Null and missing values](/conventions/null-values)).",
             "headers": {}
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
+          },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
           },
@@ -15914,7 +17225,7 @@
     },
     "/search/{type}": {
       "get": {
-        "description": "<Danger>\n**Never call search before scrobbling or marking something watched.**\n\nThis is the most common wasted request we see. Apps look the title up here first to get a Simkl ID, then send that ID to the write endpoint. **The lookup is unnecessary.** Every write endpoint resolves the item itself, from whatever you already have:\n\n```json\n{\n  \"movie\": {\n    \"title\": \"Dune: Part Two\",\n    \"year\": 2024,\n    \"ids\": { \"imdb\": \"tt15239678\", \"tmdb\": \"693134\" }\n  }\n}\n```\n\nPass any combination of IDs, plus `title` and `year` as fallbacks, in the **same request** that records the watch. Simkl matches it server-side. A Simkl ID is never required.\n\nThat applies to [`/scrobble/*`](/api-reference/scrobble), [`POST /sync/history`](/api-reference/simkl/add-to-history), [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) and [`POST /sync/ratings`](/api-reference/simkl/add-ratings) alike.\n\nSearching first doubles your request count for no benefit, burns rate limit you'll want later, and picks the wrong title whenever the search ranking disagrees with the IDs you already hold. **One call, not two.**\n\nUse search only when you have **no usable IDs at all**: a title the user typed, a file name, or a random pick.\n</Danger>\n\nFull-text search over the Simkl catalog. Pick a type — `movie`, `tv`, `anime`, or `all` for all three at once — and pass a search term like `john wick` or `john wick 2014`.\n\n<Note>\n**Heads up: `movie` becomes `\"movies\"` in the response.**\n\nYou call `/search/movie` (no `s`) but each item in the response has `endpoint_type: \"movies\"` (with an `s`). TV and anime don't change.\n\n| You call | Each item's `endpoint_type` is |\n|---|---|\n| `/search/movie` | `\"movies\"` ← note the extra `s` |\n| `/search/tv` | `\"tv\"` |\n| `/search/anime` | `\"anime\"` |\n| `/search/all` | each item's own type: `\"movies\"`, `\"tv\"` or `\"anime\"` |\n\nWith `movie`, `tv` or `anime`, every item in the response has that `endpoint_type`. `all` mixes them — see **Searching all types** below.\n</Note>\n\n#### Path parameter\n\n| Param | Values |\n|---|---|\n| `type` | `movie`, `tv`, `anime`, or `all` for all three at once (see **Searching all types** below) |\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `q` | — | **Required.** Text query (matches `title` and `all_titles[]`). For external-ID lookups (IMDb / TMDB / TVDB / etc.), use [`/redirect`](/api-reference/redirect) or [`/search/id`](/api-reference/simkl/search-by-id) instead. |\n| `page` | `1` | Hard-capped server-side at `20`. Higher values silently clamp. |\n| `limit` | `10` | Hard-capped server-side at `50`. Higher values silently clamp. |\n| `extended` | `simple` | `full` adds `all_titles[]`, `url`, `ep_count` (TV/anime), `rank` (nullable), `status` (TV/anime), and a `ratings` block. |\n| `sort` | `relevance` | Result order: `relevance`, `release-date`, `last-air-date` (TV and anime only), `title` or `rank` — see **Sorting** below. Any other value is a `400`. |\n\nReturns paginated results with `X-Pagination-*` headers — see [Pagination](/conventions/pagination) for the standard paginator pattern.\n\n#### Sorting\n\n`sort` changes the order of the matches, not which titles match, and paging keeps it — page 2 continues where page 1 stopped.\n\n| `sort` | Order |\n|---|---|\n| `relevance` *(default)* | Best match first, then the more popular title. |\n| `release-date` | Newest release first. Upcoming titles come before released ones. |\n| `last-air-date` | Most recently aired first. **TV and anime only** — on `/search/movie` it returns `400`. |\n| `title` | A–Z. Titles that start with punctuation or a number come before `A`. |\n| `rank` | Simkl rank, most popular first. |\n\nValues are case-insensitive, and an empty `sort=` means `relevance`. Any other value returns `400 wrong_parameter`, with the accepted values listed in `message`.\n\n#### Searching all types\n\nUse `all` as the type to search movies, TV shows and anime in one request:\n\n```text\nGET /search/all?q=batman\n```\n\n`all` is lower-case only (`/search/ALL` returns `null`), and the path always needs a type — `/search` on its own returns `404`.\n\n- **Results mix types.** Each item carries its own `endpoint_type` — `movies`, `tv` or `anime` — so branch on it per item, not per response. Every item has the fields it would have in a search of its own type.\n- **The query parameters work the same** — `q`, `page`, `limit`, `extended`, `sort`. All five sorts are accepted, `last-air-date` included, but movies have no air dates, so their place in that order isn't meaningful; prefer `release-date` when the results include movies.\n- **If your app shows only one kind of title, use that type instead of `all`.** You get only that type, and the `X-Pagination-*` counts cover only those matches.\n\n#### Per-item fields by mode\n\n| Field | `simple` | `extended=full` | Notes |\n|---|---|---|---|\n| `title` | ✓ | ✓ | Display title in the user's locale. |\n| `title_en` | — | — | **Anime only**, optional even on anime — only when an English-localized title is on file. |\n| `title_romaji` | anime only | anime only | **Anime only**, always present on anime items. Currently mirrors `title` for the romaji slot. |\n| `year` | ✓ | ✓ | Premiere year. |\n| `endpoint_type` | ✓ | ✓ | `\"movies\"` / `\"tv\"` / `\"anime\"`. Same value on every item in one response. |\n| `type` | anime only | anime only | **Anime only**: `tv`, `movie`, `ova`, `ona`, `special`, `music`. |\n| `poster` | ✓ | ✓ | Image path fragment — see [Image conventions](/conventions/images) for the full URL pattern (`https://wsrv.nl/?url=https://simkl.in/posters/{poster}_m.webp&q=90`). |\n| `ids` | ✓ | ✓ | `{ simkl_id, slug, tmdb? }`. `tmdb` only present when a TMDB link is on file. |\n| `all_titles` | — | movies/anime | Aliases / localized variants. Anime sees the most entries. TV items typically don't carry this even on `extended=full`. |\n| `url` | — | ✓ | Relative simkl.com URL (with slug). |\n| `ep_count` | — | TV/anime | Total episode count when known. |\n| `rank` | — | ✓ | Simkl popularity rank. **Nullable** — see below. |\n| `status` | — | TV/anime | Closed enum: `tba`, `ended`, `airing`. |\n| `ratings.simkl` | — | ✓ | `{ rating, votes }` — only present when votes > 0. |\n| `ratings.imdb` | — | ✓ | `{ rating, votes }` — only present when an IMDb rating record exists. |\n| `ratings.mal` | — | anime only | `{ rating, votes, rank }` — anime only, only when a MAL record exists. |\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `rank` | Item not yet ranked, or rank value ≥ 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n| `ep_count` | TV/anime item with no episode count on file yet | [Type 4](/conventions/null-values#type-4) |\n| `poster` | No poster image on file | [Type 4](/conventions/null-values#type-4) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `400 wrong_parameter` | `sort` is not one of the values above, or `last-air-date` on `/search/movie` |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nInvalid `page` / `limit` never return `400` — they silently clamp to the server caps. No `404` — empty result is `[]` with status `200`.\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
+        "description": "<Danger>\n**Never call search before scrobbling or marking something watched.**\n\nThis is the most common wasted request we see. Apps look the title up here first to get a Simkl ID, then send that ID to the write endpoint. **The lookup is unnecessary.** Every write endpoint resolves the item itself, from whatever you already have:\n\n```json\n{\n  \"movie\": {\n    \"title\": \"Dune: Part Two\",\n    \"year\": 2024,\n    \"ids\": { \"imdb\": \"tt15239678\", \"tmdb\": \"693134\" }\n  }\n}\n```\n\nPass any combination of IDs, plus `title` and `year` as fallbacks, in the **same request** that records the watch. Simkl matches it server-side. A Simkl ID is never required.\n\nThat applies to [`/scrobble/*`](/api-reference/scrobble), [`POST /sync/history`](/api-reference/simkl/add-to-history), [`POST /sync/add-to-list`](/api-reference/simkl/add-to-list) and [`POST /sync/ratings`](/api-reference/simkl/add-ratings) alike.\n\nSearching first doubles your request count for no benefit, burns rate limit you'll want later, and picks the wrong title whenever the search ranking disagrees with the IDs you already hold. **One call, not two.**\n\nUse search only when you have **no usable IDs at all**: a title the user typed, a file name, or a random pick.\n</Danger>\n\nFull-text search over the Simkl catalog. Pick a type — `movie`, `tv`, `anime`, or `all` for all three at once — and pass a search term like `john wick` or `john wick 2014`.\n\n<Note>\n**Heads up: `movie` becomes `\"movies\"` in the response.**\n\nYou call `/search/movie` (no `s`) but each item in the response has `endpoint_type: \"movies\"` (with an `s`). TV and anime don't change.\n\n| You call | Each item's `endpoint_type` is |\n|---|---|\n| `/search/movie` | `\"movies\"` ← note the extra `s` |\n| `/search/tv` | `\"tv\"` |\n| `/search/anime` | `\"anime\"` |\n| `/search/all` | each item's own type: `\"movies\"`, `\"tv\"` or `\"anime\"` |\n\nWith `movie`, `tv` or `anime`, every item in the response has that `endpoint_type`. `all` mixes them — see **Searching all types** below.\n</Note>\n\n#### Path parameter\n\n| Param | Values |\n|---|---|\n| `type` | `movie`, `tv`, `anime`, or `all` for all three at once (see **Searching all types** below) |\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `q` | — | **Required.** Text query (matches `title` and `all_titles[]`). For external-ID lookups (IMDb / TMDB / TVDB / etc.), use [`/redirect`](/api-reference/redirect) or [`/search/id`](/api-reference/simkl/search-by-id) instead. |\n| `page` | `1` | Hard-capped server-side at `20`. Higher values silently clamp. |\n| `limit` | `10` | Hard-capped server-side at `50`. Higher values silently clamp. |\n| `extended` | `simple` | `full` adds `all_titles[]`, `url`, `ep_count` (TV/anime), `rank` (nullable), `status` (TV/anime), and a `ratings` block. |\n| `sort` | `relevance` | Result order: `relevance`, `release-date`, `last-air-date` (TV and anime only), `title` or `rank` — see **Sorting** below. Any other value is a `400`. |\n\nReturns paginated results with `X-Pagination-*` headers — see [Pagination](/conventions/pagination) for the standard paginator pattern.\n\n#### Sorting\n\n`sort` changes the order of the matches, not which titles match, and paging keeps it — page 2 continues where page 1 stopped.\n\n| `sort` | Order |\n|---|---|\n| `relevance` *(default)* | Best match first, then the more popular title. |\n| `release-date` | Newest release first. Upcoming titles come before released ones. |\n| `last-air-date` | Most recently aired first. **TV and anime only** — on `/search/movie` it returns `400`. |\n| `title` | A–Z. Titles that start with punctuation or a number come before `A`. |\n| `rank` | Simkl rank, most popular first. |\n\nValues are case-insensitive, and an empty `sort=` means `relevance`. Any other value returns `400 wrong_parameter`, with the accepted values listed in `message`.\n\n#### Searching all types\n\nUse `all` as the type to search movies, TV shows and anime in one request:\n\n```text\nGET /search/all?q=batman\n```\n\n`all` is lower-case only (`/search/ALL` returns `null`), and the path always needs a type — `/search` on its own returns `404`.\n\n- **Results mix types.** Each item carries its own `endpoint_type` — `movies`, `tv` or `anime` — so branch on it per item, not per response. Every item has the fields it would have in a search of its own type.\n- **The query parameters work the same** — `q`, `page`, `limit`, `extended`, `sort`. All five sorts are accepted, `last-air-date` included, but movies have no air dates, so their place in that order isn't meaningful; prefer `release-date` when the results include movies.\n- **If your app shows only one kind of title, use that type instead of `all`.** You get only that type, and the `X-Pagination-*` counts cover only those matches.\n\n#### Per-item fields by mode\n\n| Field | `simple` | `extended=full` | Notes |\n|---|---|---|---|\n| `title` | ✓ | ✓ | Display title in the user's locale. |\n| `title_en` | — | — | **Anime only**, optional even on anime — only when an English-localized title is on file. |\n| `title_romaji` | anime only | anime only | **Anime only**, always present on anime items. Currently mirrors `title` for the romaji slot. |\n| `year` | ✓ | ✓ | Premiere year. |\n| `endpoint_type` | ✓ | ✓ | `\"movies\"` / `\"tv\"` / `\"anime\"`. Same value on every item in one response. |\n| `type` | anime only | anime only | **Anime only**: `tv`, `movie`, `ova`, `ona`, `special`, `music`. |\n| `poster` | ✓ | ✓ | Image path fragment — see [Image conventions](/conventions/images) for the full URL pattern (`https://wsrv.nl/?url=https://simkl.in/posters/{poster}_m.webp&q=90`). |\n| `ids` | ✓ | ✓ | `{ simkl_id, slug, tmdb? }`. `tmdb` only present when a TMDB link is on file. |\n| `all_titles` | — | movies/anime | Aliases / localized variants. Anime sees the most entries. TV items typically don't carry this even on `extended=full`. |\n| `url` | — | ✓ | Relative simkl.com URL (with slug). |\n| `ep_count` | — | TV/anime | Total episode count when known. |\n| `rank` | — | ✓ | Simkl popularity rank. **Nullable** — see below. |\n| `status` | — | TV/anime | Closed enum: `tba`, `ended`, `airing`. |\n| `ratings.simkl` | — | ✓ | `{ rating, votes }` — only present when votes > 0. |\n| `ratings.imdb` | — | ✓ | `{ rating, votes }` — only present when an IMDb rating record exists. |\n| `ratings.mal` | — | anime only | `{ rating, votes, rank }` — anime only, only when a MAL record exists. |\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `rank` | Item not yet ranked, or rank value ≥ 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n| `ep_count` | TV/anime item with no episode count on file yet | [Type 4](/conventions/null-values#type-4) |\n| `poster` | No poster image on file | [Type 4](/conventions/null-values#type-4) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `400 wrong_parameter` | `sort` is not one of the values above, or `last-air-date` on `/search/movie` |\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nInvalid `page` / `limit` never return `400` — they silently clamp to the server caps. No `404` — empty result is `[]` with status `200`.\n\n<Tip>\n**Which IDs can I send/expect?** All accepted input identifiers and the keys you'll see echoed back in responses are listed at [**Standard media objects → Supported ID keys**](/conventions/standard-media-objects#supported-id-keys). Send every ID you have on writes — Simkl picks the first that resolves and ignores the rest. Reminder: `slug` is **response-only** (never send it on a request).\n</Tip>",
         "operationId": "get-search-type",
         "parameters": [
           {
@@ -16752,6 +18063,21 @@
               }
             },
             "description": "`wrong_parameter` — `sort` is not one of `relevance`, `release-date`, `last-air-date`, `title`, `rank`, or `last-air-date` was sent to `/search/movie`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -21927,7 +23253,7 @@
         "operationId": "delete-sync-playback-id",
         "parameters": [
           {
-            "description": "The numeric playback-session id to delete. Must be a positive integer — pass values returned in the `id` field of [`GET /sync/playback/{type}`](/api-reference/simkl/get-playback-sessions). Non-numeric ids return `404 url_failed`; the literal value `0` is interpreted as \"no id\" and falls through to the list handler (see Warning above).",
+            "description": "The numeric playback-session id to delete. Must be a positive integer — pass values returned in the `id` field of [`GET /sync/playback/{type}`](/api-reference/simkl/get-playback-sessions). Non-numeric ids and `0` return `404 url_failed`.",
             "example": 10916890,
             "in": "path",
             "name": "id",
@@ -23531,7 +24857,7 @@
     },
     "/tv/airing": {
       "get": {
-        "description": "Currently airing TV shows — same data that powers the [Simkl TV calendar](https://simkl.com/tv/airing/). No `access_token` required.\n\nSame shape and parameters as [`/anime/airing`](/api-reference/simkl/get-anime-airing) but for the TV catalog: no `anime_type` field, and the per-item `episode` block includes a `season` integer.\n\n<Warning>\n**Prefer the cached calendar endpoints for high-traffic use cases.** `/tv/airing` is **uncached** — every request hits the origin. For widgets, mobile-app home screens, or anything that fetches this on app launch / wake / timer, use the CDN-cached [Calendar data files](/api-reference/calendar) on `data.simkl.in` instead — both the rolling-window `/calendar/{type}.json` (yesterday + next 33 days) and the monthly archive `/calendar/{year}/{month}/{type}.json` serve the same per-day airing data, edge-cached so most requests don't even reach origin. Reserve `/tv/airing` for ad-hoc queries by a specific date that the calendar files don't pre-bake.\n\nBoth forms still need the standard URL params on every request — `client_id`, `app-name`, `app-version` (and the `User-Agent` header) — same as every other Simkl endpoint. See [Headers and required parameters](/conventions/headers).\n</Warning>\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `date` | `today` | `today`, `tomorrow`, or `DD-MM-YYYY`. Bogus values silently fall back to `today`. |\n| `sort` | `time` | `time`, `rank`, `popularity`. Bogus values silently fall back to `time`. |\n\n#### Item shape\n\n```json\n{\n \"title\": \"string\",\n \"year\": \"integer | null (extracted from the episode air time)\",\n \"date\": \"ISO-8601 string with -05:00 offset | null\",\n \"poster\": \"string (relative path; prepend https://simkl.in/posters/ + size)\",\n \"rank\": \"integer | null (Simkl popularity rank; null when not yet ranked)\",\n \"url\": \"string (relative simkl.com URL)\",\n \"ids\": {\n \"simkl_id\": \"integer\",\n \"slug\": \"string\"\n },\n \"episode\": {\n \"season\": \"integer\",\n \"episode\": \"integer\",\n \"url\": \"string\"\n }\n}\n```\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `date` | Catalog has no `Airs_Time` on file for this episode (rare — usually older or low-data titles) | [Type 4](/conventions/null-values#type-4) |\n| `rank` | Item not yet ranked, or rank value >= 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` — invalid `date`/`sort` values silently fall back to defaults. No `404` — empty result is `[]` with status `200`.",
+        "description": "Currently airing TV shows — same data that powers the [Simkl TV calendar](https://simkl.com/tv/airing/). No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).\n\nSame shape and parameters as [`/anime/airing`](/api-reference/simkl/get-anime-airing) but for the TV catalog: no `anime_type` field, and the per-item `episode` block includes a `season` integer.\n\n<Warning>\n**Prefer the cached calendar endpoints for high-traffic use cases.** `/tv/airing` is **uncached** — every request hits the origin. For widgets, mobile-app home screens, or anything that fetches this on app launch / wake / timer, use the CDN-cached [Calendar data files](/api-reference/calendar) on `data.simkl.in` instead — both the rolling-window `/calendar/{type}.json` (yesterday + next 33 days) and the monthly archive `/calendar/{year}/{month}/{type}.json` serve the same per-day airing data, edge-cached so most requests don't even reach origin. Reserve `/tv/airing` for ad-hoc queries by a specific date that the calendar files don't pre-bake.\n\nBoth forms still need the standard URL params on every request — `client_id`, `app-name`, `app-version` (and the `User-Agent` header) — same as every other Simkl endpoint. See [Headers and required parameters](/conventions/headers).\n</Warning>\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `date` | `today` | `today`, `tomorrow`, or `DD-MM-YYYY`. Bogus values silently fall back to `today`. |\n| `sort` | `time` | `time`, `rank`, `popularity`. Bogus values silently fall back to `time`. |\n\n#### Item shape\n\n```json\n{\n \"title\": \"string\",\n \"year\": \"integer | null (extracted from the episode air time)\",\n \"date\": \"ISO-8601 string with -05:00 offset | null\",\n \"poster\": \"string (relative path; prepend https://simkl.in/posters/ + size)\",\n \"rank\": \"integer | null (Simkl popularity rank; null when not yet ranked)\",\n \"url\": \"string (relative simkl.com URL)\",\n \"ids\": {\n \"simkl_id\": \"integer\",\n \"slug\": \"string\"\n },\n \"episode\": {\n \"season\": \"integer\",\n \"episode\": \"integer\",\n \"url\": \"string\"\n }\n}\n```\n\n#### Nulls — what they mean\n\n| Field | When null | Type |\n|---|---|---|\n| `date` | Catalog has no `Airs_Time` on file for this episode (rare — usually older or low-data titles) | [Type 4](/conventions/null-values#type-4) |\n| `rank` | Item not yet ranked, or rank value >= 999999 sentinel | [Type 4](/conventions/null-values#type-4) |\n\n#### Error responses\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` — invalid `date`/`sort` values silently fall back to defaults. No `404` — empty result is `[]` with status `200`.",
         "operationId": "get-tv-airing-date",
         "parameters": [
           {
@@ -23703,6 +25029,21 @@
             "description": "OK",
             "headers": {}
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
+          },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
           },
@@ -23729,7 +25070,7 @@
     },
     "/tv/best/{filter}": {
       "get": {
-        "description": "Top-rated TV shows. Mirrors the [Simkl Best TV](https://simkl.com/tv/best-shows/) pages. No `access_token` required.\n\nPick a bucket via the `{filter}` path segment:\n\n| Filter | What you get |\n|---|---|\n| `all` | All-time top-rated. |\n| `year` | Top-rated for the current year. |\n| `month` | Top-rated for the current month. |\n| `voted` | Most-voted titles (sorted by total IMDB votes). Items also include a `votes` count. |\n| `watched` | Most-watched this month. Items also include a `watched` count. |\n\nUnknown filter values fall back to `all`.\n\nOptionally narrow by `type=series`, `documentary`, `entertainment`, or `animation`. Unknown values are ignored.\n\n<Note>\n**60 items, no pagination.** The endpoint always returns up to 60 items in one call. The `page` and `limit` query parameters are accepted but ignored. For paginated browsing use [`GET /tv/genres/...`](/api-reference/simkl/get-tv-genres).\n</Note>\n\n<Tip>\n**`type=documentary` can return `null`.** When the type filter doesn't match anything in the top set, the response body is bare `null` rather than an empty array. Handle both shapes in your parser.\n</Tip>\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nUnknown `filter` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
+        "description": "Top-rated TV shows. Mirrors the [Simkl Best TV](https://simkl.com/tv/best-shows/) pages. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).\n\nPick a bucket via the `{filter}` path segment:\n\n| Filter | What you get |\n|---|---|\n| `all` | All-time top-rated. |\n| `year` | Top-rated for the current year. |\n| `month` | Top-rated for the current month. |\n| `voted` | Most-voted titles (sorted by total IMDB votes). Items also include a `votes` count. |\n| `watched` | Most-watched this month. Items also include a `watched` count. |\n\nUnknown filter values fall back to `all`.\n\nOptionally narrow by `type=series`, `documentary`, `entertainment`, or `animation`. Unknown values are ignored.\n\n<Note>\n**60 items, no pagination.** The endpoint always returns up to 60 items in one call. The `page` and `limit` query parameters are accepted but ignored. For paginated browsing use [`GET /tv/genres/...`](/api-reference/simkl/get-tv-genres).\n</Note>\n\n<Tip>\n**`type=documentary` can return `null`.** When the type filter doesn't match anything in the top set, the response body is bare `null` rather than an empty array. Handle both shapes in your parser.\n</Tip>\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nUnknown `filter` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
         "operationId": "get-best-tv",
         "parameters": [
           {
@@ -23844,6 +25185,21 @@
               }
             },
             "description": "OK — array of items, or bare `null` when a `?type=` filter zeroes the result set."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -24067,7 +25423,7 @@
     },
     "/tv/genres/{genre}/{type}/{country}/{network}/{year}/{sort}": {
       "get": {
-        "description": "<Warning>\n**Not for TV / console / 10-foot apps.** The V1 genre-browse endpoints return a thin per-item shape (`title`, `year`, `poster`, `ids`, `ratings`, `rank`). Building a TV-app grid that shows overview text, full ratings, networks, runtimes, recommendations, or trailers would force one per-item refetch against the detail endpoint per visible card. **Wait for the V2 Beta API**, which returns the richer per-item shape TV-app surfaces need in a single call. If you're targeting TV / console / streaming-box clients, please hold off integrating these endpoints.\n</Warning>\n\n<Tip>\n**Just need this month's most watched titles in a genre? Use the [trending genre files](/api-reference/trending#by-genre-this-month) instead.** They are free: they don't count against any [rate limit](/resources/rate-limits#what-does-not-count) or a user's daily allowance, and they need no user token. Every call to this endpoint does count — against the user's daily allowance under [AUTH V2](/api-reference/auth-v2), where it also needs a user token, or your app's allowance under AUTH V1.\n\nA genre file is one cached request with no paging, and every item comes in the full trending shape (overview, trailer, ratings, runtime) rather than the thin shape above. Call this endpoint only for what the files don't cover: other sorts, the country / network / year filters, or anything beyond this month.\n</Tip>\n\nBrowse TV shows filtered by genre, type, country, network, year, and sort order. Path is `/tv/genres/{genre}/{type}/{country}/{network}/{year}/{sort}` — all segments **required** (use `all` as the wildcard).\n\nThis is the **6-segment** variant (one more than movies + anime — TV has both `country` AND `network` filters).\n\n| Path param | Values |\n|---|---|\n| `genre` | `all`, `action`, `adventure`, `animation`, `awards-show`, `children`, `comedy`, `crime`, `documentary`, `drama`, `erotica`, `family`, `fantasy`, `food`, `game-show`, `history`, `home-and-garden`, `horror`, `indie`, `korean-drama`, `martial-arts`, `mini-series`, `musical`, `mystery`, `news`, `podcast`, `reality`, `romance`, `science-fiction`, `soap`, `special-interest`, `sport`, `suspense`, `talk-show`, `thriller`, `travel`, `video-game-play`, `war`, `western` |\n| `type` | `all`, `series`, `mini-series`, `specials` |\n| `country` | `all` or ISO 3166-1 alpha-2 |\n| `network` | `all` or a network slug (`hbo`, `netflix`, `apple-tv`, `prime-video`, …) |\n| `year` | `all`, single year, or decade |\n| `sort` | `popular-this-week`, `popular-this-month`, `popular-all-time`, `rank`, `release-date`, `voted`, `watched` |\n\n#### Pagination\n\n| Param | Default | Notes |\n|---|---|---|\n| `page` | `1` | Hard-capped server-side at `20`. Higher values clamp silently. |\n| `limit` | `60` | Hard-capped server-side at `60`. Higher values clamp silently. Returned `X-Pagination-Limit` reflects the clamped value. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\n#### Silent fallbacks\n\nBad path segments DO NOT return errors:\n\n| Bad input | What happens |\n|---|---|\n| Unknown `genre` slug (`zzz`) | Top-level response is `null` (NOT `[]`). |\n| Unknown `year` (e.g. `zzz`) | Silently treated as `all` — full result set. |\n| Unknown `sort` (`zzzsortzzz`) | Silently treated as default sort order. |\n| Unknown `country` / `network` | Silently treated as `all`. |\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` or `404` — bad segments fall back silently or return `null`.\n",
+        "description": "<Warning>\n**Not for TV / console / 10-foot apps.** The V1 genre-browse endpoints return a thin per-item shape (`title`, `year`, `poster`, `ids`, `ratings`, `rank`). Building a TV-app grid that shows overview text, full ratings, networks, runtimes, recommendations, or trailers would force one per-item refetch against the detail endpoint per visible card. **Wait for the V2 Beta API**, which returns the richer per-item shape TV-app surfaces need in a single call. If you're targeting TV / console / streaming-box clients, please hold off integrating these endpoints.\n</Warning>\n\n<Tip>\n**Just need this month's most watched titles in a genre? Use the [trending genre files](/api-reference/trending#by-genre-this-month) instead.** They are free: they don't count against any [rate limit](/resources/rate-limits#what-does-not-count) or a user's daily allowance, and they need no user token. Every call to this endpoint does count — against the user's daily allowance under [AUTH V2](/api-reference/auth-v2), where it also needs a user token, or your app's allowance under AUTH V1.\n\nA genre file is one cached request with no paging, and every item comes in the full trending shape (overview, trailer, ratings, runtime) rather than the thin shape above. Call this endpoint only for what the files don't cover: other sorts, the country / network / year filters, or anything beyond this month.\n</Tip>\n\nBrowse TV shows filtered by genre, type, country, network, year, and sort order. Path is `/tv/genres/{genre}/{type}/{country}/{network}/{year}/{sort}` — all segments **required** (use `all` as the wildcard).\n\nThis is the **6-segment** variant (one more than movies + anime — TV has both `country` AND `network` filters).\n\n| Path param | Values |\n|---|---|\n| `genre` | `all`, `action`, `adventure`, `animation`, `awards-show`, `children`, `comedy`, `crime`, `documentary`, `drama`, `erotica`, `family`, `fantasy`, `food`, `game-show`, `history`, `home-and-garden`, `horror`, `indie`, `korean-drama`, `martial-arts`, `mini-series`, `musical`, `mystery`, `news`, `podcast`, `reality`, `romance`, `science-fiction`, `soap`, `special-interest`, `sport`, `suspense`, `talk-show`, `thriller`, `travel`, `video-game-play`, `war`, `western` |\n| `type` | `all`, `series`, `mini-series`, `specials` |\n| `country` | `all` or ISO 3166-1 alpha-2 |\n| `network` | `all` or a network slug (`hbo`, `netflix`, `apple-tv`, `prime-video`, …) |\n| `year` | `all`, single year, or decade |\n| `sort` | `popular-this-week`, `popular-this-month`, `popular-all-time`, `rank`, `release-date`, `voted`, `watched` |\n\n#### Pagination\n\n| Param | Default | Notes |\n|---|---|---|\n| `page` | `1` | Hard-capped server-side at `20`. Higher values clamp silently. |\n| `limit` | `60` | Hard-capped server-side at `60`. Higher values clamp silently. Returned `X-Pagination-Limit` reflects the clamped value. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\n#### Silent fallbacks\n\nBad path segments DO NOT return errors:\n\n| Bad input | What happens |\n|---|---|\n| Unknown `genre` slug (`zzz`) | Top-level response is `null` (NOT `[]`). |\n| Unknown `year` (e.g. `zzz`) | Silently treated as `all` — full result set. |\n| Unknown `sort` (`zzzsortzzz`) | Silently treated as default sort order. |\n| Unknown `country` / `network` | Silently treated as `all`. |\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412 client_id_failed` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nNo `400` or `404` — bad segments fall back silently or return `null`.\n",
         "operationId": "get-tv-genres",
         "parameters": [
           {
@@ -24257,6 +25613,21 @@
               }
             }
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
+          },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
           },
@@ -24298,7 +25669,7 @@
     },
     "/tv/premieres/{param}": {
       "get": {
-        "description": "TV premieres — recently aired or upcoming new shows. Mirrors the [Simkl TV Premieres](https://simkl.com/tv/premieres/) page. No `access_token` required.\n\nPass `new` for shows that already premiered (newest first), or `soon` for shows premiering in the next few weeks (soonest first). Any path value other than `new` is treated as `soon`.\n\nThe two shapes differ slightly: items in the `new` response include `rank` and `ratings`; items in the `soon` response don't carry those fields at all (the show hasn't aired enough to be ranked or rated yet).\n\n<Note>\n**US and Canada only.** The list is restricted to shows produced in the US or Canada — there's no opt-out. If you want premieres from other regions, use [`GET /tv/genres/{genre}/{type}/{country}/{network}/{year}/{sort}`](/api-reference/simkl/get-tv-genres) with the country segment set to your target (`kr`, `jp`, `gb`, etc.).\n</Note>\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `type` | (any) | Optional. `series` or `documentary`. Anything else is ignored and you get the full list. |\n| `page` | `1` | 1 to 20. Higher values are reduced to 20. |\n| `limit` | `60` | 1 to 60. Higher values are reduced to 60. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\nThe full per-item shape is in the **Response** panel on the right.\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nBogus `param` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
+        "description": "TV premieres — recently aired or upcoming new shows. Mirrors the [Simkl TV Premieres](https://simkl.com/tv/premieres/) page. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).\n\nPass `new` for shows that already premiered (newest first), or `soon` for shows premiering in the next few weeks (soonest first). Any path value other than `new` is treated as `soon`.\n\nThe two shapes differ slightly: items in the `new` response include `rank` and `ratings`; items in the `soon` response don't carry those fields at all (the show hasn't aired enough to be ranked or rated yet).\n\n<Note>\n**US and Canada only.** The list is restricted to shows produced in the US or Canada — there's no opt-out. If you want premieres from other regions, use [`GET /tv/genres/{genre}/{type}/{country}/{network}/{year}/{sort}`](/api-reference/simkl/get-tv-genres) with the country segment set to your target (`kr`, `jp`, `gb`, etc.).\n</Note>\n\n#### Query parameters\n\n| Param | Default | Notes |\n|---|---|---|\n| `type` | (any) | Optional. `series` or `documentary`. Anything else is ignored and you get the full list. |\n| `page` | `1` | 1 to 20. Higher values are reduced to 20. |\n| `limit` | `60` | 1 to 60. Higher values are reduced to 60. |\n\n`X-Pagination-*` headers on every response — see [Pagination](/conventions/pagination).\n\nThe full per-item shape is in the **Response** panel on the right.\n\n#### Errors\n\n| Status | When |\n|---|---|\n| `401 user_token_required` | AUTH V2 app called without the user's token |\n| `412` | Missing or invalid `client_id` |\n| `500` | Server error |\n\nBogus `param` or `type` values silently fall back — no `400`. The endpoint never returns `404`.",
         "operationId": "get-tv-premieres",
         "parameters": [
           {
@@ -24407,6 +25778,21 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "412": {
             "$ref": "#/components/responses/ClientIdFailed"
@@ -24764,7 +26150,7 @@
     },
     "/users/recently-watched-background/{user_id}": {
       "get": {
-        "description": "Pulls metadata about the user's most recently watched item — useful for \"Now Watching\" widgets, dashboard backgrounds, and embedded user-cards.\n\nPUBLIC endpoint — no `access_token` required, just your `client_id`. The target user's profile must be public; private profiles return `404`.\n\n#### Two response modes (selected by the `image` query param)\n\n| `image` | Status | Body | Use case |\n|---|---|---|---|\n| _omitted_ | `200` | JSON with `id`, `url`, `title`, `poster`, `fanart` | Server-side render or custom card layout |\n| `poster` | `302` | Empty; `Location: https://simkl.net/posters/<key>_0.jpg` | Drop the request URL straight into `<img src=…>` |\n| `fanart` | `302` | Empty; `Location: https://simkl.net/fanart/<key>_0.jpg` | Same — full-bleed background image |\n\n#### Drop-in `<img>` example\n\nThe `?image=` redirect modes are designed for `<img src=\"…\">` tags. The browser follows the 302 automatically and renders the JPG — no JSON parsing, no string concatenation, no extra requests:\n\n```html\n<!-- Background image (1920×1080-ish) -->\n<img src=\"https://api.simkl.com/users/recently-watched-background/12345?image=fanart&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\">\n\n<!-- Cover poster (vertical) -->\n<img src=\"https://api.simkl.com/users/recently-watched-background/12345?image=poster&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\">\n```\n\n#### JSON mode shape\n\nThe no-param mode returns the same image keys as the redirect modes — concatenate manually if you want to skip the second round-trip:\n\n```json\n{\n \"id\": 17465,\n \"url\": \"https://simkl.com/tv/17465/game-of-thrones\",\n \"title\": \"Game of Thrones\",\n \"poster\": \"17/17465posterkey\",\n \"fanart\": \"17/17465fanartkey\"\n}\n```\n\nRender as `https://simkl.net/posters/<poster>_0.jpg` / `https://simkl.net/fanart/<fanart>_0.jpg`.",
+        "description": "Pulls metadata about the user's most recently watched item — useful for \"Now Watching\" widgets, dashboard backgrounds, and embedded user-cards.\n\nNo `access_token` needed on AUTH V1 — just your `client_id`. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2). The target user's profile must be public; private profiles return `404`.\n\n#### Two response modes (selected by the `image` query param)\n\n| `image` | Status | Body | Use case |\n|---|---|---|---|\n| _omitted_ | `200` | JSON with `id`, `url`, `title`, `poster`, `fanart` | Server-side render or custom card layout |\n| `poster` | `302` | Empty; `Location: https://simkl.net/posters/<key>_0.jpg` | Drop the request URL straight into `<img src=…>` |\n| `fanart` | `302` | Empty; `Location: https://simkl.net/fanart/<key>_0.jpg` | Same — full-bleed background image |\n\n#### Drop-in `<img>` example\n\nThe `?image=` redirect modes are designed for `<img src=\"…\">` tags. The browser follows the 302 automatically and renders the JPG — no JSON parsing, no string concatenation, no extra requests:\n\n```html\n<!-- Background image (1920×1080-ish) -->\n<img src=\"https://api.simkl.com/users/recently-watched-background/12345?image=fanart&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\">\n\n<!-- Cover poster (vertical) -->\n<img src=\"https://api.simkl.com/users/recently-watched-background/12345?image=poster&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0\">\n```\n\n#### JSON mode shape\n\nThe no-param mode returns the same image keys as the redirect modes — concatenate manually if you want to skip the second round-trip:\n\n```json\n{\n \"id\": 17465,\n \"url\": \"https://simkl.com/tv/17465/game-of-thrones\",\n \"title\": \"Game of Thrones\",\n \"poster\": \"17/17465posterkey\",\n \"fanart\": \"17/17465fanartkey\"\n}\n```\n\nRender as `https://simkl.net/posters/<poster>_0.jpg` / `https://simkl.net/fanart/<fanart>_0.jpg`.",
         "operationId": "get-users-recently-watched-background-user-id",
         "parameters": [
           {
@@ -24869,6 +26255,21 @@
                 }
               }
             }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`user_token_required` — **AUTH V2 apps only.** No user token was sent; on V2 this endpoint needs the user's `Authorization: Bearer` token. AUTH V1 apps can call it with `client_id` alone."
           },
           "404": {
             "content": {

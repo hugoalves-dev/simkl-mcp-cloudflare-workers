@@ -1069,12 +1069,13 @@ If you are maintaining an existing app built on [AUTH V1](/api-reference/auth-v1
 > * Movie, show and anime summaries by Simkl ID — [`/movies`](/api-reference/simkl/get-movie), [`/tv`](/api-reference/simkl/get-tv-show), [`/anime`](/api-reference/simkl/get-anime)
 > * Episode lists — [`/tv/episodes`](/api-reference/simkl/get-tv-episodes) and [`/anime/episodes`](/api-reference/simkl/get-anime-episodes)
 > * The [Trending](/api-reference/trending) and [Calendar](/api-reference/calendar) data files on `data.simkl.in`
+> * [`/redirect`](/api-reference/redirect) links, which send the browser on to a simkl.com page
 >
 > These carry no per-user state, so they are exempt **by design** rather than as a side effect of caching — a cache miss behaves the same way. They also [do not count against your quota](/resources/rate-limits#what-does-not-count).
 >
 > **"No user token" does not mean "no parameters".** Every request still carries `client_id`, `app-name` and `app-version`, plus a `User-Agent` header — see [Headers and required parameters](/conventions/headers). The exception is about the `Authorization` header only.
 >
-> **Everything else requires a user token**, including search, [`/redirect`](/api-reference/redirect), and every sync, scrobble, ratings, custom-lists and user-settings endpoint.
+> **Everything else requires a user token**, including search, the best / airing / premieres / genres lists, `/changes`, and every sync, scrobble, ratings, custom-lists and user-settings endpoint. Without one, V2 returns `401 user_token_required`.
 
 ## Which flow do I need?
 
@@ -1412,7 +1413,7 @@ Three regeneration tiers:
 
 * **Current month + next 3 months ahead** — regenerated **every 6 hours**. Future-month files contain only what's already been scheduled or announced, so item counts taper off the further ahead you go.
 * **Previous 12 months** — regenerated **every 24 hours**.
-* **Older than 12 months** — archived in place. Files remain queryable indefinitely but are no longer regenerated; `Last-Modified` freezes at end-of-month.
+* **Older than 12 months** — archived in place. Files remain queryable indefinitely but are no longer regenerated; `Last-Modified` freezes at end-of-month. The earliest v2 month is **July 2024**. Some archived months were generated before `episode.runtime`, `watching` and `completed` existed, and lack those keys.
 
 URL pattern:
 
@@ -1434,7 +1435,7 @@ https://data.simkl.in/calendar/v2/{{FUTURE_YEAR}}/{{FUTURE_MONTH}}/anime.json?cl
 https://data.simkl.in/calendar/v2/{{FUTURE_YEAR}}/{{FUTURE_MONTH}}/movie_release.json?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0
 ```
 
-Requesting any month beyond `currentMonth + 3` returns **404**.
+Requesting any month beyond `currentMonth + 3`, before July 2024, or with a zero-padded month (`/2026/05/`) returns **404**.
 
 ## Response shape
 
@@ -1559,13 +1560,13 @@ Marks finale episodes so you can badge them in the UI. `null` on ordinary episod
 
 **episode** `object`
 
-**TV and anime only — the key is absent entirely on movie files** (Type 2 null — see [Null and missing values](/conventions/null-values#type-2)). A movie release has no episode, so the whole object is omitted rather than set to `null`.
+**TV and anime only — the key is absent entirely on movie files, and on anime movies in the anime file** (Type 2 null — see [Null and missing values](/conventions/null-values#type-2)). A movie release has no episode, so the whole object is omitted rather than set to `null`.
 
 **properties**
 
 **season** `integer`
 
-Season number. **Present on TV; absent on anime** — anime uses AniDB sequential numbering with no seasons (Type 2 null).
+Season number. **Present on TV; absent on regular anime episodes** — anime uses AniDB sequential numbering with no seasons (Type 2 null). Anime specials are the exception and carry `season: 0`.
 
 **episode** `integer` *required*
 
@@ -1589,7 +1590,7 @@ Keyed by `simkl_id` (as a string). One record per distinct title in the file.
 
 > [!WARNING]
 >
-> **Code defensively — TV records can be sparse.** Newly-added shows that Simkl hasn't finished enriching yet carry only a minimal set of keys (`title`, `url`, `poster`, `ids`, `release_date`, `rank`, `ratings`) and omit the rest. Anime and movie records are consistently complete, but on TV always use optional access (`show.genres ?? []`, `show?.network`) rather than assuming a key exists.
+> **Code defensively — TV and movie records can be sparse.** Newly-added titles that Simkl hasn't finished enriching yet carry only a minimal set of keys (`title`, `url`, `poster`, `ids`, `release_date`, `rank`, `ratings`) and omit the rest. Anime records are consistently complete, but on TV and movies always use optional access (`show.genres ?? []`, `show?.network`) rather than assuming a key exists.
 
 **title** `string` *required*
 
@@ -1605,7 +1606,7 @@ Link to the title on simkl.com. Normally a **root-relative path** (`/tv/3437/kin
 
 **alt\_titles** `array`
 
-Localized and alternate titles. Each entry is `name` (string), `lang` (integer — Simkl internal language code, **not** ISO 639), and `type` (one of `official`, `short`, `synonym`, `original`).
+Localized and alternate titles. Each entry is `name` (string), `lang` (integer — Simkl internal language code, **not** ISO 639), and `type` (such as `official` or `original` — treat it as an open set).
 
 **poster** `string | null` *required*
 
@@ -1679,9 +1680,9 @@ Lowercase two-letter language code (`en`, `ja`).
 
 Episode or feature runtime as a display string (`"22m"`, `"1h 57m"`). Type 4 null when unknown. For a specific episode, `calendar[].episode.runtime` gives whole minutes as an integer.
 
-**status** `string`
+**status** `string | null`
 
-Release / airing status. Observed values: `ongoing`, `ended`, `premiere`, `soon`, and `undefined` (the literal string, on a handful of un-enriched TV records). Treat this as an open vocabulary — match the values you care about and fall through gracefully on anything else.
+Release / airing status. Usually `ongoing`, `ended`, `premiere` or `soon`; a handful of un-enriched TV records carry another value or Type 4 `null`. Treat this as an open vocabulary — match the values you care about and fall through gracefully on anything else.
 
 **total\_episodes** `integer`
 
@@ -1786,7 +1787,7 @@ for e in calendar:
 
 > [!TIP]
 >
-> **Anime differs in two places.** `calendar[].episode` has no `season` key (use `episode.episode` alone), and `metadata` adds `title_romaji` and `anime_type`. Movie files have no `episode` object at all — the `calendar` entry is just `simkl_id`, `date`, and `finale_type`.
+> **Anime differs in two places.** `calendar[].episode` has no `season` key except on specials (`season: 0`), so use `episode.episode` alone, and `metadata` adds `title_romaji` and `anime_type`. Movie files, and anime movies, have no `episode` object at all — the `calendar` entry is just `simkl_id`, `date`, and `finale_type`.
 
 
 # Introduction
@@ -5954,7 +5955,7 @@ Use a Simkl ID for the lookup. If you only have an external ID, resolve it via [
 Source: https://api.simkl.org/api-reference/simkl/get-anime-airing
 
 /openapi.json get /anime/airing
-Currently airing anime — same data that powers the [Simkl anime calendar](https://simkl.com/anime/airing/). No `access_token` required.
+Currently airing anime — same data that powers the [Simkl anime calendar](https://simkl.com/anime/airing/). No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).
 
 Same shape and parameters as [`/tv/airing`](/api-reference/simkl/get-tv-airing) but for the anime catalog: each item includes an `anime_type` field (`tv`, `ona`, `ova`, `movie`, `special`, `music`), and the `episode` block omits `season` (anime numbering is single-season — AniDB sequential).
 
@@ -6005,6 +6006,7 @@ Both forms still need the standard URL params on every request — `client_id`, 
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412 client_id_failed` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6105,6 +6107,7 @@ Bad path segments DO NOT return errors:
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412 client_id_failed` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6117,7 +6120,7 @@ No `400` or `404` — bad segments fall back silently or return `null`.
 Source: https://api.simkl.org/api-reference/simkl/get-anime-premieres
 
 /openapi.json get /anime/premieres/{param}
-Anime premieres — recently aired or upcoming new anime. Mirrors the [Simkl Anime Premieres](https://simkl.com/anime/premieres/) page. No `access_token` required.
+Anime premieres — recently aired or upcoming new anime. Mirrors the [Simkl Anime Premieres](https://simkl.com/anime/premieres/) page. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).
 
 Pass `new` for anime that already aired (newest first), or `soon` for anime airing in the next few weeks (soonest first). Any path value other than `new` is treated as `soon`.
 
@@ -6141,6 +6144,7 @@ The full per-item shape is in the **Response** panel on the right.
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6152,7 +6156,7 @@ Bogus `param` or `type` values silently fall back — no `400`. The endpoint nev
 Source: https://api.simkl.org/api-reference/simkl/get-best-anime
 
 /openapi.json get /anime/best/{filter}
-Top-rated anime. Mirrors the [Simkl Best Anime](https://simkl.com/anime/best-anime/) pages. No `access_token` required.
+Top-rated anime. Mirrors the [Simkl Best Anime](https://simkl.com/anime/best-anime/) pages. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).
 
 Same behavior as [`/tv/best/{filter}`](/api-reference/simkl/get-best-tv) with one difference: items carry `ratings.mal` instead of `ratings.imdb`. Items do **not** carry `anime_type` here — for format-aware browsing use [`GET /anime/genres/...`](/api-reference/simkl/get-anime-genres).
 
@@ -6178,6 +6182,7 @@ Optionally narrow by `type=all`, `tv`, `movies`, `ovas`, `onas`, or `music`. Unk
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6189,7 +6194,7 @@ Unknown `filter` or `type` values silently fall back — no `400`. The endpoint 
 Source: https://api.simkl.org/api-reference/simkl/get-best-tv
 
 /openapi.json get /tv/best/{filter}
-Top-rated TV shows. Mirrors the [Simkl Best TV](https://simkl.com/tv/best-shows/) pages. No `access_token` required.
+Top-rated TV shows. Mirrors the [Simkl Best TV](https://simkl.com/tv/best-shows/) pages. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).
 
 Pick a bucket via the `{filter}` path segment:
 
@@ -6217,6 +6222,7 @@ Optionally narrow by `type=series`, `documentary`, `entertainment`, or `animatio
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6451,6 +6457,7 @@ Bad path segments DO NOT return errors:
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412 client_id_failed` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6608,7 +6615,7 @@ Source: https://api.simkl.org/api-reference/simkl/get-recently-watched-image
 /openapi.json get /users/recently-watched-background/{user_id}
 Pulls metadata about the user's most recently watched item — useful for "Now Watching" widgets, dashboard backgrounds, and embedded user-cards.
 
-PUBLIC endpoint — no `access_token` required, just your `client_id`. The target user's profile must be public; private profiles return `404`.
+No `access_token` needed on AUTH V1 — just your `client_id`. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2). The target user's profile must be public; private profiles return `404`.
 
 #### Two response modes (selected by the `image` query param)
 
@@ -6652,7 +6659,7 @@ Render as `https://simkl.net/posters/<poster>_0.jpg` / `https://simkl.net/fanart
 Source: https://api.simkl.org/api-reference/simkl/get-tv-airing
 
 /openapi.json get /tv/airing
-Currently airing TV shows — same data that powers the [Simkl TV calendar](https://simkl.com/tv/airing/). No `access_token` required.
+Currently airing TV shows — same data that powers the [Simkl TV calendar](https://simkl.com/tv/airing/). No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).
 
 Same shape and parameters as [`/anime/airing`](/api-reference/simkl/get-anime-airing) but for the TV catalog: no `anime_type` field, and the per-item `episode` block includes a `season` integer.
 
@@ -6702,6 +6709,7 @@ Both forms still need the standard URL params on every request — `client_id`, 
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412 client_id_failed` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6774,6 +6782,7 @@ Bad path segments DO NOT return errors:
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412 client_id_failed` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -6786,7 +6795,7 @@ No `400` or `404` — bad segments fall back silently or return `null`.
 Source: https://api.simkl.org/api-reference/simkl/get-tv-premieres
 
 /openapi.json get /tv/premieres/{param}
-TV premieres — recently aired or upcoming new shows. Mirrors the [Simkl TV Premieres](https://simkl.com/tv/premieres/) page. No `access_token` required.
+TV premieres — recently aired or upcoming new shows. Mirrors the [Simkl TV Premieres](https://simkl.com/tv/premieres/) page. No `access_token` needed on AUTH V1. **AUTH V2 apps must send the user's token** — an anonymous call returns `401 user_token_required`. See [AUTH V2 overview](/api-reference/auth-v2).
 
 Pass `new` for shows that already premiered (newest first), or `soon` for shows premiering in the next few weeks (soonest first). Any path value other than `new` is treated as `soon`.
 
@@ -6812,6 +6821,7 @@ The full per-item shape is in the **Response** panel on the right.
 
 | Status | When |
 |---|---|
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -7139,7 +7149,7 @@ Returns an array of `{id, simkl: {rating, votes, droprate}}` for every item in t
 | `simkl` *(default)* | `simkl: {rating, votes, droprate}` per item. |
 | `ext` | `imdb: {rating, votes}` and/or `mal: {rating, votes, rank}` (only the providers Simkl has on file for the title). |
 | `rank` | `rank` integer — Simkl's catalog rank for the item. |
-| `release_status` | Human-readable release status (e.g. `Ended`, `Continuing`). |
+| `release_status` | Release status, lower-case: `released` (movies), `ended`, `returning series` (TV) or `ongoing` (anime). Titles not out yet: `upcoming`, `planned`, `in production`, `post production`, `rumored` or `canceled`. |
 | `year` | `release_year` integer. |
 | `link` | Canonical Simkl URL for the item. |
 
@@ -7985,6 +7995,7 @@ GET /search/all?q=batman
 | Status | When |
 |---|---|
 | `400 wrong_parameter` | `sort` is not one of the values above, or `last-air-date` on `/search/movie` |
+| `401 user_token_required` | AUTH V2 app called without the user's token |
 | `412 client_id_failed` | Missing or invalid `client_id` |
 | `500` | Server error |
 
@@ -16698,8 +16709,9 @@ Start with [the migration steps](#the-work-in-order), then [plan how to reconnec
 | Without a user token | Requires a user token |
 | - | - |
 | Movie, show and anime summaries by Simkl ID | Search, including title searches |
-| Episode lists | User-scoped data and all other endpoints |
-| Trending and Calendar data files | |
+| Episode lists | Browse lists — best, airing, premieres and genres |
+| Trending and Calendar data files | User-scoped data and all other endpoints |
+| [`/redirect`](/api-reference/redirect) links | |
 
 > [!WARNING]
 >
