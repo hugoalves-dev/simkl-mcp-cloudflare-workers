@@ -1625,7 +1625,7 @@ Backdrop image path fragment. Same prefixing rules as `poster`. Type 4 null when
 
 **ids** `object` *required*
 
-External and Simkl IDs. Always carries `simkl_id` + `slug`. `tmdb` is near-universal; `imdb` / `tvdb` appear on TV and movies, `mal` / `anidb` / `anilist` / `kitsu` on anime. Additional slug variants (`letterslug`, `traktmslug`, `tvdbslug`, `trakttvslug`, `mdlslug`, `jwtv`, …) appear on titles with those platform links — the object is permissive, so read the keys you need and ignore the rest.
+External and Simkl IDs. Always carries `simkl_id` + `slug`. `tmdb` is near-universal; `imdb` / `tvdb` appear on TV and movies, `mal` / `anidb` / `anilist` / `kitsu` on anime. Additional IDs (`tvdbslug`, `traktslug`, `letterboxd`, `mdlslug`, …) appear on titles with those platform links — the object is permissive, so read the keys you need and ignore the rest.
 
 **release_date** `string | null` *required*
 
@@ -1931,7 +1931,7 @@ Read, create and edit a user's custom lists and the titles inside them. Beta, an
 | Remove titles | [`POST /lists/{id}/items/remove`](/api-reference/simkl/remove-list-items) |
 | Favorite or unfavorite a title | [`POST /lists/favorites`](/api-reference/simkl/add-favorites), [`POST /lists/favorites/remove`](/api-reference/simkl/remove-favorites) |
 
-Writes need the `media:write` [scope](/api-reference/oauth2-scopes) as well, and a free account gets a real **`403 premium_only`** on them, not the `200` card below. [Edit a custom list](/guides/custom-lists#edit-a-custom-list) walks through them and the rules that catch people out — chiefly that **`tags`, `private_tags` and `collaborators` are replaced whole and are not returned by `GET /lists/{id}`**, and that **posting titles in a different order moves them** unless you add `?ignore_order=yes`.
+Writes need the `media:write` [scope](/api-reference/oauth2-scopes) as well, and a free account gets a real **`403 premium_only`** on them, not the `200` card below. [Edit a custom list](/guides/custom-lists#edit-a-custom-list) walks through them and the rules that catch people out — chiefly that **`tags`, `private_tags` and `collaborators` are replaced whole**, so read the current set from `GET /lists/{id}` before adding to it.
 
 **Two fields help you lay lists out the way simkl.com does:**
 
@@ -1986,7 +1986,7 @@ A non-numeric `limit` or `page` is normally a `400` naming the parameter, so out
 >
 > **The two endpoints validate `sort` differently, on purpose.**
 >
-> On [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists), `sort` is a fixed set — `updated`, `created`, `name`, `likes`, `followers`, `items`, `popularity` — and anything else is a `400`.
+> On [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists), `sort` is a fixed set — `updated`, `updated_info`, `updated_items`, `created`, `name`, `likes`, `followers`, `comments`, `items`, `suggested`, `popularity`, `revenue`, `trending` — and anything else is a `400`.
 >
 > On [`GET /lists/{id}`](/api-reference/simkl/get-list) it is free-form: an unrecognised value falls back to the list's own stored order rather than erroring. Do not rely on a typo failing loudly there.
 
@@ -2007,8 +2007,6 @@ A non-numeric `limit` or `page` is normally a `400` naming the parameter, so out
 ```
 
 Gate on `all`, then branch on the four buckets to refresh only the kind that moved — a user favouriting one show moves `favorites` and nothing else, so it costs one list refresh rather than a full re-read. The [sync guide](/guides/sync#custom-lists-have-their-own-timestamps) has the full pattern.
-
-Changes to a list's `privacy`, `sort`, `display_number`, `private_tags` or collaborators do **not** move these timestamps — they show only in that list's `updated_at`.
 
 > [!WARNING]
 >
@@ -5258,7 +5256,7 @@ Source: https://api.simkl.org/api-reference/simkl/add-favorites
 
 Favorites without a list ID — the heart on simkl.com. Each title goes to the caller's favorite list **of its own media type**, so one request may mix `movies`, `shows` and `anime`. A first favorite of a type creates that list (private if the account is private).
 
-Same body and ordering rules as [adding to a list](/api-reference/simkl/add-list-items), including `user_position` and `?ignore_order=yes`. The response carries a `lists` object — the favorite list of each type you touched, `null` for the others — instead of `list`. Favorites move the `favorites` bucket in [`/sync/activities`](/api-reference/simkl/get-activities).
+Same body and ordering rules as [adding to a list](/api-reference/simkl/add-list-items), including `user_position` and `?allow_reorder=yes`. The response carries a `lists` object — the favorite list of each type you touched, `null` for the others — instead of `list`. Favorites move the `favorites` bucket in [`/sync/activities`](/api-reference/simkl/get-activities).
 
 # Add or reorder titles in a custom list
 Source: https://api.simkl.org/api-reference/simkl/add-list-items
@@ -5273,12 +5271,9 @@ Returns `201` when at least one title was added, otherwise `200`, with counters:
 ### Order
 
 - New titles go to the end, in the order posted.
+- Titles already on the list stay where they are — a note edit or a re-post never moves them.
 - `user_position` puts a title at that place (1-based); the rest shift down. Past the end means the end.
-- Titles you do not mention never move.
-
-<Warning>
-**Posting titles that are already on the list in a different order than they sit moves them** — even when you only meant to change their notes. A title is moved to right after the one posted before it if that one sits later. Add `?ignore_order=yes` to any request that is not meant to reorder (note edits, re-adding). A collaborator without `rearrange` gets `403` for such a request.
-</Warning>
+- With `?allow_reorder=yes` the posted order counts too: a title posted after one that sits later moves to right after it. Posting C then A to a list ordered A, B, C gives B, C, A.
 
 ### Types
 
@@ -5286,7 +5281,7 @@ The list holds one media type. A title of another type is not added; it comes ba
 
 ### Who may write
 
-The owner, or a collaborator with `add` (new titles), `rearrange` (moving titles already there), `public_notes` and `edit_private_notes` (notes). Auto lists take no titles (`400 list_error`). Plan limits apply to the **owner's** plan: 2,000 titles per list on PRO, 10,000 on VIP (`403 max_items`), and a total across all lists (`403 max_items_total`).
+The owner, or a collaborator with `add` (new titles), `rearrange` (moving titles already there, with `user_position` or `allow_reorder`), `public_notes` and `edit_private_notes` (notes). Auto lists take no titles (`400 list_error`). Plan limits apply to the **owner's** plan: 2,000 titles per list on PRO, 10,000 on VIP (`403 max_items`), and a total across all lists (`403 max_items_total`).
 
 # Add Ratings
 Source: https://api.simkl.org/api-reference/simkl/add-ratings
@@ -6087,7 +6082,7 @@ No `400` — invalid `date`/`sort` values silently fall back to defaults. No `40
 Source: https://api.simkl.org/api-reference/simkl/get-anime-episodes
 
 /openapi.json get /anime/episodes/{id}
-Returns the full episode list for a Simkl anime ID, including specials. For anime, season is omitted in regular episodes (anime is treated as a single canonical season per AniDB); specials use `type: "special"` and lack a `season`/`episode` pair.
+Returns the full episode list for a Simkl anime ID, including specials. For anime, season is omitted in regular episodes (anime is treated as a single canonical season per AniDB); specials use `type: "special"` and carry `season: 0` with their own `episode` number.
 
 #### Item shape
 
@@ -6118,7 +6113,7 @@ Responses are **Cloudflare-cached by Simkl ID**, so repeat lookups of popular an
 
 Use the parent anime's Simkl ID. If you only have an external ID (MAL, AniDB, AniList, Kitsu, …), resolve it via [`GET /redirect`](/api-reference/redirect) first.
 
-Errors: `400 empty_id` if `id` is missing.
+Errors: `400 empty_id` if `id` is missing, `400 invalid_request` if the URL ends in `/`.
 
 # Anime by genre
 Source: https://api.simkl.org/api-reference/simkl/get-anime-genres
@@ -6386,7 +6381,7 @@ Returns a custom list's metadata and its items.
 
 **Beta.** The shape may still change; this page is updated when it does.
 
-To create or change a list, see [Edit a custom list](/guides/custom-lists#edit-a-custom-list). This response does not carry the list's `tags`, `private_tags`, `note` or `collaborators`; the write endpoints return them.
+To create or change a list, see [Edit a custom list](/guides/custom-lists#edit-a-custom-list). The response carries the list's `tags` and `collaborators`, and — for the owner and collaborators allowed to see them — its `private_tags`, its `note` and each title's private note.
 
 ### Requires a PRO or VIP account
 
@@ -6760,7 +6755,7 @@ No `400` — invalid `date`/`sort` values silently fall back to defaults. No `40
 Source: https://api.simkl.org/api-reference/simkl/get-tv-episodes
 
 /openapi.json get /tv/episodes/{id}
-Returns the full episode list for a Simkl TV show ID. Items include `season`, `episode`, `title`, `description`, `aired` (boolean), `img`, `date` (timezone-shifted), and `ids.simkl_id`. Specials appear with `type: "special"` after the regular episodes.
+Returns the full episode list for a Simkl TV show ID. Items include `season`, `episode`, `title`, `description`, `aired` (boolean), `img`, `date` (timezone-shifted), and `ids.simkl_id`. Specials appear with `type: "special"` after the regular episodes, numbered in season `0`.
 
 Responses are **Cloudflare-cached by Simkl ID**, so repeat lookups of popular shows are near-free. Parallel requests against this endpoint are explicitly allowed (see [Rate limits → Parallel requests](/resources/rate-limits#parallel-requests-when-allowed)).
 
@@ -8067,15 +8062,15 @@ Source: https://api.simkl.org/api-reference/simkl/update-list
 
 Changes a list's details. **Send only what changes** — keys you leave out are kept, and an edit that changes nothing is still a `200`. `media_type` cannot be changed. Titles are edited with [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items), not here.
 
-<Warning>
-**`tags`, `private_tags` and `collaborators` replace the whole set, and `GET /lists/{id}` does not return them.** Sending `"tags": ["new"]` leaves only `new`. To add one, send the full set — the current values come back in this endpoint's response and in [`POST /lists`](/api-reference/simkl/create-list)'s, so keep them from your last write.
-</Warning>
+<Note>
+**`tags`, `private_tags` and `collaborators` replace the whole set.** Sending `"tags": ["new"]` leaves only `new`. To add one, read the current set from [`GET /lists/{id}`](/api-reference/simkl/get-list) and send it back with the addition.
+</Note>
 
 **Who may edit.** The owner, or a collaborator with the permission for each key sent: `name` needs `title`, `privacy` → `privacy`, `description` → `description`, `note` → `edit_private_notes`, `display_number` → `list_type` or `add`, `sort` → `default_sort`, `tags` → `public_tags`, `private_tags` → `private_tags`, `collaborators` → `full`. A missing permission is `403 no_access` naming the key.
 
 **List types.** A recommendation list keeps its name and takes no collaborators; a favorite list takes no collaborators; an auto list keeps its own sort. Each is `400 list_error`.
 
-**Activity.** Renaming, and changing `description`, `note` or `tags`, moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities). Changing only `privacy`, `sort`, `display_number`, `private_tags` or `collaborators` does not — those move the list's `updated_at` alone.
+**Activity.** Any change moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities); an edit that changes nothing does not.
 
 # Sync
 Source: https://api.simkl.org/api-reference/sync
@@ -11540,7 +11535,7 @@ Image path fragment for fanart. Same prefixing rules as `poster`. When `null`, h
 
 **ids** `object`
 
-External and Simkl IDs. Always carries `simkl_id` + `slug`. `tmdb` is near-universal; `imdb` appears on TV / movies, `mal` / `anidb` / `anilist` / `kitsu` on anime. Additional third-party slug and ID variants (`letterslug`, `traktmslug`, `tvdbslug`, `trakttvslug`, `mdlslug`, `jwtv`, …) may appear on items with those platform links — the response is permissive, so read the keys you need and ignore the rest.
+External and Simkl IDs. Always carries `simkl_id` + `slug`. `tmdb` is near-universal; `imdb` appears on TV / movies, `mal` / `anidb` / `anilist` / `kitsu` on anime. Additional IDs (`tvdb`, `tvdbslug`, `traktslug`, `letterboxd`, `mdlslug`, …) appear on items with those platform links, named as everywhere else in the API — the response is permissive, so read the keys you need and ignore the rest.
 
 **properties**
 
@@ -12253,6 +12248,37 @@ For broader Simkl product news — apps, features, releases — follow [**@Simkl
 
 Use the **filter** in the right rail to narrow this changelog by tag.
 
+**2026-11-13**
+
+Specials carry season and episode numbers
+
+Improvement
+
+**Numbered specials in episode lists**
+
+In [`GET /tv/episodes/{id}`](/api-reference/simkl/get-tv-episodes) and [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes), specials now carry `season: 0` and their own `episode` number, the same numbering simkl.com uses — so a special can be matched, linked or marked watched by number. Before, TV specials had neither field and anime specials had no `season`.
+
+Specials that share a title (several called *Special*, say) were merged into one entry; each is listed now.
+
+Regular episodes are unchanged: anime still omits `season` on them.
+
+**2026-11-13**
+
+Custom Lists: safer writes, more in GET /lists/\{id}
+
+Improvement
+
+**Custom Lists, a day after launch**
+
+* **[`GET /lists/{id}`](/api-reference/simkl/get-list) returns `tags`, `private_tags`, `note` and `collaborators`**, so an app can read the current set before adding to it. The private fields, and each title's private note, come back only to the owner and to collaborators allowed to see them.
+* **Adding titles no longer reorders the list by accident.** Titles already on the list stay where they are, so note edits and re-posts are safe. `user_position` still moves a title; to let the posted order move titles, add [`?allow_reorder=yes`](/api-reference/simkl/add-list-items).
+* **Every change to a list moves [`/sync/activities`](/api-reference/simkl/get-activities)** — privacy, sort, number display and collaborator edits included.
+* [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists) documents its full set of `sort` values, including `trending`, `revenue`, `comments`, `suggested`, `updated_info` and `updated_items`.
+
+Breaking change
+
+`?ignore_order` is gone — it is no longer needed and is ignored. If your app relied on the posted order moving titles, add `?allow_reorder=yes`.
+
 **2026-11-12**
 
 Custom Lists: create, edit and delete over the API — beta, PRO and VIP
@@ -12272,7 +12298,7 @@ Seven new endpoints, for an [AUTH V2](/api-reference/auth-v2) token with `media:
 | [`POST /lists/{id}/items/remove`](/api-reference/simkl/remove-list-items) | Remove titles |
 | [`POST /lists/favorites`](/api-reference/simkl/add-favorites), [`/remove`](/api-reference/simkl/remove-favorites) | Favorite and unfavorite |
 
-Start with [Edit a custom list](/guides/custom-lists#edit-a-custom-list). Two rules catch people out: `tags`, `private_tags` and `collaborators` are replaced whole and are not returned by `GET /lists/{id}`, and posting titles in a different order than they sit **moves them** — add `?ignore_order=yes` to note edits.
+Start with [Edit a custom list](/guides/custom-lists#edit-a-custom-list). *(Two rules here changed a day later — see 2026-11-13 above.)*
 
 Breaking change
 
@@ -13225,7 +13251,7 @@ Simkl uses standard HTTP status codes. Almost every error body carries `error` (
 | - | - | - |
 | `empty_field` | A required field is missing | `Missed "to" parameter` |
 | `wrong_parameter` | A field has an unaccepted value | `Wrong "to" parameter` |
-| `invalid_request` | The body is not valid JSON | `Invalid JSON request. Please validate at https://jsonlint.com/` |
+| `invalid_request` | The body is not valid JSON — or a catalog URL (`/movies/…`, `/tv/…`, `/anime/…`, episode lists) ends in `/` | `Invalid JSON request. Please validate at https://jsonlint.com/` · `Remove the trailing slash from the URL. This endpoint is cached, and the trailing-slash form is not.` |
 | `list_error` | A [Custom Lists](/guides/custom-lists#edit-a-custom-list) write that this kind of list does not allow | `A recommendation list cannot be deleted` |
 | `rate_limit` | Custom Lists: another write for the same user is still running — see [below](#rate-limit-400) | `Your lists are being updated, try again in a minute` |
 | [`unauthorized_client`](#unauthorized-client) | A V2 `client_id` was sent to an AUTH V1 endpoint | `This client_id is an OAuth 2.0 app: use POST /oauth2/token` |
@@ -14521,8 +14547,7 @@ show_last_watched(item.get('last_watched_at') or '1970-01-01')
 | [`GET /sync/activities`](/api-reference/simkl/get-activities) | `movies` block | `watching` and `hold` keys (movies can't be in those statuses) |
 | [`GET /sync/all-items`](/api-reference/simkl/get-all-items) | Movie records | Episode-related fields (`seasons`, `last_watched`, etc.) |
 | Movie / TV records | — | Anime-only IDs (`mal`, `anidb`, `anilist`, `kitsu`) and `anime_type` |
-| [`GET /tv/episodes/{id}`](/api-reference/simkl/get-tv-episodes) | TV specials | `season` AND `episode` both omitted on `type: "special"` items |
-| [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) | Every anime episode | `season` omitted (AniDB numbers anime sequentially, no per-season concept) |
+| [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) | Regular anime episodes | `season` omitted (AniDB numbers anime sequentially, no per-season concept). Specials carry `season: 0`. |
 | [`GET /anime/{id}`](/api-reference/simkl/get-anime) | TV-classified shows | `relations` array omitted entirely (anime catalog only — TV records skip this field) |
 | [`GET /sync/all-items`](/api-reference/simkl/get-all-items) without `?memos=yes` | every entry | `memo` key omitted (gated on the query param) |
 | [`GET /sync/all-items`](/api-reference/simkl/get-all-items) without `?next_watch_info=yes` | every entry | `next_to_watch_info` key omitted |
@@ -14780,7 +14805,8 @@ endpoint so a single parsing path can handle them all.
 | `GET /movies/{id}` | non-numeric `id` | 404 | `{error, code, message?}` | JSON error envelope. |
 | `GET /tv/{id}` | non-numeric `id` | **200** | `object{...}` | **Fallthrough** — server returns discover data (`top_aired_fanarts`, etc.) instead of an error — NOT a `ShowDetail` shape. |
 | `GET /anime/{id}` | non-numeric `id` | **200** | `object{...}` | Same fallthrough behavior. |
-| `GET /tv/episodes/` | empty `id` (trailing slash) | 400 | `{error: "empty_id", code: 400}` | JSON error envelope. |
+| `GET /tv/episodes` | no `id` | 400 | `{error: "empty_id", code: 400}` | JSON error envelope. |
+| `GET /tv/episodes/` | trailing slash | 400 | `{error: "invalid_request", code: 400, message: "Remove the trailing slash…"}` | Any catalog URL ending in `/` is refused this way. |
 | `GET /anime/episodes/` | empty `id` | 400 | `{error: "empty_id", code: 400}` | Same. |
 | `GET /sync/activities` | fresh account (no activity yet) | 200 | `object{}` w/ all-null timestamps | Type 1 nulls inside, never null at top. |
 | `GET /sync/all-items` | brand-new user (no library, no `type` filter) | 200 | `{}` | Empty object. Iterating keys yields nothing. |
@@ -15819,7 +15845,7 @@ Lists prequels, sequels, summaries, and side-stories.
 
 ### 3. Flat Episode Lists
 
-Unlike standard TV episode lists, [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) returns a flat array of episodes. Standard episodes and specials alike omit the `season` field, carrying only `episode` (flat/absolute number) and a `tvdb` coordinate block.
+Unlike standard TV episode lists, [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) returns a flat array of episodes. Regular episodes omit the `season` field, carrying only `episode` (flat/absolute number) and a `tvdb` coordinate block. Specials follow them with `type: "special"`, `season: 0` and their own `episode` number.
 
 ***
 
@@ -16025,6 +16051,8 @@ curl "https://api.simkl.com/lists/123456?client_id=YOUR_CLIENT_ID&app-name=my-ap
 
 **The list's own metadata comes back alongside `items`, at the top level** — the same fields you saw in step 1, merged in rather than nested under a `list` key. One difference: `top_items` is always empty here, because you're getting the real `items` instead.
 
+This endpoint also returns the list's `tags` and `collaborators`. Its `private_tags`, its `note` and each title's private note come back only to the owner and to collaborators allowed to see them; anyone else gets `null` for the first two, and collaborators without their `permissions`.
+
 Omit `sort` to get the order the list owner chose. Add `extended=full` for an `overview` on each item.
 
 **Two numbers place each title.** `position` is its place in *this response*, following whatever `sort` you asked for and continuing across pages. `user_position` is its place in the list's own order, whatever the sort — the number you send back to [move a title](#edit-a-custom-list). On an auto list `user_position` is `null`, because its rules order it.
@@ -16120,13 +16148,13 @@ A title of the wrong media type is not added — it comes back in `wrong_type` w
 
 `user_position` puts a title at that place (1-based) and shifts the rest down; past the end means the end. It is the same number `GET /lists/{id}` returns as `user_position`, so a title you read can be posted back without moving.
 
-Notes ride on the same item, with `?ignore_order=yes` so that nothing moves:
+Notes ride on the same item, and the title stays where it is:
 
 ```json theme={"theme":{"light":"github-light","dark":"vesper"}}
 { "movies": [ { "ids": { "simkl": 54130 }, "note": { "public": "Better the second time", "private": "Watched with Sam" } } ] }
 ```
 
-Public notes appear on the list; private notes are saved but no endpoint returns them.
+Public notes appear to everyone who can see the list; private notes only to the owner and to collaborators with a notes permission.
 
 **4. Remove titles, or the list**
 
@@ -16138,25 +16166,22 @@ On `POST /lists/{id}`, keys you leave out are kept: send `{"privacy": "private"}
 
 > [!WARNING]
 >
-> **`tags`, `private_tags` and `collaborators` replace the whole set — and `GET /lists/{id}` does not return them.** Sending `tags` as `["new"]` to a list tagged `comfort` leaves only `new`. To add a tag, send every tag the list should keep.
->
-> The current values come back only in the responses of `POST /lists` and `POST /lists/{id}`, so keep them from your last write. If your app did not make the last change — the user edited the list on simkl.com — you cannot read the current set; do not offer "add one tag" there, or you will wipe the others.
+> **`tags`, `private_tags` and `collaborators` replace the whole set.** Sending `tags` as `["new"]` to a list tagged `comfort` leaves only `new`. To add a tag, read the current set from [`GET /lists/{id}`](/api-reference/simkl/get-list) and send it back with the addition.
 
 ### Order rules
 
-* Titles you do not mention never move.
-* New titles go to the end, in the order sent, unless they carry `user_position`.
-* **A title already on the list that you post after one sitting later than it moves to right after that one.** Posting `[C, A]` to a list ordered `A, B, C` moves `A` behind `C`.
+* New titles go to the end, in the order sent.
+* Titles already on the list stay where they are — re-posting one, or changing its notes, never moves it.
+* `user_position` moves a title to that place (1-based); the rest shift down.
+* **`?allow_reorder=yes`** lets the posted order count as well: a title posted after one that sits later moves to right after it. Posting `[C, A]` to a list ordered `A, B, C` gives `B, C, A`. Use it when your UI lets the user drag several titles at once.
 
-> [!WARNING]
->
-> **That last rule fires on note edits too.** Updating the notes on two titles in a different order than they sit reorders the list. Add **`?ignore_order=yes`** to every request that is not meant to move anything — note edits, re-adding titles that are already there. A collaborator without the `rearrange` permission gets `403` for such a request even though it only changes notes.
+Moving titles that are already on the list needs the `rearrange` permission from a collaborator.
 
 ### Before you ship
 
 * **Writes for one user run one at a time.** A second write that arrives while the first is running waits briefly, then gets `400 rate_limit` — *Your lists are being updated, try again in a minute*. Send a user's list writes in sequence and retry that error after a moment; never in parallel. Writes also count against the normal [1 POST per second](/resources/rate-limits).
 * **`sort` is saved as given.** `["rating", "desc"]` sets the list's own order, but the token is not checked against the sorts simkl.com offers — a typo is saved and the list falls back to some other order. Use the tokens your own UI offers, and `["position", "asc"]` for the manual order.
-* **Not every edit moves [`/sync/activities`](/guides/sync#custom-lists-have-their-own-timestamps).** Creating, deleting, any title change, and edits to `name`, `description`, `note` or `tags` move `custom_lists`. Changing only `privacy`, `sort`, `display_number`, `private_tags` or `collaborators` moves the list's `updated_at` and nothing in activities. Your own writes move it too, so update your saved snapshot after writing rather than treating the next poll as a remote change.
+* **Your own writes move [`/sync/activities`](/guides/sync#custom-lists-have-their-own-timestamps).** Every change to a list moves `custom_lists`, so save the new timestamps into your snapshot after writing rather than treating the next poll as a remote change.
 * **Every write clears the cache for that list**, so a `GET /lists/{id}` right after shows the change.
 * **Wrong verbs are `405`**, with an `Allow` header. Edits are `POST`, not `PUT` or `PATCH`.
 
@@ -16289,7 +16314,7 @@ The two endpoints validate `sort` differently, which is deliberate but easy to t
 
 | Endpoint | `sort` behaviour |
 | - | - |
-| `GET /lists/user/{userId}` | Fixed set — `updated`, `created`, `name`, `likes`, `followers`, `items`, `popularity`. Anything else is a `400 wrong_parameter`. |
+| `GET /lists/user/{userId}` | Fixed set — `updated`, `updated_info`, `updated_items`, `created`, `name`, `likes`, `followers`, `comments`, `items`, `suggested`, `popularity`, `revenue`, `trending`. Anything else is a `400 wrong_parameter`. |
 | `GET /lists/{id}` | Free-form. An unrecognised value is **accepted**, and echoed straight back in the response's `sort` field. |
 
 So a typo in `sort` fails loudly on one endpoint and silently on the other.
@@ -16379,7 +16404,7 @@ The Watchlist sync endpoints are unaffected by any of this — Custom Lists are 
 >
 > [Fetch lazily, cache locally](#fetch-lazily-cache-locally) has the three rules that matter: render the index from `top_items` without opening any list, serve the cache on back-navigation, and refetch only when `updated_at` says a list actually changed.
 >
-> **Poll [`/sync/activities`](/api-reference/simkl/get-activities) rather than the lists themselves.** It carries `custom_lists.lists.all`, which moves when the user's lists change — their titles, names, descriptions, notes or tags — see [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps). One cheap call tells you whether a refetch is needed at all, instead of pulling lists on a timer to find out nothing changed. Privacy, sort and collaborator changes do not move it; they show only in each list's `updated_at`.
+> **Poll [`/sync/activities`](/api-reference/simkl/get-activities) rather than the lists themselves.** It carries `custom_lists.lists.all`, which moves when the user's lists change — their titles, names, descriptions, notes or tags — see [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps). One cheap call tells you whether a refetch is needed at all, instead of pulling lists on a timer to find out nothing changed.
 >
 > Writes count like any other `POST`: one per second, and one at a time per user — see [Before you ship](#before-you-ship).
 >
@@ -18983,12 +19008,10 @@ Read `custom_lists.lists.all`, not `custom_lists.all` — the extra level leaves
 | Bucket | Moves when |
 | - | - |
 | `all` | Any of the four below moved. **Gate on this one.** |
-| `regular` | A hand-made list changed — created, deleted, renamed, its description, note or tags edited, or titles added, removed, moved or annotated |
+| `regular` | A hand-made list changed — created, deleted, any of its details edited (name, description, privacy, sort, tags, collaborators…), or titles added, removed, moved or annotated |
 | `favorites` | The user's favourites changed |
 | `recommendations` | A recommendation list changed. All recommendation kinds share this bucket |
 | `auto` | The user changed an **auto list's settings**. Not when its contents refresh — see below |
-
-**Some edits move nothing here.** A change to only a list's `privacy`, its sort order setting, `display_number`, private tags or collaborators leaves every bucket where it was; it moves that list's own `updated_at` on [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists) instead. If you display those properties, compare `updated_at` when you next read the index.
 
 **Your own [writes](/guides/custom-lists#edit-a-custom-list) move these timestamps too.** After writing, save the new values into your snapshot, or your next poll will refetch the list you just changed.
 
@@ -19203,6 +19226,7 @@ Real users do unusual things, clients have bugs, and networks drop. The behaviou
 > ```bash theme={"theme":{"light":"github-light","dark":"vesper"}}
 > curl -X POST "https://api.simkl.com/sync/history?allow_rewatch=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0" \
 >   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+>   -H "User-Agent: my-app-name/1.0" \
 >   -H "Content-Type: application/json" \
 >   -d '{
 >     "movies": [
