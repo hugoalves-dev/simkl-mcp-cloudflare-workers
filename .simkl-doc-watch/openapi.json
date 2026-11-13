@@ -3993,6 +3993,72 @@
         ],
         "type": "object"
       },
+      "CustomListBlock": {
+        "description": "The list after the write.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/CustomListCounts"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "description": "UTC. Unchanged when the request changed nothing.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "counts",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "CustomListCollaborator": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/CustomListPermission"
+            },
+            "type": "array"
+          },
+          "user": {
+            "$ref": "#/components/schemas/CustomListUser"
+          }
+        },
+        "required": [
+          "user",
+          "permissions"
+        ],
+        "type": "object"
+      },
+      "CustomListCollaboratorWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "permissions": {
+            "description": "What they may do. Omitted or `[]` = read access only (they can open a private list).",
+            "example": [
+              "add",
+              "rearrange"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CustomListPermission"
+            },
+            "type": "array"
+          },
+          "user": {
+            "description": "Simkl user ID. Not the owner, and someone the caller follows on Simkl.",
+            "example": 8199460,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
       "CustomListCollection": {
         "description": "A set of the owner's lists that belong together — the buttons shown above a list on simkl.com. A user builds one by giving their lists the same title, each ending in a different label in parentheses: `Star Wars Franchise (Movies)` and `Star Wars Franchise (TV Shows)`. The label can be anything — a media type, a year, a genre. For a favourites list, the collection is the owner's other favourites lists. See [Custom List Collections](https://docs.simkl.org/how-to-use-simkl/core-features/watchlists-and-custom-lists/custom-lists/custom-list-collections) for how users create them.",
         "properties": {
@@ -4093,6 +4159,153 @@
         "required": [
           "short",
           "full"
+        ],
+        "type": "object"
+      },
+      "CustomListFavoritesRemoveResult": {
+        "properties": {
+          "deleted": {
+            "description": "Titles taken off the list.",
+            "type": "integer"
+          },
+          "lists": {
+            "description": "The favorite list of each media type the request touched. See [Null and missing values](/conventions/null-values).",
+            "properties": {
+              "anime": {
+                "description": "**Type 4 null** — the request had no anime title for that list.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomListBlock"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "movies": {
+                "description": "**Type 4 null** — the request had no movies title for that list.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomListBlock"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tv": {
+                "description": "**Type 4 null** — the request had no tv title for that list.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomListBlock"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "movies",
+              "tv",
+              "anime"
+            ],
+            "type": "object"
+          },
+          "not_found": {
+            "description": "Titles not on the list (a wrong media type included), echoed as you sent them.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted",
+          "not_found",
+          "lists"
+        ],
+        "type": "object"
+      },
+      "CustomListFavoritesResult": {
+        "properties": {
+          "added": {
+            "description": "Titles put on the list.",
+            "type": "integer"
+          },
+          "existing": {
+            "description": "Titles already on the list that this request did not change.",
+            "type": "integer"
+          },
+          "lists": {
+            "description": "The favorite list of each media type the request touched. See [Null and missing values](/conventions/null-values).",
+            "properties": {
+              "anime": {
+                "description": "**Type 4 null** — the request had no anime title for that list.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomListBlock"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "movies": {
+                "description": "**Type 4 null** — the request had no movies title for that list.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomListBlock"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tv": {
+                "description": "**Type 4 null** — the request had no tv title for that list.",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomListBlock"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "movies",
+              "tv",
+              "anime"
+            ],
+            "type": "object"
+          },
+          "not_found": {
+            "description": "Titles that matched nothing, echoed as you sent them.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "updated": {
+            "description": "Titles already on the list that moved or got a changed note.",
+            "type": "integer"
+          },
+          "wrong_type": {
+            "items": {
+              "$ref": "#/components/schemas/CustomListWrongTypeItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "added",
+          "updated",
+          "existing",
+          "not_found",
+          "wrong_type",
+          "lists"
         ],
         "type": "object"
       },
@@ -4222,7 +4435,7 @@
             ]
           },
           "note": {
-            "description": "The owner's note on this entry. An empty object `{}` when no note has been published -- it is never `null`, so test for the `note.public` key rather than for the object itself.",
+            "description": "The owner's note on this entry. An empty object `{}` when no note has been published -- it is never `null`, so test for the `note.public` key rather than for the object itself. Private notes are never returned.",
             "properties": {
               "public": {
                 "description": "The note text. Newlines are preserved.",
@@ -4264,7 +4477,7 @@
             "type": "integer"
           },
           "position": {
-            "description": "The entry's place in the list's own ordering, 1-based. Stable regardless of how you sort the response.",
+            "description": "The title's place in **this response's** order, 1-based, continuing across pages (page 2 at `limit=50` starts at 51). It follows `sort`, so it is not the list's own order — that is `user_position`.",
             "example": 1,
             "type": "integer"
           },
@@ -4432,6 +4645,14 @@
             "example": "anime",
             "type": "string"
           },
+          "user_position": {
+            "description": "Type 4 null — an auto list, which has no order of its own. See [Null and missing values](/conventions/null-values). The title's place in the list's own order, 1-based, whatever `sort` you asked for — the number [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items) takes as `user_position`, so a title read under any sort can be posted back without moving.",
+            "example": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "watched": {
             "description": "Users who have watched this title.",
             "example": 51204,
@@ -4470,6 +4691,7 @@
           "ids",
           "rank",
           "position",
+          "user_position",
           "ratings",
           "watched",
           "plan_to_watch",
@@ -4483,6 +4705,174 @@
           "origin_countries",
           "original_language",
           "metadata"
+        ],
+        "type": "object"
+      },
+      "CustomListItemWrite": {
+        "description": "One title, in the same shape `POST /sync/history` takes. Needs `ids`, or a `title` (with `year` to disambiguate).",
+        "properties": {
+          "ids": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "description": "Any ID Simkl knows: `simkl` (or `simkl_id`, as `GET /lists/{id}` returns it), `tmdb`, `imdb`, `tvdb`, `mal`, `anidb`, `anilist`, `kitsu`, and the rest of the [supported IDs](/conventions/standard-media-objects). `0` and `\"\"` count as missing.",
+            "properties": {
+              "imdb": {
+                "type": "string"
+              },
+              "simkl": {
+                "example": 53992,
+                "type": "integer"
+              },
+              "simkl_id": {
+                "type": "integer"
+              },
+              "tmdb": {
+                "type": [
+                  "string",
+                  "integer"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "note": {
+            "description": "Notes on this title. Trimmed, HTML removed, up to 4096 characters each. A note equal to the stored one is no change.",
+            "properties": {
+              "private": {
+                "description": "Saved, but **no endpoint returns it** — it shows on simkl.com only.",
+                "type": "string"
+              },
+              "public": {
+                "description": "Shown to everyone who can see the list.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "season": {
+            "description": "**Anime only.** Add the entry that covers this season instead of the base title. `0` means no hint. Ignored for TV and movies.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "seasons": {
+            "description": "**Anime only.** Several seasons at once; each becomes its own entry, in season order.",
+            "items": {
+              "properties": {
+                "number": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "user_position": {
+            "description": "Put the title at this place in the list's own order, 1-based — the number `GET /lists/{id}` returns as `user_position`. Past the end means the end; the titles after it shift down.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "year": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CustomListItemsRemoveResult": {
+        "properties": {
+          "deleted": {
+            "description": "Titles taken off the list.",
+            "type": "integer"
+          },
+          "list": {
+            "$ref": "#/components/schemas/CustomListBlock"
+          },
+          "not_found": {
+            "description": "Titles not on the list (a wrong media type included), echoed as you sent them.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted",
+          "not_found",
+          "list"
+        ],
+        "type": "object"
+      },
+      "CustomListItemsRequest": {
+        "additionalProperties": false,
+        "description": "Up to 1000 titles per request across the three arrays. A title of the wrong media type for the list is not added; it is reported in `wrong_type`. `episodes` and `seasons` buckets are refused — lists hold whole titles.",
+        "properties": {
+          "anime": {
+            "items": {
+              "$ref": "#/components/schemas/CustomListItemWrite"
+            },
+            "type": "array"
+          },
+          "movies": {
+            "items": {
+              "$ref": "#/components/schemas/CustomListItemWrite"
+            },
+            "type": "array"
+          },
+          "shows": {
+            "items": {
+              "$ref": "#/components/schemas/CustomListItemWrite"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CustomListItemsResult": {
+        "properties": {
+          "added": {
+            "description": "Titles put on the list.",
+            "type": "integer"
+          },
+          "existing": {
+            "description": "Titles already on the list that this request did not change.",
+            "type": "integer"
+          },
+          "list": {
+            "$ref": "#/components/schemas/CustomListBlock"
+          },
+          "not_found": {
+            "description": "Titles that matched nothing, echoed as you sent them.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "updated": {
+            "description": "Titles already on the list that moved or got a changed note.",
+            "type": "integer"
+          },
+          "wrong_type": {
+            "items": {
+              "$ref": "#/components/schemas/CustomListWrongTypeItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "added",
+          "updated",
+          "existing",
+          "not_found",
+          "wrong_type",
+          "list"
         ],
         "type": "object"
       },
@@ -4512,6 +4902,30 @@
           "total_pages"
         ],
         "type": "object"
+      },
+      "CustomListPermission": {
+        "description": "One collaborator permission.\n\n| Permission | Grants |\n|---|---|\n| `full` | Everything the owner can do, including deleting the list and managing collaborators. |\n| `privacy` | Change `privacy`. |\n| `list_type` | Change `display_number` (so does `add`). |\n| `default_sort` | Change `sort`. |\n| `title` | Rename the list. |\n| `description` | Change `description`. |\n| `public_tags` | Change `tags`. |\n| `private_tags` | Change and read `private_tags`. |\n| `background` | Change the list's background on simkl.com. |\n| `add` | Add titles. |\n| `suggest` | Suggest titles on simkl.com. |\n| `delete` | Remove titles. |\n| `rearrange` | Change the order of titles already on the list. |\n| `import` | Import titles on simkl.com. |\n| `public_notes` | Write public item notes. |\n| `read_private_notes` | Read the list's `note`. |\n| `edit_private_notes` | Write the list's `note` and private item notes. |\n| `comments` | Moderate comments on simkl.com. |",
+        "enum": [
+          "full",
+          "privacy",
+          "list_type",
+          "default_sort",
+          "title",
+          "description",
+          "public_tags",
+          "private_tags",
+          "background",
+          "add",
+          "suggest",
+          "delete",
+          "rearrange",
+          "import",
+          "public_notes",
+          "read_private_notes",
+          "edit_private_notes",
+          "comments"
+        ],
+        "type": "string"
       },
       "CustomListPremiumOnly": {
         "description": "Returned with **HTTP 200** when the caller is not PRO or VIP. Carries no list data. Check for the `error` key before reading `items`.",
@@ -4605,6 +5019,198 @@
           "id",
           "name",
           "avatar"
+        ],
+        "type": "object"
+      },
+      "CustomListWriteRequest": {
+        "additionalProperties": false,
+        "description": "Body of `POST /lists` and `POST /lists/{id}`. On create, `name` and `media_type` are required. On an edit, send only what changes; every other key is left as it is. An unknown key is a `400` naming it. Text is trimmed and HTML tags are removed.",
+        "properties": {
+          "collaborators": {
+            "description": "**Replaces the whole set**: anyone left out is removed, `[]` removes everyone. Re-sending a collaborator with other permissions changes them in place. Adding someone new needs a **VIP** account and that you follow them. Refused on favorite and recommendation lists. Up to 10.",
+            "items": {
+              "$ref": "#/components/schemas/CustomListCollaboratorWrite"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "description": {
+            "additionalProperties": false,
+            "description": "Send either key alone; the other is kept. `\"\"` clears one.",
+            "properties": {
+              "full": {
+                "description": "Longer text.",
+                "type": "string"
+              },
+              "short": {
+                "description": "One line, up to 140 characters.",
+                "maxLength": 140,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "display_number": {
+            "description": "Show rank numbers beside the titles. A JSON boolean, or the strings `\"true\"` / `\"false\"`.",
+            "example": true,
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "type": "string"
+              }
+            ]
+          },
+          "media_type": {
+            "description": "**Create only, required.** What the list holds, lower-case. It cannot change: sending it on an edit is a `400`.",
+            "enum": [
+              "movies",
+              "tv",
+              "anime"
+            ],
+            "example": "movies",
+            "type": "string"
+          },
+          "name": {
+            "description": "The list's title. **Required on create.**",
+            "example": "Movies to rewatch",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "note": {
+            "description": "The owner's private note on the whole list — never shown to other users. `\"\"` clears it.",
+            "type": "string"
+          },
+          "privacy": {
+            "description": "Who can read the list. **A new list is public unless you send this** — the account's own privacy setting is not applied.",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "example": "unlisted",
+            "type": "string"
+          },
+          "private_tags": {
+            "description": "Tags only the owner (and collaborators with `private_tags`) see. Same rules as `tags`, and also **replaces the whole set**.",
+            "example": [
+              "weekend"
+            ],
+            "items": {
+              "maxLength": 100,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "sort": {
+            "description": "The list's own order, `[token, direction]` — direction `asc` (the default) or `desc`. `[\"position\", \"asc\"]` is the manual order you set with `POST /lists/{id}/items`. **The token is not checked against the sorts simkl.com offers**: any short lower-case token (`a-z`, `0-9`, `_`, `-`) is saved, and one that means nothing orders the list by a fallback. Refused on auto lists.",
+            "example": [
+              "rating",
+              "desc"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "type": "array"
+          },
+          "tags": {
+            "description": "Public tags. **Replaces the whole set** — send every tag the list should keep; `[]` removes them all. Up to 20, each up to 100 characters, without emoji, quotes, `<`, `>` or commas. Case and accents are ignored when matching, so `Dup` and `dup` are one tag.",
+            "example": [
+              "comfort"
+            ],
+            "items": {
+              "maxLength": 100,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CustomListWriteResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CustomList"
+          },
+          {
+            "description": "Returned by create and edit only — `GET /lists/{id}` does not carry these four fields.",
+            "properties": {
+              "collaborators": {
+                "description": "Everyone the list is shared with, and what each may do.",
+                "items": {
+                  "$ref": "#/components/schemas/CustomListCollaborator"
+                },
+                "type": "array"
+              },
+              "note": {
+                "description": "Type 4 null — no note is set, or it is withheld from a collaborator without `read_private_notes`. See [Null and missing values](/conventions/null-values). The owner's note on the list.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "private_tags": {
+                "description": "Type 4 null — withheld from a collaborator without the `private_tags` permission. See [Null and missing values](/conventions/null-values). Private tag names.",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "tags": {
+                "description": "Public tag names.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "tags",
+              "private_tags",
+              "note",
+              "collaborators"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "CustomListWrongTypeItem": {
+        "description": "A posted title whose media type does not match the list, as posted plus the resolved Simkl ID and its `type`.",
+        "properties": {
+          "ids": {
+            "additionalProperties": true,
+            "properties": {
+              "simkl": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": {
+            "description": "What the title actually is (singular, unlike a list's `media_type`).",
+            "enum": [
+              "movie",
+              "tv",
+              "anime"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "ids",
+          "type"
         ],
         "type": "object"
       },
@@ -11721,6 +12327,621 @@
         }
       }
     },
+    "/lists": {
+      "post": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nCreates a list owned by the caller. `name` and `media_type` are required; `media_type` cannot change later.\n\nReturns `201` with the new list: the same fields as `GET /lists/{id}` (without `items`), plus `tags`, `private_tags`, `note` and `collaborators`. Add titles with [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items).\n\n<Warning>\n**New lists are public unless you send `privacy`.** The account's own privacy setting is not applied — send `\"privacy\": \"private\"` if the user expects that.\n</Warning>\n\nPlan limits apply when the list is created: **30 lists on PRO, 1,000 on VIP** (`403 max_lists`). See [Account limits](/api-reference/lists#account-limits).",
+        "operationId": "create-list",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "create_list": {
+                  "summary": "Create a movies list",
+                  "value": {
+                    "description": {
+                      "full": "Films I come back to every year.",
+                      "short": "Comfort films for a slow weekend"
+                    },
+                    "display_number": true,
+                    "media_type": "movies",
+                    "name": "Movies to rewatch",
+                    "note": "Swap in something new each spring",
+                    "privacy": "unlisted",
+                    "private_tags": [
+                      "weekend"
+                    ],
+                    "sort": [
+                      "rating",
+                      "desc"
+                    ],
+                    "tags": [
+                      "comfort"
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CustomListWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "create_list": {
+                    "description": "`top_items` is empty on every write response; `GET /lists/user/{userId}` fills it in.",
+                    "summary": "Create a movies list",
+                    "value": {
+                      "collaborators": [],
+                      "counts": {
+                        "collaborators": 0,
+                        "comments": 0,
+                        "followers": 0,
+                        "items": 0,
+                        "likes": 0
+                      },
+                      "created_at": "2026-11-13T06:02:45Z",
+                      "description": {
+                        "full": "Films I come back to every year.",
+                        "short": "Comfort films for a slow weekend"
+                      },
+                      "display_number": true,
+                      "id": 239124,
+                      "media_type": "movies",
+                      "name": "Movies to rewatch",
+                      "note": "Swap in something new each spring",
+                      "privacy": "unlisted",
+                      "private_tags": [
+                        "weekend"
+                      ],
+                      "slug": "movies-to-rewatch",
+                      "sort": [
+                        "rating",
+                        "desc"
+                      ],
+                      "tags": [
+                        "comfort"
+                      ],
+                      "top_items": [],
+                      "type": "regular",
+                      "updated_at": "2026-11-13T06:02:45Z",
+                      "user": {
+                        "avatar": "https://us.simkl.in/img_tv/ico_profile_guest.png",
+                        "id": 8199460,
+                        "name": "testweek"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListWriteResponse"
+                }
+              }
+            },
+            "description": "Created."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "empty_field",
+                  "message": "media_type is required"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The body was refused; nothing was created. `empty_field` — `name` or `media_type` missing, or the name is empty once HTML is removed. `wrong_parameter` — an unknown key (the message names it), a wrong type, or a rule in the request schema (lengths, tag rules, `privacy`, `sort`, collaborators); links in `description` or `note` need a **VIP** account. `invalid_request` — the body is not JSON. `rate_limit` — *Your lists are being updated, try again in a minute*: another write for this user is still running. Writes for one user run one at a time; retry after a moment, never in parallel."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "premium_only",
+                  "message": "Custom lists over the API are available to Simkl Pro and VIP members only."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`. `max_lists` — the plan's list limit is reached."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use POST"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`POST`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "POST",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a custom list",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "create_list",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"name\": \"Movies to rewatch\",\n  \"privacy\": \"unlisted\",\n  \"display_number\": true,\n  \"description\": {\n    \"short\": \"Comfort films for a slow weekend\",\n    \"full\": \"Films I come back to every year.\"\n  },\n  \"tags\": [\n    \"comfort\"\n  ],\n  \"private_tags\": [\n    \"weekend\"\n  ],\n  \"note\": \"Swap in something new each spring\",\n  \"sort\": [\n    \"rating\",\n    \"desc\"\n  ],\n  \"media_type\": \"movies\"\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/create-list",
+          "metadata": {
+            "sidebarTitle": "Create custom list"
+          }
+        }
+      }
+    },
+    "/lists/favorites": {
+      "post": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nFavorites without a list ID — the heart on simkl.com. Each title goes to the caller's favorite list **of its own media type**, so one request may mix `movies`, `shows` and `anime`. A first favorite of a type creates that list (private if the account is private).\n\nSame body and ordering rules as [adding to a list](/api-reference/simkl/add-list-items), including `user_position` and `?ignore_order=yes`. The response carries a `lists` object — the favorite list of each type you touched, `null` for the others — instead of `list`. Favorites move the `favorites` bucket in [`/sync/activities`](/api-reference/simkl/get-activities).",
+        "operationId": "add-favorites",
+        "parameters": [
+          {
+            "description": "As on `POST /lists/{id}/items`.",
+            "in": "query",
+            "name": "ignore_order",
+            "required": false,
+            "schema": {
+              "enum": [
+                "yes",
+                "true",
+                "1"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "add_favorite": {
+                  "summary": "Favorite a movie",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 53992
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CustomListItemsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListFavoritesResult"
+                }
+              }
+            },
+            "description": "Nothing was added."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "add_favorite": {
+                    "description": "This account had no favorite movies list, so the request created one; `tv` and `anime` are `null` because no title of those types was sent.",
+                    "summary": "Favorite a movie",
+                    "value": {
+                      "added": 1,
+                      "existing": 0,
+                      "lists": {
+                        "anime": null,
+                        "movies": {
+                          "counts": {
+                            "collaborators": 0,
+                            "comments": 0,
+                            "followers": 0,
+                            "items": 1,
+                            "likes": 0
+                          },
+                          "id": 239088,
+                          "updated_at": "2026-11-13T01:56:19Z"
+                        },
+                        "tv": null
+                      },
+                      "not_found": [],
+                      "updated": 0,
+                      "wrong_type": []
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListFavoritesResult"
+                }
+              }
+            },
+            "description": "At least one title was added."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "empty_field",
+                  "message": "Send movies, shows or anime"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "As for adding to a list."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "premium_only",
+                  "message": "Custom lists over the API are available to Simkl Pro and VIP members only."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`. `max_items` — the favorite list is full for the plan."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 404,
+                  "error": "url_failed",
+                  "message": "This page is not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The path is not a list route."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use POST"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`POST`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "POST",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add favorites",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "add_favorite",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/favorites?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 53992\n      }\n    }\n  ]\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/add-favorites",
+          "metadata": {
+            "sidebarTitle": "Add favorites"
+          }
+        }
+      }
+    },
+    "/lists/favorites/remove": {
+      "post": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nTakes titles off the caller's favorite lists, each from the list of its own media type. Always `200`.",
+        "operationId": "remove-favorites",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "remove_favorite": {
+                  "summary": "Unfavorite a movie",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 53992
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CustomListItemsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "remove_favorite": {
+                    "description": "A title that is not a favorite, or whose type has no favorite list, comes back in `not_found`.",
+                    "summary": "Unfavorite a movie",
+                    "value": {
+                      "deleted": 1,
+                      "lists": {
+                        "anime": null,
+                        "movies": {
+                          "counts": {
+                            "collaborators": 0,
+                            "comments": 0,
+                            "followers": 0,
+                            "items": 0,
+                            "likes": 0
+                          },
+                          "id": 239088,
+                          "updated_at": "2026-11-13T01:56:20Z"
+                        },
+                        "tv": null
+                      },
+                      "not_found": []
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListFavoritesRemoveResult"
+                }
+              }
+            },
+            "description": "Done."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "empty_field",
+                  "message": "Send movies, shows or anime"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "As for adding to a list."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "premium_only",
+                  "message": "Custom lists over the API are available to Simkl Pro and VIP members only."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 404,
+                  "error": "url_failed",
+                  "message": "This page is not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The path is not a list route."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use POST"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`POST`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "POST",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove favorites",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "remove_favorite",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/favorites/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 53992\n      }\n    }\n  ]\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/remove-favorites",
+          "metadata": {
+            "sidebarTitle": "Remove favorites"
+          }
+        }
+      }
+    },
     "/lists/user/{userId}": {
       "get": {
         "description": "Returns the custom lists belonging to one user, with pagination.\n\n**Beta.** The shape may still change; this page is updated when it does.\n\nViewing your own account returns your private and unlisted lists too, and adds a `pinned` flag to each one. Viewing someone else's returns only what they have made visible, and has no `pinned` field.\n\n### Requires a PRO or VIP account\n\nCustom lists is a paid feature. The request must carry an access token belonging to a **Simkl PRO or VIP** user -- there is no anonymous access, because an anonymous caller is treated as a free account.\n\nA free or anonymous caller does not get an error status. The response is **HTTP 200** carrying a `premium_only` body instead of list data:\n\n```json\n{\n  \"error\": \"premium_only\",\n  \"message\": \"Custom list items are available to Simkl PRO and VIP members only.\",\n  \"item\": {\n    \"title\": \"Upgrade to Simkl PRO/VIP to unlock this list\",\n    \"description\": \"Subscribe to Simkl PRO or VIP to view this list\",\n    \"poster\": \"https://simkl.in/poster_upgrade.webp\"\n  }\n}\n```\n\nThree things to know about it, because each one breaks a naive client:\n\n- `error` is lowercase `premium_only`.\n- There is **no `items` array and no `pagination` object**. This is a different response shape, not a degraded one, so `items` is undefined rather than empty.\n- `item` is singular and renderable -- it has a title, a description and a real poster URL, so you can drop it straight into your list view instead of leaving the user with a blank screen.\n\n**Check for an `error` key on a 200 before reading `items`.** A client that branches only on the status code will treat this as a successful list and render the placeholder as though it were real content.\n\n### Sorting\n\n`sort` here **is** validated against a fixed set, unlike `GET /lists/{id}`. An unrecognised value is a `400` rather than a silent fallback.\n\n### When to call this\n\n**Do not poll this endpoint on a timer.** `GET /sync/activities` carries a\n`custom_lists.lists` block whose `all` moves whenever any of the user's lists\nchanges, so one cheap call answers \"is a refetch needed?\" without touching the\nlists at all.\n\nIt also breaks down by kind -- `regular`, `favorites`, `recommendations`,\n`auto` -- so you can refresh only the kind that changed. A user favouriting a\nsingle show moves `favorites` and nothing else.\n\nNote the block is nested one level deeper than the others on that endpoint:\nread `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is\n`favorites` (plural) while a list's own `type` is `favorite` (singular).\n",
@@ -12022,8 +13243,151 @@
       }
     },
     "/lists/{id}": {
+      "delete": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nDeletes the list, its titles, likes, follows and comments. **There is no undo.** Returns `204` with an empty body; deleting it again is `404`.\n\nAllowed for the owner and for a collaborator with `full`. Favorite lists can be deleted (the next favorite creates a new one); recommendation lists cannot (`400 list_error`). Moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities).",
+        "operationId": "delete-list",
+        "parameters": [
+          {
+            "description": "Numeric list ID.",
+            "example": 239084,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted. No body."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "list_error",
+                  "message": "A recommendation list cannot be deleted"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`list_error` — a recommendation list. `rate_limit` — *Your lists are being updated, try again in a minute*: another write for this user is still running. Writes for one user run one at a time; retry after a moment, never in parallel."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "no_access",
+                  "message": "Only the owner or a collaborator with full rights can delete a list"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`. `private_list` — a private list you are not on. `no_access` — not the owner, nor a collaborator with `full`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 404,
+                  "error": "url_failed",
+                  "message": "List not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such list (`List not found`), or the path is not a list route."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use GET, POST, DELETE"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`GET, POST, DELETE`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "GET, POST, DELETE",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a custom list",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "delete_list",
+            "lang": "curl",
+            "source": "curl -X DELETE 'https://api.simkl.com/lists/239084?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/delete-list",
+          "metadata": {
+            "sidebarTitle": "Delete custom list"
+          }
+        }
+      },
       "get": {
-        "description": "Returns a custom list's metadata and its items.\n\n**Beta.** The shape may still change; this page is updated when it does.\n\nReads only. Creating lists, editing them and adding or removing items are done on the website and are not yet part of the API.\n\n### Requires a PRO or VIP account\n\nCustom lists is a paid feature. The request must carry an access token belonging to a **Simkl PRO or VIP** user -- there is no anonymous access, because an anonymous caller is treated as a free account.\n\nA free or anonymous caller does not get an error status. The response is **HTTP 200** carrying a `premium_only` body instead of list data:\n\n```json\n{\n  \"error\": \"premium_only\",\n  \"message\": \"Custom list items are available to Simkl PRO and VIP members only.\",\n  \"item\": {\n    \"title\": \"Upgrade to Simkl PRO/VIP to unlock this list\",\n    \"description\": \"Subscribe to Simkl PRO or VIP to view this list\",\n    \"poster\": \"https://simkl.in/poster_upgrade.webp\"\n  }\n}\n```\n\nThree things to know about it, because each one breaks a naive client:\n\n- `error` is lowercase `premium_only`.\n- There is **no `items` array and no `pagination` object**. This is a different response shape, not a degraded one, so `items` is undefined rather than empty.\n- `item` is singular and renderable -- it has a title, a description and a real poster URL, so you can drop it straight into your list view instead of leaving the user with a blank screen.\n\n**Check for an `error` key on a 200 before reading `items`.** A client that branches only on the status code will treat this as a successful list and render the placeholder as though it were real content.\n\n### A missing list is indistinguishable\n\nThe tier check runs before the list is looked up, so for a free or anonymous caller **a list ID that does not exist returns the same 200 `premium_only` body as a list that does**. You cannot tell them apart without a PRO token. With a PRO or VIP token an unknown ID is a normal `404`.\n\n### Sorting\n\n`sort` here is **not** validated against a fixed list, unlike `GET /lists/user/{userId}`. An unrecognised value does not error -- it falls back to the list's own ordering. Omit `sort` to use the order the list owner chose, which is usually what you want.\n\nSorts that depend on a viewer's own watch data resolve against the **list owner**, not the caller, so the same list looks the same to everyone and stays shareable.\n\n### When to call this\n\n**Do not poll this endpoint on a timer.** `GET /sync/activities` carries a\n`custom_lists.lists` block whose `all` moves whenever any of the user's lists\nchanges, so one cheap call answers \"is a refetch needed?\" without touching the\nlists at all.\n\nIt also breaks down by kind -- `regular`, `favorites`, `recommendations`,\n`auto` -- so you can refresh only the kind that changed. A user favouriting a\nsingle show moves `favorites` and nothing else.\n\nNote the block is nested one level deeper than the others on that endpoint:\nread `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is\n`favorites` (plural) while a list's own `type` is `favorite` (singular).\n",
+        "description": "Returns a custom list's metadata and its items.\n\n**Beta.** The shape may still change; this page is updated when it does.\n\nTo create or change a list, see [Edit a custom list](/guides/custom-lists#edit-a-custom-list). This response does not carry the list's `tags`, `private_tags`, `note` or `collaborators`; the write endpoints return them.\n\n### Requires a PRO or VIP account\n\nCustom lists is a paid feature. The request must carry an access token belonging to a **Simkl PRO or VIP** user -- there is no anonymous access, because an anonymous caller is treated as a free account.\n\nA free or anonymous caller does not get an error status. The response is **HTTP 200** carrying a `premium_only` body instead of list data:\n\n```json\n{\n  \"error\": \"premium_only\",\n  \"message\": \"Custom list items are available to Simkl PRO and VIP members only.\",\n  \"item\": {\n    \"title\": \"Upgrade to Simkl PRO/VIP to unlock this list\",\n    \"description\": \"Subscribe to Simkl PRO or VIP to view this list\",\n    \"poster\": \"https://simkl.in/poster_upgrade.webp\"\n  }\n}\n```\n\nThree things to know about it, because each one breaks a naive client:\n\n- `error` is lowercase `premium_only`.\n- There is **no `items` array and no `pagination` object**. This is a different response shape, not a degraded one, so `items` is undefined rather than empty.\n- `item` is singular and renderable -- it has a title, a description and a real poster URL, so you can drop it straight into your list view instead of leaving the user with a blank screen.\n\n**Check for an `error` key on a 200 before reading `items`.** A client that branches only on the status code will treat this as a successful list and render the placeholder as though it were real content.\n\n### A missing list is indistinguishable\n\nThe tier check runs before the list is looked up, so for a free or anonymous caller **a list ID that does not exist returns the same 200 `premium_only` body as a list that does**. You cannot tell them apart without a PRO token. With a PRO or VIP token an unknown ID is a normal `404`.\n\n### Sorting\n\n`sort` here is **not** validated against a fixed list, unlike `GET /lists/user/{userId}`. An unrecognised value does not error -- it falls back to the list's own ordering. Omit `sort` to use the order the list owner chose, which is usually what you want.\n\nSorts that depend on a viewer's own watch data resolve against the **list owner**, not the caller, so the same list looks the same to everyone and stays shareable.\n\n### When to call this\n\n**Do not poll this endpoint on a timer.** `GET /sync/activities` carries a\n`custom_lists.lists` block whose `all` moves whenever any of the user's lists\nchanges, so one cheap call answers \"is a refetch needed?\" without touching the\nlists at all.\n\nIt also breaks down by kind -- `regular`, `favorites`, `recommendations`,\n`auto` -- so you can refresh only the kind that changed. A user favouriting a\nsingle show moves `favorites` and nothing else.\n\nNote the block is nested one level deeper than the others on that endpoint:\nread `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is\n`favorites` (plural) while a list's own `type` is `favorite` (singular).\n",
         "operationId": "get-list",
         "parameters": [
           {
@@ -12118,8 +13482,123 @@
                       "id": 216324,
                       "items": [
                         {
-                          "completed": 40981,
-                          "dropped": 3611,
+                          "completed": -8,
+                          "dropped": 898,
+                          "fanart": "13/13680229cd7d82506b",
+                          "genres": [
+                            "Adventure",
+                            "Drama",
+                            "Mystery",
+                            "Science-Fiction"
+                          ],
+                          "hold": 520,
+                          "ids": {
+                            "imdb": "tt14688458",
+                            "simkl_id": 1648964,
+                            "slug": "silo",
+                            "tmdb": "125988",
+                            "traktslug": "silo",
+                            "tvdb": "403245",
+                            "tvdbslug": "wool"
+                          },
+                          "metadata": "2023 - Now • Apple TV • 40 episodes",
+                          "network": "Apple TV",
+                          "next_episode_date": "2027-07-09T00:00:00Z",
+                          "note": {
+                            "public": "public note"
+                          },
+                          "origin_countries": [
+                            "us"
+                          ],
+                          "original_language": "en",
+                          "plan_to_watch": 9631,
+                          "position": 1,
+                          "poster": "13/139014550692f3112d",
+                          "rank": 1381,
+                          "ratings": {
+                            "imdb": {
+                              "rating": 8.1,
+                              "votes": 254548
+                            },
+                            "simkl": {
+                              "drop_rate": "2.7%",
+                              "rating": 8.2,
+                              "votes": 3916
+                            }
+                          },
+                          "release_date": "2023-05-05T05:00:00Z",
+                          "runtime": 1536,
+                          "runtime_episode": 43,
+                          "status": "ongoing",
+                          "title": "Silo",
+                          "total_episodes": 40,
+                          "total_seasons": 4,
+                          "type": "tv",
+                          "user_position": 1,
+                          "watched": 31227,
+                          "watching": 31250,
+                          "year": 2023,
+                          "year_start_end": "2023 - Now"
+                        },
+                        {
+                          "completed": 0,
+                          "dropped": 203,
+                          "fanart": "19/19897185d21579a1d7",
+                          "genres": [
+                            "Comedy",
+                            "Fantasy",
+                            "Science-Fiction"
+                          ],
+                          "hold": 48,
+                          "ids": {
+                            "imdb": "tt27497393",
+                            "simkl_id": 2832321,
+                            "slug": "stuart-fails-to-save-the-universe",
+                            "tmdb": "287620",
+                            "traktslug": "stuart-fails-to-save-the-universe",
+                            "tvdb": "465664",
+                            "tvdbslug": "stuart-fails-to-save-the-universe"
+                          },
+                          "metadata": "2026 - Now • HBO Max • 10 episodes",
+                          "network": "HBO Max",
+                          "next_episode_date": null,
+                          "note": {},
+                          "origin_countries": [
+                            "us"
+                          ],
+                          "original_language": "en",
+                          "plan_to_watch": 1973,
+                          "position": 2,
+                          "poster": "20/20082821239ce843e3",
+                          "rank": 8155,
+                          "ratings": {
+                            "imdb": {
+                              "rating": 6.9,
+                              "votes": 15343
+                            },
+                            "simkl": {
+                              "drop_rate": "3.5%",
+                              "rating": 6.96,
+                              "votes": 315
+                            }
+                          },
+                          "release_date": "2026-07-24T02:00:00Z",
+                          "runtime": 198,
+                          "runtime_episode": 18,
+                          "status": "ongoing",
+                          "title": "Stuart Fails to Save the Universe",
+                          "total_episodes": 10,
+                          "total_seasons": 1,
+                          "type": "tv",
+                          "user_position": 2,
+                          "watched": 5621,
+                          "watching": 5631,
+                          "year": 2026,
+                          "year_start_end": "2026 - Now"
+                        },
+                        {
+                          "completed": 44006,
+                          "dropped": 3836,
                           "fanart": "48/48131003734eec969",
                           "genres": [
                             "Adventure",
@@ -12131,7 +13610,7 @@
                             "Suspense",
                             "Thriller"
                           ],
-                          "hold": 1431,
+                          "hold": 1518,
                           "ids": {
                             "imdb": "tt4574334",
                             "simkl_id": 548312,
@@ -12149,22 +13628,22 @@
                             "us"
                           ],
                           "original_language": "en",
-                          "plan_to_watch": 13779,
-                          "position": 1,
+                          "plan_to_watch": 14119,
+                          "position": 3,
                           "poster": "18/1886552367968d91bc",
-                          "rank": 293,
+                          "rank": 290,
                           "ratings": {
                             "imdb": {
                               "rating": 8.6,
-                              "votes": 1738548
+                              "votes": 1754423
                             },
                             "simkl": {
-                              "drop_rate": "3.5%",
+                              "drop_rate": "3.6%",
                               "rating": 8.21,
-                              "votes": 12117
+                              "votes": 12733
                             }
                           },
-                          "release_date": "2016-07-16T00:00:00Z",
+                          "release_date": "2016-07-16T01:00:00Z",
                           "runtime": 2725,
                           "runtime_episode": 78,
                           "status": "ended",
@@ -12172,8 +13651,9 @@
                           "total_episodes": 42,
                           "total_seasons": 5,
                           "type": "tv",
-                          "watched": 98416,
-                          "watching": 57484,
+                          "user_position": 3,
+                          "watched": 101179,
+                          "watching": 57195,
                           "year": 2016,
                           "year_start_end": "2016 - 2026"
                         }
@@ -12224,9 +13704,9 @@
                       "counts": {
                         "collaborators": 1,
                         "comments": 0,
-                        "followers": 168,
+                        "followers": 179,
                         "items": 28,
-                        "likes": 117
+                        "likes": 128
                       },
                       "created_at": "2023-05-03T18:03:47Z",
                       "description": {
@@ -12238,7 +13718,7 @@
                       "items": [
                         {
                           "completed": 0,
-                          "dropped": 115,
+                          "dropped": 128,
                           "fanart": "19/198801314873234ab6",
                           "genres": [
                             "Action",
@@ -12249,7 +13729,7 @@
                             "Family",
                             "Science-Fiction"
                           ],
-                          "hold": 53,
+                          "hold": 55,
                           "ids": {
                             "imdb": "tt36594331",
                             "simkl_id": 2758731,
@@ -12267,22 +13747,22 @@
                             "us"
                           ],
                           "original_language": "en",
-                          "plan_to_watch": 1839,
+                          "plan_to_watch": 1953,
                           "position": 1,
                           "poster": "19/197064259c96cd7a98",
-                          "rank": 495,
+                          "rank": 490,
                           "ratings": {
                             "imdb": {
                               "rating": 8.5,
-                              "votes": 31079
+                              "votes": 32045
                             },
                             "simkl": {
-                              "drop_rate": "2.6%",
-                              "rating": 9.03,
-                              "votes": 346
+                              "drop_rate": "2.7%",
+                              "rating": 8.92,
+                              "votes": 371
                             }
                           },
-                          "release_date": "2026-04-06T04:00:00Z",
+                          "release_date": "2026-04-06T05:00:00Z",
                           "runtime": 235,
                           "runtime_episode": 22,
                           "status": "ongoing",
@@ -12290,8 +13770,9 @@
                           "total_episodes": 10,
                           "total_seasons": 1,
                           "type": "tv",
-                          "watched": 4301,
-                          "watching": 4311,
+                          "user_position": 25,
+                          "watched": 4525,
+                          "watching": 4527,
                           "year": 2026,
                           "year_start_end": "2026 - Now"
                         }
@@ -12391,14 +13872,15 @@
               "application/json": {
                 "example": {
                   "code": 403,
-                  "error": "private_list"
+                  "error": "private_list",
+                  "message": "This list is private"
                 },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "A private list the caller is not the owner of or a collaborator on. The body carries no message."
+            "description": "A private list the caller is not the owner of or a collaborator on."
           },
           "404": {
             "content": {
@@ -12429,6 +13911,815 @@
           "href": "/api-reference/simkl/get-list",
           "metadata": {
             "sidebarTitle": "Get custom list"
+          }
+        }
+      },
+      "post": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nChanges a list's details. **Send only what changes** — keys you leave out are kept, and an edit that changes nothing is still a `200`. `media_type` cannot be changed. Titles are edited with [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items), not here.\n\n<Warning>\n**`tags`, `private_tags` and `collaborators` replace the whole set, and `GET /lists/{id}` does not return them.** Sending `\"tags\": [\"new\"]` leaves only `new`. To add one, send the full set — the current values come back in this endpoint's response and in [`POST /lists`](/api-reference/simkl/create-list)'s, so keep them from your last write.\n</Warning>\n\n**Who may edit.** The owner, or a collaborator with the permission for each key sent: `name` needs `title`, `privacy` → `privacy`, `description` → `description`, `note` → `edit_private_notes`, `display_number` → `list_type` or `add`, `sort` → `default_sort`, `tags` → `public_tags`, `private_tags` → `private_tags`, `collaborators` → `full`. A missing permission is `403 no_access` naming the key.\n\n**List types.** A recommendation list keeps its name and takes no collaborators; a favorite list takes no collaborators; an auto list keeps its own sort. Each is `400 list_error`.\n\n**Activity.** Renaming, and changing `description`, `note` or `tags`, moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities). Changing only `privacy`, `sort`, `display_number`, `private_tags` or `collaborators` does not — those move the list's `updated_at` alone.",
+        "operationId": "update-list",
+        "parameters": [
+          {
+            "description": "Numeric list ID.",
+            "example": 239084,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "edit_list": {
+                  "summary": "Rename, make private, change the order and clear the tags",
+                  "value": {
+                    "description": {
+                      "short": "Next year's comfort films"
+                    },
+                    "display_number": "false",
+                    "name": "Movies to rewatch in 2027",
+                    "note": "",
+                    "privacy": "private",
+                    "sort": [
+                      "position",
+                      "asc"
+                    ],
+                    "tags": []
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CustomListWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "edit_list": {
+                    "description": "Only the keys sent change: `description.full` and `private_tags` are kept. `tags: []` cleared the tags and `note: \"\"` the note.",
+                    "summary": "Rename, make private, change the order and clear the tags",
+                    "value": {
+                      "collaborators": [],
+                      "counts": {
+                        "collaborators": 0,
+                        "comments": 0,
+                        "followers": 0,
+                        "items": 0,
+                        "likes": 0
+                      },
+                      "created_at": "2026-11-13T06:02:45Z",
+                      "description": {
+                        "full": "Films I come back to every year.",
+                        "short": "Next year's comfort films"
+                      },
+                      "display_number": false,
+                      "id": 239124,
+                      "media_type": "movies",
+                      "name": "Movies to rewatch in 2027",
+                      "note": null,
+                      "privacy": "private",
+                      "private_tags": [
+                        "weekend"
+                      ],
+                      "slug": "movies-to-rewatch-in-2027",
+                      "sort": [
+                        "position",
+                        "asc"
+                      ],
+                      "tags": [],
+                      "top_items": [],
+                      "type": "regular",
+                      "updated_at": "2026-11-13T06:02:46Z",
+                      "user": {
+                        "avatar": "https://us.simkl.in/img_tv/ico_profile_guest.png",
+                        "id": 8199460,
+                        "name": "testweek"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListWriteResponse"
+                }
+              }
+            },
+            "description": "The list after the edit."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "wrong_parameter",
+                  "message": "media_type cannot be changed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The body was refused; nothing changed. `empty_field` — the body is empty. `wrong_parameter` — as for create, plus `media_type cannot be changed`. `list_error` — not allowed on this kind of list. `invalid_request` — the body is not JSON. `rate_limit` — *Your lists are being updated, try again in a minute*: another write for this user is still running. Writes for one user run one at a time; retry after a moment, never in parallel."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "no_access",
+                  "message": "No permission to change name"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`. `private_list` — a private list you are not on. `no_access` — a collaborator without the permission for a key (the message names it)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 404,
+                  "error": "url_failed",
+                  "message": "List not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such list (`List not found`), or the path is not a list route."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use GET, POST, DELETE"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`GET, POST, DELETE`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "GET, POST, DELETE",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit a custom list",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "edit_list",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/239084?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"name\": \"Movies to rewatch in 2027\",\n  \"privacy\": \"private\",\n  \"display_number\": \"false\",\n  \"sort\": [\n    \"position\",\n    \"asc\"\n  ],\n  \"description\": {\n    \"short\": \"Next year'\\''s comfort films\"\n  },\n  \"tags\": [],\n  \"note\": \"\"\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/update-list",
+          "metadata": {
+            "sidebarTitle": "Edit custom list"
+          }
+        }
+      }
+    },
+    "/lists/{id}/items": {
+      "post": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nAdds titles, moves them and sets their notes — one request for all three. The body is the `/sync/history` shape: `movies`, `shows` and `anime` arrays, up to 1000 titles.\n\nReturns `201` when at least one title was added, otherwise `200`, with counters: `added`, `updated` (moved, or a note changed) and `existing` (already there, untouched), plus `not_found`, `wrong_type` and the list's new `counts`.\n\n### Order\n\n- New titles go to the end, in the order posted.\n- `user_position` puts a title at that place (1-based); the rest shift down. Past the end means the end.\n- Titles you do not mention never move.\n\n<Warning>\n**Posting titles that are already on the list in a different order than they sit moves them** — even when you only meant to change their notes. A title is moved to right after the one posted before it if that one sits later. Add `?ignore_order=yes` to any request that is not meant to reorder (note edits, re-adding). A collaborator without `rearrange` gets `403` for such a request.\n</Warning>\n\n### Types\n\nThe list holds one media type. A title of another type is not added; it comes back in `wrong_type` with its Simkl ID and real `type`. An anime posted under `shows` is still anime. For anime, `season` or `seasons` adds the entry that covers that season; a season no entry covers puts the title in `not_found`.\n\n### Who may write\n\nThe owner, or a collaborator with `add` (new titles), `rearrange` (moving titles already there), `public_notes` and `edit_private_notes` (notes). Auto lists take no titles (`400 list_error`). Plan limits apply to the **owner's** plan: 2,000 titles per list on PRO, 10,000 on VIP (`403 max_items`), and a total across all lists (`403 max_items_total`).",
+        "operationId": "add-list-items",
+        "parameters": [
+          {
+            "description": "Numeric list ID.",
+            "example": 239084,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Do not move titles already on the list. New titles are still appended, and `user_position` is still applied.",
+            "in": "query",
+            "name": "ignore_order",
+            "required": false,
+            "schema": {
+              "enum": [
+                "yes",
+                "true",
+                "1"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "add_titles": {
+                  "summary": "Add three movies",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 53992
+                        }
+                      },
+                      {
+                        "ids": {
+                          "simkl": 54130
+                        }
+                      },
+                      {
+                        "ids": {
+                          "simkl": 53894
+                        }
+                      }
+                    ]
+                  }
+                },
+                "not_found_and_wrong_type": {
+                  "summary": "Unknown ID and a TV show on a movies list",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 999999999
+                        }
+                      }
+                    ],
+                    "shows": [
+                      {
+                        "ids": {
+                          "simkl": 17465
+                        }
+                      }
+                    ]
+                  }
+                },
+                "place_with_user_position": {
+                  "summary": "Add a movie at the top with user_position",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 472214
+                        },
+                        "user_position": 1
+                      }
+                    ]
+                  }
+                },
+                "set_notes": {
+                  "summary": "Set notes on a title already on the list",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 54130
+                        },
+                        "note": {
+                          "private": "Watched with Sam",
+                          "public": "Better the second time"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CustomListItemsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "not_found_and_wrong_type": {
+                    "description": "Neither is written. `not_found` echoes what you sent; `wrong_type` adds the Simkl ID and the title's real type.",
+                    "summary": "Unknown ID and a TV show on a movies list",
+                    "value": {
+                      "added": 0,
+                      "existing": 0,
+                      "list": {
+                        "counts": {
+                          "collaborators": 0,
+                          "comments": 0,
+                          "followers": 0,
+                          "items": 4,
+                          "likes": 0
+                        },
+                        "id": 239130,
+                        "updated_at": "2026-11-13T06:03:08Z"
+                      },
+                      "not_found": [
+                        {
+                          "ids": {
+                            "simkl": 999999999
+                          }
+                        }
+                      ],
+                      "updated": 0,
+                      "wrong_type": [
+                        {
+                          "ids": {
+                            "simkl": 17465
+                          },
+                          "type": "tv"
+                        }
+                      ]
+                    }
+                  },
+                  "set_notes": {
+                    "description": "Sent with `?ignore_order=yes`, as note edits should be. A note change counts as `updated`; `200` because nothing was added. The private note is saved but never returned.",
+                    "summary": "Set notes on a title already on the list",
+                    "value": {
+                      "added": 0,
+                      "existing": 0,
+                      "list": {
+                        "counts": {
+                          "collaborators": 0,
+                          "comments": 0,
+                          "followers": 0,
+                          "items": 4,
+                          "likes": 0
+                        },
+                        "id": 239130,
+                        "updated_at": "2026-11-13T06:03:06Z"
+                      },
+                      "not_found": [],
+                      "updated": 1,
+                      "wrong_type": []
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListItemsResult"
+                }
+              }
+            },
+            "description": "Nothing was added (titles moved, notes changed, or nothing changed)."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "add_titles": {
+                    "description": "Titles land in the order posted. `201` because something was added.",
+                    "summary": "Add three movies",
+                    "value": {
+                      "added": 3,
+                      "existing": 0,
+                      "list": {
+                        "counts": {
+                          "collaborators": 0,
+                          "comments": 0,
+                          "followers": 0,
+                          "items": 3,
+                          "likes": 0
+                        },
+                        "id": 239130,
+                        "updated_at": "2026-11-13T06:03:00Z"
+                      },
+                      "not_found": [],
+                      "updated": 0,
+                      "wrong_type": []
+                    }
+                  },
+                  "place_with_user_position": {
+                    "description": "The titles already on the list shift down one place.",
+                    "summary": "Add a movie at the top with user_position",
+                    "value": {
+                      "added": 1,
+                      "existing": 0,
+                      "list": {
+                        "counts": {
+                          "collaborators": 0,
+                          "comments": 0,
+                          "followers": 0,
+                          "items": 4,
+                          "likes": 0
+                        },
+                        "id": 239130,
+                        "updated_at": "2026-11-13T06:03:03Z"
+                      },
+                      "not_found": [],
+                      "updated": 0,
+                      "wrong_type": []
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListItemsResult"
+                }
+              }
+            },
+            "description": "At least one title was added."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "wrong_parameter",
+                  "message": "Unknown key: episodes (lists hold whole titles)"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The body was refused; nothing was written. `empty_field` — no titles. `wrong_parameter` — an unknown key, a malformed title (the message names it, e.g. `movies[0] needs ids or a title`), or more than 1000 titles. `list_error` — an auto list. `rate_limit` — *Your lists are being updated, try again in a minute*: another write for this user is still running. Writes for one user run one at a time; retry after a moment, never in parallel."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "no_access",
+                  "message": "No permission to rearrange items"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`. `private_list` / `no_access` — you are not on the list, or lack `add`, `rearrange` or the notes permission. `max_items`, `max_items_total` — the owner's plan limit. A refused request writes nothing."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 404,
+                  "error": "url_failed",
+                  "message": "List not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such list (`List not found`), or the path is not a list route."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use POST"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`POST`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "POST",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add or reorder titles in a custom list",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "add_titles",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/239040/items?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 53992\n      }\n    },\n    {\n      \"ids\": {\n        \"simkl\": 54130\n      }\n    },\n    {\n      \"ids\": {\n        \"simkl\": 53894\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "place_with_user_position",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/239040/items?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 472214\n      },\n      \"user_position\": 1\n    }\n  ]\n}'"
+          },
+          {
+            "label": "set_notes",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/239040/items?ignore_order=yes&client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 54130\n      },\n      \"note\": {\n        \"public\": \"Better the second time\",\n        \"private\": \"Watched with Sam\"\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "not_found_and_wrong_type",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/239040/items?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 999999999\n      }\n    }\n  ],\n  \"shows\": [\n    {\n      \"ids\": {\n        \"simkl\": 17465\n      }\n    }\n  ]\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/add-list-items",
+          "metadata": {
+            "sidebarTitle": "Add list items"
+          }
+        }
+      }
+    },
+    "/lists/{id}/items/remove": {
+      "post": {
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nTakes titles off the list. Same body as [adding](/api-reference/simkl/add-list-items). Titles not on the list — a wrong media type included — come back in `not_found`. Always `200`.\n\nThe owner, or a collaborator with `delete`. Auto lists take no writes (`400 list_error`).",
+        "operationId": "remove-list-items",
+        "parameters": [
+          {
+            "description": "Numeric list ID.",
+            "example": 239084,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "remove_titles": {
+                  "summary": "Remove a title (and one that is not on the list)",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "simkl": 53992
+                        }
+                      },
+                      {
+                        "ids": {
+                          "simkl": 999999999
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CustomListItemsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "remove_titles": {
+                    "description": "The title not on the list comes back in `not_found`.",
+                    "summary": "Remove a title (and one that is not on the list)",
+                    "value": {
+                      "deleted": 1,
+                      "list": {
+                        "counts": {
+                          "collaborators": 0,
+                          "comments": 0,
+                          "followers": 0,
+                          "items": 3,
+                          "likes": 0
+                        },
+                        "id": 239130,
+                        "updated_at": "2026-11-13T06:03:12Z"
+                      },
+                      "not_found": [
+                        {
+                          "ids": {
+                            "simkl": 999999999
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/CustomListItemsRemoveResult"
+                }
+              }
+            },
+            "description": "Done."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "empty_field",
+                  "message": "Send movies, shows or anime"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "As for adding."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_required",
+                  "message": "This client_id requires a user access token on every request"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable token. `user_token_required` — no bearer from an AUTH V2 app; `user_token_failed` — no bearer from an AUTH V1 app; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "no_access",
+                  "message": "No permission to delete items"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Refused. `premium_only` — the account is free (or, when adding collaborators, not VIP). `oauth2_token_required` — an AUTH V1 token. `insufficient_scope` — the token lacks `media:write`. `private_list` / `no_access` — you are not on the list or lack `delete`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 404,
+                  "error": "url_failed",
+                  "message": "List not found"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such list (`List not found`), or the path is not a list route."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 405,
+                  "error": "method_not_allowed",
+                  "message": "Use POST"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Wrong verb for this path. The `Allow` header lists the right ones (`POST`).",
+            "headers": {
+              "Allow": {
+                "description": "The verbs this path accepts.",
+                "schema": {
+                  "example": "POST",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove titles from a custom list",
+        "tags": [
+          "Lists"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "remove_titles",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/lists/239040/items/remove?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"ids\": {\n        \"simkl\": 53992\n      }\n    },\n    {\n      \"ids\": {\n        \"simkl\": 999999999\n      }\n    }\n  ]\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/remove-list-items",
+          "metadata": {
+            "sidebarTitle": "Remove list items"
           }
         }
       }
@@ -26695,7 +28986,7 @@
       "name": "Users"
     },
     {
-      "description": "Custom lists, read-only and in beta. Requires a Simkl PRO or VIP access token.",
+      "description": "Custom lists — read, create and edit them. In beta. Requires an AUTH V2 token for a Simkl PRO or VIP account.",
       "name": "Lists"
     }
   ]
