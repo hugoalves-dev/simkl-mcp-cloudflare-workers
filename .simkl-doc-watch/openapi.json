@@ -5135,13 +5135,13 @@
             "type": "string"
           },
           "privacy": {
-            "description": "Who can read the list. **A new list is public unless you send this** — the account's own privacy setting is not applied.",
+            "description": "Who can read the list. **Public is the default:** a list created without `privacy` is public, and your create form should preselect Public too. `unlisted` and `private` are for when the user picks them. On an edit, leaving it out keeps the current value. See [What `privacy` controls](/guides/custom-lists#what-privacy-actually-controls).",
             "enum": [
               "public",
               "unlisted",
               "private"
             ],
-            "example": "unlisted",
+            "example": "public",
             "type": "string"
           },
           "private_tags": {
@@ -8284,7 +8284,7 @@
             ]
           },
           "type": {
-            "description": "Always `show` on this endpoint. (The canonical media type for TV records is `show` — `tv` is reserved for the URL/route segment.) Live-verified 2026-05-14.",
+            "description": "Always `show` on this endpoint. (The canonical media type for TV records is `show` — `tv` is reserved for the URL/route segment.)",
             "enum": [
               "show"
             ],
@@ -8557,6 +8557,14 @@
             ],
             "type": "string"
           },
+          "certification": {
+            "description": "Type 4 null — no rating on file. See [Null and missing values](/conventions/null-values). Content rating as the rating body issues it — `PG-13`, `R`, `TV-MA`, `TV-14`, `NR` … — for movies, TV and anime alike.",
+            "example": "PG-13",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "completed": {
             "description": "Users with the title in **Completed**, all time — not limited to the file's timeframe.",
             "example": 27251,
@@ -8565,6 +8573,14 @@
           "country": {
             "example": "us",
             "type": "string"
+          },
+          "director": {
+            "description": "Type 4 null — no director on file. See [Null and missing values](/conventions/null-values). **Movies only.** Director's name; several are joined with commas.",
+            "example": "Kitao Sakurai",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "drop_rate": {
             "description": "Percentage of users who dropped, pre-formatted (e.g. `\"1.6%\"`).",
@@ -8673,12 +8689,39 @@
             "example": "2h 37m",
             "type": "string"
           },
+          "season_name_year": {
+            "description": "Type 4 null — no premiere date on file. See [Null and missing values](/conventions/null-values). **Anime only.** The anime season it premiered in, as `Winter`, `Spring`, `Summer` or `Fall` plus the year — `Fall 2026`.",
+            "example": "Fall 2026",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "description": "Title status (e.g. `ended`, `ongoing`).",
             "type": "string"
           },
+          "studios": {
+            "description": "Type 4 null — no studio on file. See [Null and missing values](/conventions/null-values). **Anime only.** Animation studios.",
+            "items": {
+              "properties": {
+                "id": {
+                  "description": "Simkl company ID.",
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "theater": {
-            "description": "**Movies only.** `MM/DD/YYYY` theatrical release date.",
+            "description": "**Movies only.** Theatrical release date, `MM/DD/YYYY`. Present on every movie with a theatrical release on file — past releases included — compare it with today before calling a film \"in theaters\".",
             "type": "string"
           },
           "title": {
@@ -11763,8 +11806,10 @@
                             "type": "official"
                           }
                         ],
-                        "completed": 1051,
+                        "certification": "PG-13",
+                        "completed": 1074,
                         "country": "us",
+                        "director": "Kitao Sakurai",
                         "drop_rate": "1.4%",
                         "dvd_date": "11/11/2026",
                         "fanart": "20/20917205417575a114",
@@ -11801,7 +11846,7 @@
                         "release_date": "10/13/2026",
                         "runtime": "2h",
                         "status": "ended",
-                        "theater": "10/13/2026",
+                        "theater": "10/16/2026",
                         "title": "Street Fighter",
                         "trailer": "U6sbm1OaJb8",
                         "url": "/movies/2212913/street-fighter",
@@ -11975,6 +12020,7 @@
                             }
                           ],
                           "anime_type": "tv",
+                          "certification": "R",
                           "completed": 0,
                           "country": "jp",
                           "drop_rate": "3.1%",
@@ -12003,7 +12049,7 @@
                           "network": "TBS (JP)",
                           "original_language": "ja",
                           "overview": "Born into a prestigious family of master swordsmen, Elymas Edvaughn`s future shatters when he awakens the so-called \"defective\" Heavy Knight class. Disowned and cast out, he regains memories of another life—and realizes this world mirrors a VR game he once mastered. Armed with knowledge no one else possesses, he sets out to rewrite his fate and prove the strength of the \"weakest\" class.",
-                          "plan_to_watch": 1273,
+                          "plan_to_watch": 1276,
                           "poster": "20/202223396223148260",
                           "rank": 4659,
                           "ratings": {
@@ -12018,14 +12064,21 @@
                           },
                           "release_date": "07/02/2026",
                           "runtime": "25m",
+                          "season_name_year": "Summer 2026",
                           "status": "ongoing",
+                          "studios": [
+                            {
+                              "id": 736,
+                              "name": "GoHands"
+                            }
+                          ],
                           "title": "The Exiled Heavy Knight Knows How to Game the System",
                           "title_romaji": "Tsuihou Sareta Tensei Juu Kishi wa Game Chishiki de Musou Suru",
                           "total_episodes": 26,
                           "trailer": "mcZRE6a2XgU",
                           "url": "/anime/2573730/tsuihou-sareta-tensei-juu-kishi-wa-game-chishiki-de-musou-suru",
                           "watched": 660,
-                          "watching": 3917
+                          "watching": 3922
                         }
                       ],
                       "movies": [
@@ -12042,9 +12095,11 @@
                               "type": "official"
                             }
                           ],
-                          "completed": 2726,
+                          "certification": "PG-13",
+                          "completed": 2842,
                           "country": "us",
-                          "drop_rate": "0.7%",
+                          "director": "David Ayer",
+                          "drop_rate": "0.6%",
                           "dvd_date": "11/10/2026",
                           "fanart": "21/2106038361187289bf",
                           "genres": [
@@ -12066,7 +12121,7 @@
                           "metadata": "September 19, 2026 • Budget $82M • Box office $188M",
                           "original_language": "en",
                           "overview": "After a harrowing plane crash, Special Forces officer James Belmont and his combat dog, Odin, find themselves stranded deep in the Alaskan wilderness. Together, they are forced into a brutal fight for survival against the elements.",
-                          "plan_to_watch": 2277,
+                          "plan_to_watch": 2271,
                           "poster": "21/2102900159c276e48a",
                           "rank": 6220,
                           "ratings": {
@@ -12082,7 +12137,7 @@
                           "release_date": "09/19/2026",
                           "runtime": "1h 41m",
                           "status": "ended",
-                          "theater": "09/19/2026",
+                          "theater": "09/25/2026",
                           "title": "Heart of the Beast",
                           "trailer": "bfCgu83suHs",
                           "url": "/movies/2413479/heart-of-the-beast",
@@ -12099,7 +12154,8 @@
                               "type": "official"
                             }
                           ],
-                          "completed": 3084,
+                          "certification": "TV-14",
+                          "completed": 3272,
                           "country": "us",
                           "drop_rate": "1%",
                           "fanart": "20/205045758db21ba248",
@@ -12123,7 +12179,7 @@
                           "network": "Disney+",
                           "original_language": "en",
                           "overview": "A rebooted Vision has been hiding from those who seek to weaponize him. While lying low he consults the AI personas embedded in his programming to find his true meaning. This quiet life ends when a bounty placed on his head thrusts him on the run.",
-                          "plan_to_watch": 3604,
+                          "plan_to_watch": 3614,
                           "poster": "20/205044139af2dab1a9",
                           "rank": 2609,
                           "ratings": {
@@ -12137,14 +12193,14 @@
                             }
                           },
                           "release_date": "10/14/2026",
-                          "runtime": "45m",
+                          "runtime": "46m",
                           "status": "ended",
                           "title": "VisionQuest",
                           "total_episodes": 8,
-                          "trailer": "sXKnmgmbkoE",
+                          "trailer": "oSVTAUKyrL8",
                           "url": "/tv/2026529/visionquest",
                           "watched": 1624,
-                          "watching": 5701
+                          "watching": 5594
                         }
                       ]
                     }
@@ -12328,9 +12384,11 @@
                             "type": "official"
                           }
                         ],
-                        "completed": 2726,
+                        "certification": "PG-13",
+                        "completed": 2842,
                         "country": "us",
-                        "drop_rate": "0.7%",
+                        "director": "David Ayer",
+                        "drop_rate": "0.6%",
                         "dvd_date": "11/10/2026",
                         "fanart": "21/2106038361187289bf",
                         "genres": [
@@ -12352,7 +12410,7 @@
                         "metadata": "September 19, 2026 • Budget $82M • Box office $188M",
                         "original_language": "en",
                         "overview": "After a harrowing plane crash, Special Forces officer James Belmont and his combat dog, Odin, find themselves stranded deep in the Alaskan wilderness. Together, they are forced into a brutal fight for survival against the elements.",
-                        "plan_to_watch": 2277,
+                        "plan_to_watch": 2271,
                         "poster": "21/2102900159c276e48a",
                         "rank": 6220,
                         "ratings": {
@@ -12368,7 +12426,7 @@
                         "release_date": "09/19/2026",
                         "runtime": "1h 41m",
                         "status": "ended",
-                        "theater": "09/19/2026",
+                        "theater": "09/25/2026",
                         "title": "Heart of the Beast",
                         "trailer": "bfCgu83suHs",
                         "url": "/movies/2413479/heart-of-the-beast",
@@ -12490,7 +12548,7 @@
     },
     "/lists": {
       "post": {
-        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nCreates a list owned by the caller. `name` and `media_type` are required; `media_type` cannot change later.\n\nReturns `201` with the new list: the same fields as `GET /lists/{id}` (without `items`), plus `tags`, `private_tags`, `note` and `collaborators`. Add titles with [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items).\n\n<Warning>\n**New lists are public unless you send `privacy`.** The account's own privacy setting is not applied — send `\"privacy\": \"private\"` if the user expects that.\n</Warning>\n\nPlan limits apply when the list is created: **30 lists on PRO, 1,000 on VIP** (`403 max_lists`). See [Account limits](/api-reference/lists#account-limits).",
+        "description": "**Beta, PRO and VIP.** Needs an [AUTH V2](/api-reference/auth-v2) token with the `media:write` [scope](/api-reference/oauth2-scopes), belonging to a Simkl **PRO or VIP** account. A free account gets `403 premium_only` here — a real error, unlike the `200` upgrade card that `GET /lists/{id}` returns. Full walkthrough: [Edit a custom list](/guides/custom-lists#edit-a-custom-list).\n\nCreates a list owned by the caller. `name` and `media_type` are required; `media_type` cannot change later.\n\nReturns `201` with the new list: the same fields as `GET /lists/{id}` (without `items`), plus `tags`, `private_tags`, `note` and `collaborators`. Add titles with [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items).\n\n<Tip>\n**New lists are public — make Public the default in your app too.** Leave `privacy` out, or send `\"public\"`, and the list is public. In a create form, preselect **Public** and offer Unlisted and Private as choices the user makes; don't start new lists as private.\n</Tip>\n\nPlan limits apply when the list is created: **30 lists on PRO, 1,000 on VIP** (`403 max_lists`). See [Account limits](/api-reference/lists#account-limits).",
         "operationId": "create-list",
         "parameters": [
           {
@@ -12521,7 +12579,7 @@
                     "media_type": "movies",
                     "name": "Movies to rewatch",
                     "note": "Swap in something new each spring",
-                    "privacy": "unlisted",
+                    "privacy": "public",
                     "private_tags": [
                       "weekend"
                     ],
@@ -12559,17 +12617,17 @@
                         "items": 0,
                         "likes": 0
                       },
-                      "created_at": "2026-11-13T16:57:16Z",
+                      "created_at": "2026-11-14T06:10:23Z",
                       "description": {
                         "full": "Films I come back to every year.",
                         "short": "Comfort films for a slow weekend"
                       },
                       "display_number": true,
-                      "id": 239268,
+                      "id": 239498,
                       "media_type": "movies",
                       "name": "Movies to rewatch",
                       "note": "Swap in something new each spring",
-                      "privacy": "unlisted",
+                      "privacy": "public",
                       "private_tags": [
                         "weekend"
                       ],
@@ -12583,7 +12641,7 @@
                       ],
                       "top_items": [],
                       "type": "regular",
-                      "updated_at": "2026-11-13T16:57:16Z",
+                      "updated_at": "2026-11-14T06:10:23Z",
                       "user": {
                         "avatar": "https://us.simkl.in/img_tv/ico_profile_guest.png",
                         "id": 8199460,
@@ -12685,7 +12743,7 @@
           {
             "label": "create_list",
             "lang": "curl",
-            "source": "curl -X POST 'https://api.simkl.com/lists?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"name\": \"Movies to rewatch\",\n  \"privacy\": \"unlisted\",\n  \"display_number\": true,\n  \"description\": {\n    \"short\": \"Comfort films for a slow weekend\",\n    \"full\": \"Films I come back to every year.\"\n  },\n  \"tags\": [\n    \"comfort\"\n  ],\n  \"private_tags\": [\n    \"weekend\"\n  ],\n  \"note\": \"Swap in something new each spring\",\n  \"sort\": [\n    \"rating\",\n    \"desc\"\n  ],\n  \"media_type\": \"movies\"\n}'"
+            "source": "curl -X POST 'https://api.simkl.com/lists?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"name\": \"Movies to rewatch\",\n  \"privacy\": \"public\",\n  \"display_number\": true,\n  \"description\": {\n    \"short\": \"Comfort films for a slow weekend\",\n    \"full\": \"Films I come back to every year.\"\n  },\n  \"tags\": [\n    \"comfort\"\n  ],\n  \"private_tags\": [\n    \"weekend\"\n  ],\n  \"note\": \"Swap in something new each spring\",\n  \"sort\": [\n    \"rating\",\n    \"desc\"\n  ],\n  \"media_type\": \"movies\"\n}'"
           }
         ],
         "x-mint": {
@@ -13203,7 +13261,7 @@
               "application/json": {
                 "examples": {
                   "lists": {
-                    "description": "The test account's own lists with `followed=true`, first page at `limit=2`. `sort` at the top is the order actually served.",
+                    "description": "An account's own lists with `followed=true`, first page at `limit=2`. `sort` at the top is the order actually served.",
                     "summary": "Own library, including a followed list",
                     "value": {
                       "lists": [
@@ -14200,13 +14258,13 @@
                         "items": 0,
                         "likes": 0
                       },
-                      "created_at": "2026-11-13T16:57:16Z",
+                      "created_at": "2026-11-14T06:10:23Z",
                       "description": {
                         "full": "Films I come back to every year.",
                         "short": "Next year's comfort films"
                       },
                       "display_number": false,
-                      "id": 239268,
+                      "id": 239498,
                       "media_type": "movies",
                       "name": "Movies to rewatch in 2027",
                       "note": null,
@@ -14222,7 +14280,7 @@
                       "tags": [],
                       "top_items": [],
                       "type": "regular",
-                      "updated_at": "2026-11-13T16:57:17Z",
+                      "updated_at": "2026-11-14T06:10:24Z",
                       "user": {
                         "avatar": "https://us.simkl.in/img_tv/ico_profile_guest.png",
                         "id": 8199460,
@@ -17892,7 +17950,7 @@
     },
     "/oauth/token": {
       "post": {
-        "description": "Step 2 of OAuth 2.0. POST your authorization `code` here to receive an `access_token`. The success response carries `{access_token, token_type: \"bearer\", scope: \"public\", expires_in: 157680000}` — about 5 years. Save the token securely. **No refresh token is issued**; if a 401 arrives before that lifetime (user revoked from [Connected Apps](https://simkl.com/settings/connected-apps/)), send the user back through `/oauth/authorize` for a fresh consent.\n\n#### Wire format\n\nThe endpoint accepts both `application/x-www-form-urlencoded` (the RFC 6749 §3.2 default that most OAuth libraries use) and `application/json` — pick whichever your HTTP client prefers. Client credentials can be sent in **either** the request body (`client_id` + `client_secret`) **or** the `Authorization: Basic <base64(client_id:client_secret)>` header (RFC 6749 §2.3.1). All four combinations are equivalent. **Off-the-shelf OAuth libraries work out-of-the-box** with default configuration; see [OAuth client libraries](/api-reference/oauth-libraries) for live-tested examples across every popular runtime.\n\nTwo flows share this endpoint, distinguished by which secret you send:\n\n- **Confidential clients** (server-side web apps) send `client_secret` + `redirect_uri`.\n- **Public clients** (mobile, SPA, desktop, browser extensions) send `code_verifier` instead — no secret required. See the [Public PKCE walkthrough](/api-reference/oauth-pkce).\n\n#### Body fields\n\n| Field | Required | Notes |\n|---|---|---|\n| `grant_type` | yes | Must be `authorization_code`. |\n| `code` | yes | Authorization code returned to your `redirect_uri` (or, for PKCE-without-registered-URI, displayed on simkl.com). |\n| `client_id` | yes (in body or Basic Auth header) | Your app's `client_id`. |\n| `client_secret` | conditional | Confidential flow only. Mutually exclusive with `code_verifier`. May be sent in the body or in the `Authorization: Basic` header. |\n| `code_verifier` | conditional | PKCE flow only. The original verifier you generated locally; Simkl re-derives the challenge and matches it against what you sent on `/oauth/authorize`. |\n| `redirect_uri` | conditional | Required on the confidential flow (must match the URL registered for your app **byte-for-byte**). On PKCE, required only if you sent one to `/oauth/authorize` — and then it must match that one. |\n\n#### Errors\n\nAll failures return JSON with an `error` field (and usually a `message` field too). 401 responses additionally carry an RFC 6750 §3 `WWW-Authenticate: Bearer realm=\"api.simkl.com\", error=\"...\"` header.\n\n| Status | `error` | When |\n|---|---|---|\n| 403 | `empty_field` | A required body field is missing (`code`, `client_id`, `grant_type`, or both `client_secret`/`code_verifier`). |\n| 403 | `redirect_failed` | `redirect_uri` doesn't match the URL registered for the app. |\n| 401 | `secret_error` | Wrong `client_secret` (confidential flow) **or** PKCE verification failed (`message: \"PKCE verification failed\"`). |\n| 401 | `grant_error` | The `code` is invalid, expired, or already used. Codes are single-use — restart from `/oauth/authorize`. |\n\n<CardGroup cols={2}>\n <Card title=\"OAuth 2.0 walkthrough\" icon=\"lock\" href=\"/api-reference/oauth\" horizontal>\n Confidential-client (server-side) flow.\n </Card>\n <Card title=\"Public PKCE walkthrough\" icon=\"shield-keyhole\" href=\"/api-reference/oauth-pkce\" horizontal>\n Public-client flow with `code_verifier`.\n </Card>\n</CardGroup>\n\n**An AUTH V2 `client_id` cannot use this endpoint.** It is refused with `400 unauthorized_client` and a message pointing at `POST /oauth2/token`. A registration is V1 or V2, never both.",
+        "description": "Step 2 of OAuth 2.0. POST your authorization `code` here to receive an `access_token`. The success response carries `{access_token, token_type: \"bearer\", scope: \"public\", expires_in: 157680000}` — about 5 years. Save the token securely. **No refresh token is issued**; if a 401 arrives before that lifetime (user revoked from [Connected Apps](https://simkl.com/settings/connected-apps/)), send the user back through `/oauth/authorize` for a fresh consent.\n\n#### Wire format\n\nThe endpoint accepts both `application/x-www-form-urlencoded` (the RFC 6749 §3.2 default that most OAuth libraries use) and `application/json` — pick whichever your HTTP client prefers. Client credentials can be sent in **either** the request body (`client_id` + `client_secret`) **or** the `Authorization: Basic <base64(client_id:client_secret)>` header (RFC 6749 §2.3.1). All four combinations are equivalent. **Off-the-shelf OAuth libraries work out-of-the-box** with default configuration; see [OAuth client libraries](/api-reference/oauth-libraries) for working examples across every popular runtime.\n\nTwo flows share this endpoint, distinguished by which secret you send:\n\n- **Confidential clients** (server-side web apps) send `client_secret` + `redirect_uri`.\n- **Public clients** (mobile, SPA, desktop, browser extensions) send `code_verifier` instead — no secret required. See the [Public PKCE walkthrough](/api-reference/oauth-pkce).\n\n#### Body fields\n\n| Field | Required | Notes |\n|---|---|---|\n| `grant_type` | yes | Must be `authorization_code`. |\n| `code` | yes | Authorization code returned to your `redirect_uri` (or, for PKCE-without-registered-URI, displayed on simkl.com). |\n| `client_id` | yes (in body or Basic Auth header) | Your app's `client_id`. |\n| `client_secret` | conditional | Confidential flow only. Mutually exclusive with `code_verifier`. May be sent in the body or in the `Authorization: Basic` header. |\n| `code_verifier` | conditional | PKCE flow only. The original verifier you generated locally; Simkl re-derives the challenge and matches it against what you sent on `/oauth/authorize`. |\n| `redirect_uri` | conditional | Required on the confidential flow (must match the URL registered for your app **byte-for-byte**). On PKCE, required only if you sent one to `/oauth/authorize` — and then it must match that one. |\n\n#### Errors\n\nAll failures return JSON with an `error` field (and usually a `message` field too). 401 responses additionally carry an RFC 6750 §3 `WWW-Authenticate: Bearer realm=\"api.simkl.com\", error=\"...\"` header.\n\n| Status | `error` | When |\n|---|---|---|\n| 403 | `empty_field` | A required body field is missing (`code`, `client_id`, `grant_type`, or both `client_secret`/`code_verifier`). |\n| 403 | `redirect_failed` | `redirect_uri` doesn't match the URL registered for the app. |\n| 401 | `secret_error` | Wrong `client_secret` (confidential flow) **or** PKCE verification failed (`message: \"PKCE verification failed\"`). |\n| 401 | `grant_error` | The `code` is invalid, expired, or already used. Codes are single-use — restart from `/oauth/authorize`. |\n\n<CardGroup cols={2}>\n <Card title=\"OAuth 2.0 walkthrough\" icon=\"lock\" href=\"/api-reference/oauth\" horizontal>\n Confidential-client (server-side) flow.\n </Card>\n <Card title=\"Public PKCE walkthrough\" icon=\"shield-keyhole\" href=\"/api-reference/oauth-pkce\" horizontal>\n Public-client flow with `code_verifier`.\n </Card>\n</CardGroup>\n\n**An AUTH V2 `client_id` cannot use this endpoint.** It is refused with `400 unauthorized_client` and a message pointing at `POST /oauth2/token`. A registration is V1 or V2, never both.",
         "operationId": "post-oauth-token",
         "parameters": [
           {
@@ -23018,7 +23076,7 @@
               },
               "examples": {
                 "add_anime_completed": {
-                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                   "summary": "Add an anime to `completed`",
                   "value": {
                     "anime": [
@@ -23032,7 +23090,7 @@
                   }
                 },
                 "add_anime_dropped": {
-                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                   "summary": "Add an anime to `dropped`",
                   "value": {
                     "anime": [
@@ -23066,7 +23124,7 @@
                   }
                 },
                 "add_anime_hold": {
-                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                   "summary": "Add an anime to `hold`",
                   "value": {
                     "anime": [
@@ -23080,7 +23138,7 @@
                   }
                 },
                 "add_anime_plantowatch": {
-                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                   "summary": "Add an anime to `plantowatch`",
                   "value": {
                     "anime": [
@@ -23108,7 +23166,7 @@
                   }
                 },
                 "add_anime_watching": {
-                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                  "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                   "summary": "Add an anime to `watching`",
                   "value": {
                     "anime": [
@@ -23122,7 +23180,7 @@
                   }
                 },
                 "add_movie_completed_per_item": {
-                  "description": "Canonical body shape: media-type array of items, each with its own `to` field. Verified live against a real account (Parasite, simkl 752138).",
+                  "description": "Canonical body shape: media-type array of items, each with its own `to` field.",
                   "summary": "Add a single movie to `completed` (per-item `to`)",
                   "value": {
                     "movies": [
@@ -23136,7 +23194,7 @@
                   }
                 },
                 "add_movie_dropped_per_item": {
-                  "description": "Canonical body shape: media-type array of items, each with its own `to` field. Verified live against a real account (Parasite, simkl 752138).",
+                  "description": "Canonical body shape: media-type array of items, each with its own `to` field.",
                   "summary": "Add a single movie to `dropped` (per-item `to`)",
                   "value": {
                     "movies": [
@@ -23150,7 +23208,7 @@
                   }
                 },
                 "add_movie_plantowatch_per_item": {
-                  "description": "Canonical body shape: media-type array of items, each with its own `to` field. Verified live against a real account (Parasite, simkl 752138).",
+                  "description": "Canonical body shape: media-type array of items, each with its own `to` field.",
                   "summary": "Add a single movie to `plantowatch` (per-item `to`)",
                   "value": {
                     "movies": [
@@ -23205,7 +23263,7 @@
                   }
                 },
                 "add_show_completed": {
-                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                   "summary": "Add a TV show to `completed`",
                   "value": {
                     "shows": [
@@ -23219,7 +23277,7 @@
                   }
                 },
                 "add_show_dropped": {
-                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                   "summary": "Add a TV show to `dropped`",
                   "value": {
                     "shows": [
@@ -23252,7 +23310,7 @@
                   }
                 },
                 "add_show_hold": {
-                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                   "summary": "Add a TV show to `hold`",
                   "value": {
                     "shows": [
@@ -23266,7 +23324,7 @@
                   }
                 },
                 "add_show_plantowatch": {
-                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                   "summary": "Add a TV show to `plantowatch`",
                   "value": {
                     "shows": [
@@ -23294,7 +23352,7 @@
                   }
                 },
                 "add_show_watching": {
-                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                  "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                   "summary": "Add a TV show to `watching`",
                   "value": {
                     "shows": [
@@ -23385,7 +23443,7 @@
                   }
                 },
                 "negative_top_level_to_rejected": {
-                  "description": "**This shape is wrong** — the inherited apiary spec showed it as canonical, but the live server rejects it with `400 empty_field` (`Missed \"to\" parameter`). Per-item `to` is required.",
+                  "description": "**This shape is rejected** — `to` at the top level alone returns `400 empty_field` (`Missed \"to\" parameter`). Put `to` on each item.",
                   "summary": "REJECTED: `to` at top level alone (without per-item `to`)",
                   "value": {
                     "movies": [
@@ -23484,7 +23542,7 @@
                 },
                 "examples": {
                   "add_anime_completed": {
-                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                     "summary": "Add an anime to `completed`",
                     "value": {
                       "added": {
@@ -23507,7 +23565,7 @@
                     }
                   },
                   "add_anime_dropped": {
-                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                     "summary": "Add an anime to `dropped`",
                     "value": {
                       "added": {
@@ -23559,7 +23617,7 @@
                     }
                   },
                   "add_anime_hold": {
-                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                     "summary": "Add an anime to `hold`",
                     "value": {
                       "added": {
@@ -23582,7 +23640,7 @@
                     }
                   },
                   "add_anime_plantowatch": {
-                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                     "summary": "Add an anime to `plantowatch`",
                     "value": {
                       "added": {
@@ -23628,7 +23686,7 @@
                     }
                   },
                   "add_anime_watching": {
-                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.) Verified live with Demon Slayer (simkl 831411).",
+                    "description": "Anime use the `anime` array key in the REQUEST body. (In responses, anime entries are wrapped in `show:` for cross-catalog compatibility — see /conventions/null-values.)",
                     "summary": "Add an anime to `watching`",
                     "value": {
                       "added": {
@@ -23651,7 +23709,7 @@
                     }
                   },
                   "add_movie_completed_per_item": {
-                    "description": "Canonical body shape: media-type array of items, each with its own `to` field. Verified live against a real account (Parasite, simkl 752138).",
+                    "description": "Canonical body shape: media-type array of items, each with its own `to` field.",
                     "summary": "Add a single movie to `completed` (per-item `to`)",
                     "value": {
                       "added": {
@@ -23674,7 +23732,7 @@
                     }
                   },
                   "add_movie_dropped_per_item": {
-                    "description": "Canonical body shape: media-type array of items, each with its own `to` field. Verified live against a real account (Parasite, simkl 752138).",
+                    "description": "Canonical body shape: media-type array of items, each with its own `to` field.",
                     "summary": "Add a single movie to `dropped` (per-item `to`)",
                     "value": {
                       "added": {
@@ -23697,7 +23755,7 @@
                     }
                   },
                   "add_movie_plantowatch_per_item": {
-                    "description": "Canonical body shape: media-type array of items, each with its own `to` field. Verified live against a real account (Parasite, simkl 752138).",
+                    "description": "Canonical body shape: media-type array of items, each with its own `to` field.",
                     "summary": "Add a single movie to `plantowatch` (per-item `to`)",
                     "value": {
                       "added": {
@@ -23788,7 +23846,7 @@
                     }
                   },
                   "add_show_completed": {
-                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                     "summary": "Add a TV show to `completed`",
                     "value": {
                       "added": {
@@ -23811,7 +23869,7 @@
                     }
                   },
                   "add_show_dropped": {
-                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                     "summary": "Add a TV show to `dropped`",
                     "value": {
                       "added": {
@@ -23862,7 +23920,7 @@
                     }
                   },
                   "add_show_hold": {
-                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                     "summary": "Add a TV show to `hold`",
                     "value": {
                       "added": {
@@ -23885,7 +23943,7 @@
                     }
                   },
                   "add_show_plantowatch": {
-                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                     "summary": "Add a TV show to `plantowatch`",
                     "value": {
                       "added": {
@@ -23931,7 +23989,7 @@
                     }
                   },
                   "add_show_watching": {
-                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped). Verified live with The Walking Dead (simkl 2090).",
+                    "description": "TV shows accept all 5 watchlist statuses (movies are restricted to plantowatch/completed/dropped).",
                     "summary": "Add a TV show to `watching`",
                     "value": {
                       "added": {
@@ -24106,7 +24164,7 @@
               "application/json": {
                 "examples": {
                   "negative_top_level_to_rejected": {
-                    "description": "**This shape is wrong** — the inherited apiary spec showed it as canonical, but the live server rejects it with `400 empty_field` (`Missed \"to\" parameter`). Per-item `to` is required.",
+                    "description": "**This shape is rejected** — `to` at the top level alone returns `400 empty_field` (`Missed \"to\" parameter`). Put `to` on each item.",
                     "summary": "REJECTED: `to` at top level alone (without per-item `to`)",
                     "value": {
                       "code": 400,
@@ -26033,7 +26091,7 @@
                   }
                 },
                 "mark_whole_show_completed": {
-                  "description": "Most efficient way to mark an entire show watched: omit `seasons[]` AND `episodes[]`, set `status: \"completed\"`. The server iterates every episode of the series and marks them all watched. Response's `added.episodes` is the total count. Source-verified against the backend.",
+                  "description": "Most efficient way to mark an entire show watched: omit `seasons[]` AND `episodes[]`, set `status: \"completed\"`. The server iterates every episode of the series and marks them all watched. Response's `added.episodes` is the total count.",
                   "summary": "GRANULARITY: mark whole show — no seasons/episodes + status=completed",
                   "value": {
                     "shows": [
@@ -26690,7 +26748,7 @@
                     }
                   },
                   "mark_whole_show_completed": {
-                    "description": "Most efficient way to mark an entire show watched: omit `seasons[]` AND `episodes[]`, set `status: \"completed\"`. The server iterates every episode of the series and marks them all watched. Response's `added.episodes` is the total count. Source-verified against the backend.",
+                    "description": "Most efficient way to mark an entire show watched: omit `seasons[]` AND `episodes[]`, set `status: \"completed\"`. The server iterates every episode of the series and marks them all watched. Response's `added.episodes` is the total count.",
                     "summary": "GRANULARITY: mark whole show — no seasons/episodes + status=completed",
                     "value": {
                       "added": {

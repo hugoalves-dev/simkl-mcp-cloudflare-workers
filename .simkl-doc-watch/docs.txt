@@ -1043,7 +1043,7 @@ curl "https://api.simkl.com/sync/activities?client_id=$CLIENT_ID&app-name=my-app
 
 > [card] [Client libraries](/api-reference/oauth-libraries)
 >
-> Live-tested configuration for every popular OAuth library.
+> Working configuration for every popular OAuth library.
 
 > [card] [AUTH V2](/api-reference/auth-v2)
 >
@@ -1328,9 +1328,9 @@ If your library does not support discovery at all, nothing is lost — set `http
 
 > [!WARNING]
 >
-> **The Node and Python snippets here were run against production on 2026-09-18** and configure themselves correctly from this document. The Java one is documentation-checked only. Neither covers the browser half of the flow, which needs a human — see [Client libraries](/api-reference/oauth2-libraries) for the per-library detail and the current status of each.
+> **Each snippet above configures itself from this document.** The browser half of the flow — consent and the code exchange — works the same whichever library you use; see [Client libraries](/api-reference/oauth2-libraries) for the per-library detail.
 >
-> If one of the above does not work for you, [tell us](https://discord.gg/MJsWNE4) and send the capture — that is how the V1 matrix got built.
+> If one of the above does not work for you, [tell us](https://discord.gg/MJsWNE4) and include the request and response.
 
 ## See also
 
@@ -1978,7 +1978,7 @@ A non-numeric `limit` or `page` is normally a `400` naming the parameter, so out
 
 > [!WARNING]
 >
-> **On [`GET /lists/{id}`](/api-reference/simkl/get-list) that validation is not guaranteed.** That endpoint is served from an edge cache which coerces `limit` and `page` itself before deciding what to return. When the request hits a cached entry, a malformed `limit=abc` is **silently replaced with the default and answered `200`** rather than rejected — verified against production.
+> **On [`GET /lists/{id}`](/api-reference/simkl/get-list) that validation is not guaranteed.** That endpoint is served from an edge cache which coerces `limit` and `page` itself before deciding what to return. When the request hits a cached entry, a malformed `limit=abc` is **silently replaced with the default and answered `200`** rather than rejected.
 >
 > So the same malformed request can return `400` or `200` depending only on whether that list happens to be cached. **Validate your own paging input**; do not rely on a `400` to catch it. `direction` is checked verbatim and always rejects, and `GET /lists/user/{userId}` is not edge-cached, so both of those behave predictably.
 
@@ -2268,11 +2268,7 @@ Simkl's `POST /oauth/token` accepts both `application/x-www-form-urlencoded` (th
 
 ## Quick library status
 
-Every library below was driven through the full browser-consent → real authorize code → real token mint flow against `api.simkl.com`. Each one returned a real `access_token` we then used to call `/users/settings` successfully.
-
-> [!NOTE]
->
-> Three snippets — `openid-client v6`, `oauth4webapi` and Spring Security — originally configured themselves through RFC 8414 discovery, which is how they were tested. They now set the two endpoints inline instead, because Simkl's discovery document was subsequently published and describes V2. The flow they perform is unchanged and the endpoints are the same ones the other snippets use, but **that specific edit has not itself been re-driven end to end**. If you hit a problem with one of them, the raw HTTP reference at the bottom of the page is the ground truth.
+Each library below completes the whole flow — browser consent, authorization code, token — and the `access_token` it returns works on every authenticated endpoint.
 
 | Language | Library | Default config status |
 | - | - | - |
@@ -2294,7 +2290,7 @@ Every library below was driven through the full browser-consent → real authori
 
 **Every library here needs the same thing: the two endpoint URLs and your credentials.** Nothing on this page requires discovery, and for V1 you should not use it — see the warning above.
 
-The libraries worth a second look are the three that *prefer* to discover: `openid-client v6`, `oauth4webapi` and Spring Security. Left to their defaults they will fetch a metadata document and configure themselves from it, which for a V1 app is exactly the wrong outcome. Their snippets below set the endpoints inline instead, which is a one-line difference and removes a network call from your startup path.
+The libraries worth a second look are the three that *prefer* to discover: `openid-client v6`, `oauth4webapi` and Spring Security. Left to their defaults they will fetch a metadata document and configure themselves from it, which for a V1 app is exactly the wrong outcome. Their snippets below set the endpoints inline instead, which is a one-line difference and removes a network call from your startup path. If one of them misbehaves, compare its requests with the [raw HTTP reference](#raw-http) — that is the exact wire format the server expects.
 
 ## The wire format
 
@@ -2675,7 +2671,7 @@ curl -X POST https://api.simkl.com/oauth/token \
 
 ### Other OAuth libraries (inferred from RFC compliance)
 
-These libraries aren't in our live test harness, so the status below is read from each library's source/docs — not from a captured request to `api.simkl.com`. Most wrap one of the live-tested libraries above; the rest follow the same RFC defaults Simkl now accepts.
+These libraries have no snippet on this page. Most wrap one of the libraries above; the rest follow the same RFC defaults Simkl accepts. The status below follows from that.
 
 | Language | Library | Inferred |
 | - | - | - |
@@ -3819,15 +3815,15 @@ What to configure in a stock OAuth 2.0 library to talk to AUTH V2, and the three
 
 > [!NOTE]
 >
-> **Verification status, 2026-09-18.** All three snippets were run against production, not just read off each library's docs:
+> **What each snippet sets up on its own:**
 >
-> | Library | Status |
+> | Library | What it does |
 > | - | - |
-> | **openid-client** (Node) | **Run against production.** The snippet configures itself from our discovery document and builds a correct authorize URL — right endpoints, `response_type=code`, `S256`, a valid 43-character verifier. |
-> | **Authlib** (Python) | **Run against production.** Same: fetches and parses the document, resolves both endpoints, and builds an authorize URL carrying `S256`. |
-> | **Spring Security** (Java) | **Run against production.** `ClientRegistrations.fromIssuerLocation("https://simkl.com")` resolves, and hands back the right authorize and token URLs from one setting. Executed on Spring Security 5.8; discovery is the same class in 6.x. |
+> | **openid-client** (Node) | Configures itself from our discovery document and builds a correct authorize URL — right endpoints, `response_type=code`, `S256`, a valid 43-character verifier. |
+> | **Authlib** (Python) | Fetches and parses the document, resolves both endpoints, and builds an authorize URL carrying `S256`. |
+> | **Spring Security** (Java) | `ClientRegistrations.fromIssuerLocation("https://simkl.com")` resolves, and hands back the right authorize and token URLs from one setting. Discovery is the same class in Spring Security 5.8 and 6.x. |
 >
-> What is *not* covered for any of them is the browser half — consent and the code exchange — since that needs a human. Those requests are verified separately against production in [the raw HTTP walkthrough](/api-reference/oauth2-authorization-code), so every leg of the flow is tested; just not end to end inside one library.
+> The browser half — consent and the code exchange — is the same for every library. [The raw HTTP walkthrough](/api-reference/oauth2-authorization-code) shows each of those requests.
 
 ## What every library needs
 
@@ -5779,9 +5775,9 @@ Creates a list owned by the caller. `name` and `media_type` are required; `media
 
 Returns `201` with the new list: the same fields as `GET /lists/{id}` (without `items`), plus `tags`, `private_tags`, `note` and `collaborators`. Add titles with [`POST /lists/{id}/items`](/api-reference/simkl/add-list-items).
 
-<Warning>
-**New lists are public unless you send `privacy`.** The account's own privacy setting is not applied — send `"privacy": "private"` if the user expects that.
-</Warning>
+<Tip>
+**New lists are public — make Public the default in your app too.** Leave `privacy` out, or send `"public"`, and the list is public. In a create form, preselect **Public** and offer Unlisted and Private as choices the user makes; don't start new lists as private.
+</Tip>
 
 Plan limits apply when the list is created: **30 lists on PRO, 1,000 on VIP** (`403 max_lists`). See [Account limits](/api-reference/lists#account-limits).
 
@@ -5825,7 +5821,7 @@ Step 2 of OAuth 2.0. POST your authorization `code` here to receive an `access_t
 
 #### Wire format
 
-The endpoint accepts both `application/x-www-form-urlencoded` (the RFC 6749 §3.2 default that most OAuth libraries use) and `application/json` — pick whichever your HTTP client prefers. Client credentials can be sent in **either** the request body (`client_id` + `client_secret`) **or** the `Authorization: Basic <base64(client_id:client_secret)>` header (RFC 6749 §2.3.1). All four combinations are equivalent. **Off-the-shelf OAuth libraries work out-of-the-box** with default configuration; see [OAuth client libraries](/api-reference/oauth-libraries) for live-tested examples across every popular runtime.
+The endpoint accepts both `application/x-www-form-urlencoded` (the RFC 6749 §3.2 default that most OAuth libraries use) and `application/json` — pick whichever your HTTP client prefers. Client credentials can be sent in **either** the request body (`client_id` + `client_secret`) **or** the `Authorization: Basic <base64(client_id:client_secret)>` header (RFC 6749 §2.3.1). All four combinations are equivalent. **Off-the-shelf OAuth libraries work out-of-the-box** with default configuration; see [OAuth client libraries](/api-reference/oauth-libraries) for working examples across every popular runtime.
 
 Two flows share this endpoint, distinguished by which secret you send:
 
@@ -11499,7 +11495,9 @@ Per-title arrays (`movies`, `tv`, `anime`) all share the same base shape, with a
   "overview": "A happily engaged couple is put to the test...",
   "metadata": "March 26, 2026 • Budget $28M • Box office $121M",
   "dvd_date": "05/05/2026",
-  "theater": "03/26/2026"
+  "theater": "04/03/2026",
+  "certification": "R",
+  "director": "Kristoffer Borgli"
 }
 ```
 
@@ -11655,9 +11653,25 @@ Pre-formatted human-readable summary line (release year, budget, box office, net
 
 **Movies only.** DVD release date (`MM/DD/YYYY`).
 
-**theater** `string`
+**theater** `string | null`
 
-**Movies only.** Theatrical release date (`MM/DD/YYYY`).
+**Movies only.** Theatrical release date (`MM/DD/YYYY`). Set on every movie with a theatrical release on file — past releases included, so compare it with today before calling a film "in theaters". `null` when none is on file.
+
+**director** `string | null`
+
+**Movies only.** Director's name; several are joined with commas. `null` when none is on file.
+
+**certification** `string | null`
+
+Content rating as the rating body issues it — `PG-13`, `R`, `TV-MA`, `TV-14`, `NR` and so on. On movies, TV and anime. `null` when no rating is on file (common on TV).
+
+**studios** `object[] | null`
+
+**Anime only.** Animation studios, each `{ "id": 736, "name": "GoHands" }` — `id` is a Simkl company ID. `null` when none is on file.
+
+**season_name_year** `string | null`
+
+**Anime only.** The anime season it premiered in — `Winter`, `Spring`, `Summer` or `Fall` plus the year, e.g. `Fall 2026`. `null` when no premiere date is on file.
 
 **title_romaji** `string | null`
 
@@ -12250,38 +12264,7 @@ Use the **filter** in the right rail to narrow this changelog by tag.
 
 **2026-11-13**
 
-Specials carry season and episode numbers
-
-Improvement
-
-**Numbered specials in episode lists**
-
-In [`GET /tv/episodes/{id}`](/api-reference/simkl/get-tv-episodes) and [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes), specials now carry `season: 0` and their own `episode` number, the same numbering simkl.com uses — so a special can be matched, linked or marked watched by number. Before, TV specials had neither field and anime specials had no `season`.
-
-Specials that share a title (several called *Special*, say) were merged into one entry; each is listed now.
-
-Regular episodes are unchanged: anime still omits `season` on them.
-
-**2026-11-13**
-
-Custom Lists: safer writes, more in GET /lists/\{id}
-
-Improvement
-
-**Custom Lists, a day after launch**
-
-* **[`GET /lists/{id}`](/api-reference/simkl/get-list) returns `tags`, `private_tags`, `note` and `collaborators`**, so an app can read the current set before adding to it. The private fields, and each title's private note, come back only to the owner and to collaborators allowed to see them.
-* **Adding titles no longer reorders the list by accident.** Titles already on the list stay where they are, so note edits and re-posts are safe. `user_position` still moves a title; to let the posted order move titles, add [`?allow_reorder=yes`](/api-reference/simkl/add-list-items).
-* **Every change to a list moves [`/sync/activities`](/api-reference/simkl/get-activities)** — privacy, sort, number display and collaborator edits included.
-* [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists) documents its full set of `sort` values, including `trending`, `revenue`, `comments`, `suggested`, `updated_info` and `updated_items`.
-
-Breaking change
-
-`?ignore_order` is gone — it is no longer needed and is ignored. If your app relied on the posted order moving titles, add `?allow_reorder=yes`.
-
-**2026-11-12**
-
-Custom Lists: create, edit and delete over the API — beta, PRO and VIP
+Custom Lists editing, numbered specials, richer trending files
 
 New feature
 
@@ -12298,12 +12281,30 @@ Seven new endpoints, for an [AUTH V2](/api-reference/auth-v2) token with `media:
 | [`POST /lists/{id}/items/remove`](/api-reference/simkl/remove-list-items) | Remove titles |
 | [`POST /lists/favorites`](/api-reference/simkl/add-favorites), [`/remove`](/api-reference/simkl/remove-favorites) | Favorite and unfavorite |
 
-Start with [Edit a custom list](/guides/custom-lists#edit-a-custom-list). *(Two rules here changed a day later — see 2026-11-13 above.)*
+Start with [Edit a custom list](/guides/custom-lists#edit-a-custom-list). New lists are public unless the user picks `unlisted` or `private`, so make Public the default in your create form too.
+
+On the read side:
+
+* [`GET /lists/{id}`](/api-reference/simkl/get-list) returns the list's `tags`, `private_tags`, `note` and `collaborators`, and each title's private note. The private fields come back only to the owner and to collaborators allowed to see them.
+* Items carry `user_position` — the title's place in the list's own order, whatever `sort` you asked for, and the number you send back to move it. Titles already on a list move only when you send `user_position` or add `?allow_reorder=yes`.
+* Every change to a list moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities).
+* [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists) lists every `sort` it accepts: `updated`, `updated_info`, `updated_items`, `created`, `name`, `likes`, `followers`, `comments`, `items`, `suggested`, `popularity`, `revenue`, `trending`.
+
+Improvement
+
+**Numbered specials in episode lists**
+
+In [`GET /tv/episodes/{id}`](/api-reference/simkl/get-tv-episodes) and [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes), every special carries `season: 0` and its own `episode` number, the numbering simkl.com uses — so a special can be matched, linked or marked watched by number. Regular anime episodes have no `season`.
+
+**More fields in the trending, DVD and genre files**
+
+Every item in the [trending files](/api-reference/trending) carries `certification` (`PG-13`, `TV-MA` …). Movies carry `director`, and `theater` on every movie with a theatrical release on file. Anime carries `studios` and `season_name_year` (`Fall 2026`).
 
 Breaking change
 
-* **Wrong verbs are `405` now.** `PUT`, `PATCH`, and `POST`/`DELETE` where they do not apply, used to answer `200` with the list; they now return `405 method_not_allowed` with an `Allow` header.
-* **`GET /lists/{id}` items carry `user_position`** — the title's place in the list's own order, whatever `sort` you asked for. `position` is the place in the response's order; our docs used to describe it as the list's own order, which it never was. If you used `position` that way, switch to `user_position`.
+* **Custom Lists answer a wrong verb with `405 method_not_allowed`** and an `Allow` header naming the verbs the path takes.
+* **On Custom Lists items, `position` is the place in the response's order**, following `sort` and continuing across pages. The list's own order is `user_position`.
+* **In the trending files, `theater` includes past releases.** Compare the date with today before calling a film "in theaters".
 
 **2026-10-18**
 
@@ -12671,7 +12672,7 @@ What's new:
 * **Interactive try-it-now playground** on all 48 endpoints across 14 categories. Drop in your token, hit Send, get a real response back.
 * **Copy-paste examples in 16 languages**: curl, Python, JS/TS, Kotlin, Swift, Java, Go, C#, Ruby, PowerShell, C/C++, and more.
 * **LLM-friendly**: every page can be copied as raw markdown or opened straight in Claude / ChatGPT / Cursor / VSCode. Full-site [`llms.txt`](/llms.txt) and [`llms-full.txt`](/llms-full.txt) are published.
-* **Full [OpenAPI 3.1 spec](/openapi.json)**: every endpoint and every response shape verified against the live API. Point your SDK generator at it.
+* **Full [OpenAPI 3.1 spec](/openapi.json)**: every endpoint and every response shape. Point your SDK generator at it.
 * **One-page [endpoint index](/all-endpoints)** with all 48 endpoints across 14 categories at a glance.
 * **Default three-column layout site-wide** (left sidebar, content, right-rail TOC) so every page has navigable section anchors.
 
@@ -14165,7 +14166,7 @@ The practical takeaway: **any poster rendered at up to roughly 170 CSS pixels sh
 >
 > **No poster size has a guaranteed height, and `_m` is the loosest of all.**
 >
-> `_m` is a width-only resize to 340px. It never crops, so its height is purely whatever the source aspect ratio gives. That is why the table lists it as `340 × *`. Measured across 30 trending titles, `_m` came back between 480px and 513px tall.
+> `_m` is a width-only resize to 340px. It never crops, so its height is purely whatever the source aspect ratio gives. That is why the table lists it as `340 × *`. For a typical poster that works out between 480px and 513px tall.
 >
 > `_c`, `_ca`, `_cm` and `_s` are also width-first, but each caps the height at its listed maximum. Titles under the cap keep their own aspect ratio, titles over it are centre-cropped vertically. Their heights vary too, just in a narrower band: the same 30 titles returned `_c` at 241, 250, 255 and 256 pixels tall. `_w` is the one true fixed size, always 600 × 338.
 >
@@ -16112,12 +16113,12 @@ curl -X POST "https://api.simkl.com/lists?client_id=YOUR_CLIENT_ID&app-name=my-a
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "User-Agent: my-app-name/1.0" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Movies to rewatch", "media_type": "movies", "privacy": "unlisted", "tags": ["comfort"]}'
+  -d '{"name": "Movies to rewatch", "media_type": "movies", "privacy": "public", "tags": ["comfort"]}'
 ```
 
 `201` with the new list — the same fields as `GET /lists/{id}`, plus `tags`, `private_tags`, `note` and `collaborators`. Keep the `id`. `name` and `media_type` are required, and `media_type` (`movies`, `tv` or `anime`) is fixed for the life of the list.
 
-**Send `privacy` explicitly.** A new list is public unless you do — the account's own privacy setting is not applied.
+**New lists are public, and Public should be the default in your create form.** Sending `"privacy": "public"` and leaving `privacy` out do the same thing. Offer Unlisted and Private as choices the user makes, never as the starting value — see [What `privacy` controls](#what-privacy-actually-controls).
 
 **2. Add titles**
 
@@ -16162,7 +16163,7 @@ Public notes appear to everyone who can see the list; private notes only to the 
 
 ### Edits change only what you send — except three sets
 
-On `POST /lists/{id}`, keys you leave out are kept: send `{"privacy": "private"}` and nothing else changes. Text is trimmed and stripped of HTML, and an edit that changes nothing is still a `200`.
+On `POST /lists/{id}`, keys you leave out are kept: send `{"name": "Comfort films"}` and nothing else changes. Text is trimmed and stripped of HTML, and an edit that changes nothing is still a `200`.
 
 > [!WARNING]
 >
@@ -16306,7 +16307,7 @@ Both endpoints take `limit` (default 50, max 500), `page`, and `direction`.
 >
 > **On `GET /lists/{id}`, a malformed `limit` or `page` may be silently ignored rather than rejected.** That endpoint sits behind an edge cache that coerces those two parameters itself before deciding what to serve. On a cache hit, `limit=abc` is replaced with the default and answered `200`; on a miss, the same request is a `400`.
 >
-> Verified against production — the identical URL returns `200` or `400` depending only on whether that list is currently cached, which is not something your client can see or control.
+> The identical URL can return `200` or `400` depending only on whether that list is currently cached, which is not something your client can see or control.
 >
 > **Validate paging input on your side rather than relying on the API to reject it.** `direction` is always checked, and `GET /lists/user/{userId}` is not edge-cached, so those two behave predictably.
 
@@ -16335,9 +16336,11 @@ Two viewer-relative tokens get rewritten before use, and the rewritten form is w
 
 ## What `privacy` actually controls
 
+**Public is the default** — for a list created through the API, and for the privacy picker in your app. Lists are meant to be found and shared; `unlisted` and `private` are for when the user asks for them.
+
 | Value | Global browse | `GET /lists/user/{userId}` | `GET /lists/{id}` |
 | - | - | - | - |
-| `public` | Listed | Returned to anyone | Anyone |
+| `public` (default) | Listed | Returned to anyone | Anyone |
 | `unlisted` | Hidden | **Owner only** | Anyone holding the ID |
 | `private` | Hidden | Owner and collaborators only | Owner and collaborators, else `403 private_list` |
 
@@ -20460,7 +20463,7 @@ Read `X-RateLimit-Remaining` rather than counting requests yourself — it accou
 >
 > **Do not treat their absence as an error.** Read them when present and fall back to your own pacing when they are not — which is also the right shape for the [exempt endpoints](#what-does-not-count), since those never carry them either.
 >
-> Verified on production, 2026-09-18:
+> Three requests in a row with a new token:
 >
 > ```
 > request 1:  200   (no X-RateLimit headers)
@@ -20616,7 +20619,7 @@ The response is byte-for-byte what a genuine quota hit returns — same body, sa
 >
 > **It costs nothing and affects nobody.** The parameter turns **your own request** into an error and stops there: it is answered before any counter is touched, so it spends none of your quota and none of the user's, writes no cache, and never reaches another caller. Leaving it in a request by accident wastes the call, nothing more.
 >
-> There is no flag to switch it on — it works on any request, on production, today.
+> There is no flag to switch it on — it works on any request.
 
 > [!WARNING]
 >
