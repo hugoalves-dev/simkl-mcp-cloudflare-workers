@@ -6430,6 +6430,8 @@ Note the block is nested one level deeper than the others on that endpoint:
 read `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is
 `favorites` (plural) while a list's own `type` is `favorite` (singular).
 
+**Every request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` on an event (or at most once an hour), refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so changes to lists the user only follows or collaborates on do not move them. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
+
 
 # Movie details
 Source: https://api.simkl.org/api-reference/simkl/get-movie
@@ -6923,6 +6925,8 @@ single show moves `favorites` and nothing else.
 Note the block is nested one level deeper than the others on that endpoint:
 read `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is
 `favorites` (plural) while a list's own `type` is `favorite` (singular).
+
+**Every request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` on an event (or at most once an hour), refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so changes to lists the user only follows or collaborates on do not move them. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
 
 
 # Get the user's rated items, filtered by type and rating
@@ -16183,7 +16187,6 @@ Moving titles that are already on the list needs the `rearrange` permission from
 * **Writes for one user run one at a time.** A second write that arrives while the first is running waits briefly, then gets `400 rate_limit` — *Your lists are being updated, try again in a minute*. Send a user's list writes in sequence and retry that error after a moment; never in parallel. Writes also count against the normal [1 POST per second](/resources/rate-limits).
 * **`sort` is saved as given.** `["rating", "desc"]` sets the list's own order, but the token is not checked against the sorts simkl.com offers — a typo is saved and the list falls back to some other order. Use the tokens your own UI offers, and `["position", "asc"]` for the manual order.
 * **Your own writes move [`/sync/activities`](/guides/sync#custom-lists-have-their-own-timestamps).** Every change to a list moves `custom_lists`, so save the new timestamps into your snapshot after writing rather than treating the next poll as a remote change.
-* **Every write clears the cache for that list**, so a `GET /lists/{id}` right after shows the change.
 * **Wrong verbs are `405`**, with an `Allow` header. Edits are `POST`, not `PUT` or `PATCH`.
 
 ### Collaborators and list types
@@ -16238,6 +16241,38 @@ Beyond that, refresh on an explicit pull-to-refresh and nothing else. There is n
 > **Auto lists need the opposite instinct.** Their contents are rebuilt about once a day and [the activity timestamp does not move when that happens](/guides/sync#custom-lists-have-their-own-timestamps) — so a signal-driven client would never refresh them at all.
 >
 > Refresh an auto list **at most once a day**, and only when the user opens it. Do not refresh one on every open, and do not put it on a timer: the data underneath changes daily at most, so anything more frequent is guaranteed to return what you already have.
+
+## Syncing lists from a background service
+
+A service that runs with nobody watching — a media-server plugin that mirrors lists into collections, a backup or export job, a bot, a sync to another service — is where list traffic gets out of hand. **Every request it makes comes out of the user's daily allowance**: 1,000 a day on PRO and 10,000 on VIP, shared with every other app they have connected. When a service spends it, the user's other apps start getting `429` too.
+
+The numbers add up fast. Re-reading a PRO user's 30 lists once an hour is 720 requests a day — almost three quarters of their allowance — and nearly every one of them returns what you already had.
+
+### Check one timestamp, not the lists
+
+1. **Start every run with [`GET /sync/activities`](/api-reference/simkl/get-activities).** If `custom_lists.lists.all` matches what you saved last time, stop. Nothing in the user's lists changed, and the run cost one request.
+2. **When it moved, find out which lists.** Fetch the index once — [`GET /lists/user/{userId}`](/api-reference/simkl/get-user-lists) with `limit=500` — and compare each list's `updated_at` with your stored copy. The [activity buckets](/guides/sync#custom-lists-have-their-own-timestamps) tell you which kinds to skip: if only `favorites` moved, the user's other lists did not change.
+3. **Refetch only the lists whose `updated_at` moved**, with `limit=500`, every page. At the default `limit` of 50 a 2,000-title list takes 40 requests; at 500 it takes 4.
+4. **Save the new timestamps after your own writes**, or the next run refetches what you just wrote.
+
+### How often
+
+* **Run on events, not on a clock.** Check when something gives you a reason: the user opened your app or pressed refresh, a library scan finished, a playback session ended.
+* **With no events to hook into, check `/sync/activities` at most once an hour** — 24 requests a day. Never put the lists themselves on a schedule.
+* **No nightly full re-read "to be safe".** Every change to a list the user owns moves the activity timestamp, so a full pass only confirms what you already have. Re-read everything on the first run, or when you have lost your stored state — not otherwise.
+
+### Two kinds of list the timestamp does not cover
+
+* **Auto lists.** Their contents are rebuilt about once a day without moving `/sync/activities`. Refresh each one at most once a day.
+* **Lists the user follows or collaborates on.** The activity timestamps belong to the list's **owner**. When someone else changes a list your user follows or collaborates on, your user's `/sync/activities` does not move. If you mirror those lists, check their index (`?followed=true`, `?collaborants=true`) at most once a day, and refetch only the lists whose `updated_at` moved.
+
+### When the allowance runs low
+
+* **Read `X-RateLimit-Remaining`** on every response and slow down well before it reaches zero, leaving room for the user's other apps.
+* **On `429 user_limit_exceeded`, stop all work for that user** until `Retry-After` has passed. The allowance resets at midnight US Eastern; retrying sooner only fails again.
+* **Send one user's requests in sequence**, never in parallel.
+
+See [Rate limits](/resources/rate-limits) for the headers and the reset time.
 
 ## The 200 that is not a list
 
@@ -16407,7 +16442,7 @@ The Watchlist sync endpoints are unaffected by any of this — Custom Lists are 
 >
 > [Fetch lazily, cache locally](#fetch-lazily-cache-locally) has the three rules that matter: render the index from `top_items` without opening any list, serve the cache on back-navigation, and refetch only when `updated_at` says a list actually changed.
 >
-> **Poll [`/sync/activities`](/api-reference/simkl/get-activities) rather than the lists themselves.** It carries `custom_lists.lists.all`, which moves when the user's lists change — their titles, names, descriptions, notes or tags — see [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps). One cheap call tells you whether a refetch is needed at all, instead of pulling lists on a timer to find out nothing changed.
+> **Poll [`/sync/activities`](/api-reference/simkl/get-activities) rather than the lists themselves.** It carries `custom_lists.lists.all`, which moves when the user's lists change — their titles, names, descriptions, notes or tags — see [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps). One cheap call tells you whether a refetch is needed at all, instead of pulling lists on a timer to find out nothing changed. Running a background service? Follow [Syncing lists from a background service](#syncing-lists-from-a-service).
 >
 > Writes count like any other `POST`: one per second, and one at a time per user — see [Before you ship](#before-you-ship).
 >
@@ -19018,6 +19053,8 @@ Read `custom_lists.lists.all`, not `custom_lists.all` — the extra level leaves
 
 **Your own [writes](/guides/custom-lists#edit-a-custom-list) move these timestamps too.** After writing, save the new values into your snapshot, or your next poll will refetch the list you just changed.
 
+**These timestamps belong to the list's owner.** Any change to a list — by the owner or a collaborator — moves the owner's `custom_lists`. A user who follows or collaborates on someone else's list sees nothing move when that list changes; see [lists the timestamp does not cover](/guides/custom-lists#syncing-lists-from-a-service).
+
 **This is the gate the Custom Lists endpoints did not previously have.** It is already in the snapshot you save every poll, so compare it with the saved copy and only refetch lists when it moves. That is the difference between polling a user's lists on a timer and touching them a handful of times a day.
 
 ### Use `all` as the gate, the four buckets as the router
@@ -19079,6 +19116,7 @@ The sync loop above is cheap, but only when you trigger it on user-visible event
 | - | - |
 | **Mobile / TV apps** | App launch · Wake from background · Pull-to-refresh. Throttle to **once every 15–30 min** to prevent rapid-switch spam. |
 | **Media servers (Plex / Kodi / Jellyfin / Emby)** | Hook into library-scan-completed events, or run when a playback session ends and the user returns to the home screen. |
+| **Background list services** | Check `/sync/activities` on an event — or at most once an hour if the service has none — and refetch only the lists whose `updated_at` moved. Never schedule the lists themselves. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service). |
 | **All platforms** | Always allow a manual override (a refresh button, pull-to-refresh, or a menu item). |
 | **Never** | Unconditional polling timers without active user interaction — no `setInterval(sync, 60_000)` in the background. |
 
