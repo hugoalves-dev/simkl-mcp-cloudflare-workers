@@ -2008,6 +2008,8 @@ A non-numeric `limit` or `page` is normally a `400` naming the parameter, so out
 
 Gate on `all`, then branch on the four buckets to refresh only the kind that moved — a user favouriting one show moves `favorites` and nothing else, so it costs one list refresh rather than a full re-read. The [sync guide](/guides/sync#custom-lists-have-their-own-timestamps) has the full pattern.
 
+**Every list request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` when the user is active — at most once a day when nobody visits — refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so lists the user only follows or collaborates on need their own daily check. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
+
 > [!WARNING]
 >
 > **Two things to get right.** The timestamps are nested one level deeper than every other block on that endpoint — read `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is `favorites` (plural) while a list's own `type` field is `favorite` (singular); a lookup keyed on one silently misses the other.
@@ -2048,6 +2050,10 @@ A known path with the wrong verb is **`405 method_not_allowed`**, with an `Allow
 > [card] [POST /lists/\{id}/items](/api-reference/simkl/add-list-items)
 >
 > Add, move and annotate titles.
+
+> [card] [Syncing lists from a service](/guides/custom-lists#syncing-lists-from-a-service)
+>
+> How often a background service should check, and what to refetch.
 
 > [card] [Custom lists guide](/guides/custom-lists)
 >
@@ -5874,7 +5880,7 @@ Returns the most recent update timestamps for each of the user's lists. **Always
 | `all` | Newest timestamp anywhere in this response — every domain block, `settings`, `custom_lists`, ratings and playback. If it hasn't moved since your saved snapshot, nothing has. |
 | `settings.all` | Updates to account settings (name, time zone, …) at https://simkl.com/settings/. |
 | `tv_shows`, `anime`, `movies` | Per-domain timestamp groups. |
-| `custom_lists.lists` | Custom Lists timestamps, one level deeper than the other blocks — see [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps). |
+| `custom_lists.lists` | Custom Lists timestamps, one level deeper than the other blocks — see [Custom Lists have their own timestamps](/guides/sync#custom-lists-have-their-own-timestamps). A background service nobody visits checks at most once a day — see [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service). |
 
 #### Per-domain timestamps
 
@@ -6430,7 +6436,7 @@ Note the block is nested one level deeper than the others on that endpoint:
 read `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is
 `favorites` (plural) while a list's own `type` is `favorite` (singular).
 
-**Every request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` on an event (or at most once an hour), refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so changes to lists the user only follows or collaborates on do not move them. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
+**Every request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` when the user is active (at most once a day when nobody visits), refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so changes to lists the user only follows or collaborates on do not move them. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
 
 
 # Movie details
@@ -6926,7 +6932,7 @@ Note the block is nested one level deeper than the others on that endpoint:
 read `custom_lists.lists.all`, not `custom_lists.all`. And the bucket is
 `favorites` (plural) while a list's own `type` is `favorite` (singular).
 
-**Every request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` on an event (or at most once an hour), refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so changes to lists the user only follows or collaborates on do not move them. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
+**Every request spends the user's daily allowance**, shared with every app they have connected. A background service should check `/sync/activities` when the user is active (at most once a day when nobody visits), refetch only the lists whose `updated_at` moved, and never re-read lists on a schedule. The timestamps belong to the list's **owner**, so changes to lists the user only follows or collaborates on do not move them. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
 
 
 # Get the user's rated items, filtered by type and rating
@@ -8070,7 +8076,7 @@ Changes a list's details. **Send only what changes** — keys you leave out are 
 
 **List types.** A recommendation list keeps its name and takes no collaborators; a favorite list takes no collaborators; an auto list keeps its own sort. Each is `400 list_error`.
 
-**Activity.** Any change moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities); an edit that changes nothing does not.
+**Activity.** Any change moves `custom_lists` in [`/sync/activities`](/api-reference/simkl/get-activities); an edit that changes nothing does not. Save the new timestamps after writing, so your next check does not refetch the list you just changed — see [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
 
 # Sync
 Source: https://api.simkl.org/api-reference/sync
@@ -16186,7 +16192,7 @@ Moving titles that are already on the list needs the `rearrange` permission from
 
 * **Writes for one user run one at a time.** A second write that arrives while the first is running waits briefly, then gets `400 rate_limit` — *Your lists are being updated, try again in a minute*. Send a user's list writes in sequence and retry that error after a moment; never in parallel. Writes also count against the normal [1 POST per second](/resources/rate-limits).
 * **`sort` is saved as given.** `["rating", "desc"]` sets the list's own order, but the token is not checked against the sorts simkl.com offers — a typo is saved and the list falls back to some other order. Use the tokens your own UI offers, and `["position", "asc"]` for the manual order.
-* **Your own writes move [`/sync/activities`](/guides/sync#custom-lists-have-their-own-timestamps).** Every change to a list moves `custom_lists`, so save the new timestamps into your snapshot after writing rather than treating the next poll as a remote change.
+* **Your own writes move [`/sync/activities`](/guides/sync#custom-lists-have-their-own-timestamps).** Every change to a list moves `custom_lists`, so save the new timestamps into your snapshot after writing rather than treating the next poll as a remote change. A background service should check at most once a day when nobody visits — see [Syncing lists from a background service](#syncing-lists-from-a-service).
 * **Wrong verbs are `405`**, with an `Allow` header. Edits are `POST`, not `PUT` or `PATCH`.
 
 ### Collaborators and list types
@@ -16203,7 +16209,7 @@ Collaborators are set on [`POST /lists/{id}`](/api-reference/simkl/update-list) 
 
 ## Fetch lazily, cache locally
 
-Custom Lists are the easiest endpoint on the API to over-call, because the natural UI — a screen of lists, each opening into its items — invites a fetch per screen. Three rules keep an app that browses lists constantly down to a handful of requests a day.
+Custom Lists are the easiest endpoint on the API to over-call, because the natural UI — a screen of lists, each opening into its items — invites a fetch per screen. Three rules keep an app that browses lists constantly down to a handful of requests a day. A service that runs without a user in front of it has stricter rules — see [Syncing lists from a background service](#syncing-lists-from-a-service).
 
 ### 1. Render the lists screen without fetching any list
 
@@ -16257,9 +16263,9 @@ The numbers add up fast. Re-reading a PRO user's 30 lists once an hour is 720 re
 
 ### How often
 
-* **Run on events, not on a clock.** Check when something gives you a reason: the user opened your app or pressed refresh, a library scan finished, a playback session ended.
-* **With no events to hook into, check `/sync/activities` at most once an hour** — 24 requests a day. Never put the lists themselves on a schedule.
-* **No nightly full re-read "to be safe".** Every change to a list the user owns moves the activity timestamp, so a full pass only confirms what you already have. Re-read everything on the first run, or when you have lost your stored state — not otherwise.
+* **Check when the user is there.** Opening your app, pressing refresh or finishing something they watched is a reason to look.
+* **A service nobody visits checks at most once a day.** A mirror, a backup or a bot that runs unattended needs one `/sync/activities` call a day, and nothing more when it has not moved. Never put the lists themselves on a schedule.
+* **No scheduled full re-read "to be safe".** Every change to a list the user owns moves the activity timestamp, so a full pass only confirms what you already have. Re-read everything on the first run, or when you have lost your stored state — not otherwise.
 
 ### Two kinds of list the timestamp does not cover
 
@@ -19116,7 +19122,7 @@ The sync loop above is cheap, but only when you trigger it on user-visible event
 | - | - |
 | **Mobile / TV apps** | App launch · Wake from background · Pull-to-refresh. Throttle to **once every 15–30 min** to prevent rapid-switch spam. |
 | **Media servers (Plex / Kodi / Jellyfin / Emby)** | Hook into library-scan-completed events, or run when a playback session ends and the user returns to the home screen. |
-| **Background list services** | Check `/sync/activities` on an event — or at most once an hour if the service has none — and refetch only the lists whose `updated_at` moved. Never schedule the lists themselves. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service). |
+| **Background list services** | Check `/sync/activities` when the user is active — and **at most once a day** when nobody visits — then refetch only the lists whose `updated_at` moved. Never schedule the lists themselves. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service). |
 | **All platforms** | Always allow a manual override (a refresh button, pull-to-refresh, or a menu item). |
 | **Never** | Unconditional polling timers without active user interaction — no `setInterval(sync, 60_000)` in the background. |
 
@@ -20713,6 +20719,8 @@ The response is byte-for-byte what a genuine quota hit returns — same body, sa
 > [accordion] Sync incrementally
 >
 > Always check [`/sync/activities`](/api-reference/simkl/get-activities) before pulling watchlists. Skip watchlists whose timestamp didn't change. See the [Sync guide](/guides/sync) for the two-phase model.
+>
+> The same goes for [Custom Lists](/guides/custom-lists): refetch only the lists whose `updated_at` moved, and from a background service nobody visits, check at most once a day. See [Syncing lists from a background service](/guides/custom-lists#syncing-lists-from-a-service).
 
 > [accordion] Batch writes — one POST per second is enough for arrays of 50+ items
 >
