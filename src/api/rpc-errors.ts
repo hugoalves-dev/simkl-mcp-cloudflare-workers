@@ -1,5 +1,6 @@
 import { SimklApiError, type SimklResponseHeaders } from './client.js';
 import { CustomListCooldownError } from './custom-lists.js';
+import { LibrarySyncLimitError, LibraryWriteInvalidationError } from '../library/errors.js';
 
 /**
  * Workers RPC delivers a thrown error as a plain Error whose message is
@@ -11,7 +12,9 @@ const HEADER_KEYS = ['rateLimitLimit', 'rateLimitRemaining', 'retryAfter', 'last
 
 type Payload =
   | { type: 'SimklApiError'; statusCode: number; upstreamCode: string; headers: SimklResponseHeaders; writeMayHaveSucceeded: boolean }
-  | { type: 'CustomListCooldownError'; retryAfterSeconds: number };
+  | { type: 'CustomListCooldownError'; retryAfterSeconds: number }
+  | { type: 'LibrarySyncLimitError'; phase: string; operation: string; media: string; status?: string }
+  | { type: 'LibraryWriteInvalidationError' };
 
 export function encodeRpcError(error: unknown): unknown {
   let payload: Payload | undefined;
@@ -22,8 +25,13 @@ export function encodeRpcError(error: unknown): unknown {
     };
   } else if (error instanceof CustomListCooldownError) {
     payload = { type: 'CustomListCooldownError', retryAfterSeconds: error.retryAfterSeconds };
+  } else if (error instanceof LibrarySyncLimitError) {
+    payload = { type: 'LibrarySyncLimitError', phase: error.phase, operation: error.operation, media: error.media, ...(error.status ? { status: error.status } : {}) };
+  } else if (error instanceof LibraryWriteInvalidationError) {
+    payload = { type: 'LibraryWriteInvalidationError' };
   }
-  return payload ? new Error(`${MARKER}${JSON.stringify(payload)}`) : error;
+  // Keep the original text first: logs and existing message assertions still read naturally.
+  return payload ? new Error(`${(error as Error).message} ${MARKER}${JSON.stringify(payload)}`) : error;
 }
 
 export function decodeRpcError(error: unknown): unknown {
@@ -34,6 +42,17 @@ export function decodeRpcError(error: unknown): unknown {
   try { payload = JSON.parse(error.message.slice(index + MARKER.length)); }
   catch { return error; }
 
+  if (payload.type === 'LibraryWriteInvalidationError') return new LibraryWriteInvalidationError();
+  if (payload.type === 'LibrarySyncLimitError') {
+    const { phase, operation, media, status } = payload;
+    if ((phase === 'initial' || phase === 'incremental')
+      && ['baseline', 'delta', 'ratings', 'membership'].includes(String(operation))
+      && ['shows', 'movies', 'anime'].includes(String(media))
+      && (status === undefined || ['watching', 'plantowatch', 'hold', 'completed', 'dropped'].includes(String(status)))) {
+      return new LibrarySyncLimitError(phase, operation as 'baseline', media as 'shows', status as string | undefined);
+    }
+    return error;
+  }
   if (payload.type === 'CustomListCooldownError') {
     const seconds = payload.retryAfterSeconds;
     return new CustomListCooldownError(Number.isSafeInteger(seconds) && (seconds as number) > 0 ? seconds as number : 60);

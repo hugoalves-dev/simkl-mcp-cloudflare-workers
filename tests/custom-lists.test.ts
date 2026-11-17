@@ -339,3 +339,17 @@ describe('Custom Lists adapter', () => {
     expect(handlers.size).toBe(9);
   });
 });
+
+describe('library errors across RPC', () => {
+  test('sync-limit and write-invalidation errors are rebuilt with their user-facing messages', async () => {
+    const { LibrarySyncLimitError, LibraryWriteInvalidationError } = await import('../src/library/errors');
+    const rpc = (error: Error) => new Error(`${error.name}: ${error.message}`);
+    const limit = decodeRpcError(rpc(encodeRpcError(new LibrarySyncLimitError('incremental', 'delta', 'shows', 'watching')) as Error));
+    expect(limit).toBeInstanceOf(LibrarySyncLimitError);
+    expect((limit as Error).message).not.toContain('SIMKL_RPC_ERROR');
+    expect(decodeRpcError(rpc(encodeRpcError(new LibraryWriteInvalidationError()) as Error))).toBeInstanceOf(LibraryWriteInvalidationError);
+    const plain = new Error('Library cache is not initialized');
+    expect(encodeRpcError(plain)).toBe(plain);
+    expect(decodeRpcError(plain)).toBe(plain);
+  });
+});

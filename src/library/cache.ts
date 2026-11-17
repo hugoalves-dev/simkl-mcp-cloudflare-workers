@@ -52,11 +52,13 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     };
     const result = this.queuedOperations === 1 ? run() : previous.then(run);
     this.queue = result.then(() => undefined, () => undefined);
-    return result;
+    // enqueue is only used at the public RPC surface: Workers RPC drops error
+    // classes and fields, so encode what the adapter needs to rebuild them.
+    return result.catch(error => { throw encodeRpcError(error); });
   }
 
   ensureInitialized(accessToken: string): Promise<LibraryInitialization> {
-    if (this.initialization) return this.initialization;
+    if (this.initialization) return this.initialization.catch(error => { throw encodeRpcError(error); });
     return this.enqueue(() => this.ensureInitializedInternal(accessToken));
   }
 
