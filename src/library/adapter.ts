@@ -1,10 +1,11 @@
 import { SimklApiError, type RequestOptions, type SimklResponseHeaders, type SimklClient } from '../api/client';
 import { normalizeSimklId } from './identity';
-type SimklAuthProps = { simklToken: string; simklUserId?: string };
+import { CustomListCooldownError, CustomListScopeError, type CustomListRequestOptions, type CustomListResponse } from '../api/custom-lists.js';
+type SimklAuthProps = { simklToken: string; simklUserId?: string; simklScope?: string };
 import type { SimklLibraryCache } from './cache';
 import type { LibraryItems } from './types';
 import type { RewatchRow } from './rewatches.js';
-import { LibrarySyncLimitError, LibraryWriteInvalidationError } from './errors';
+import { LibrarySyncLimitError, LibraryWriteInvalidationError, SimklAuthRequiredError } from './errors';
 export interface LibraryAdapter {
   read(force?: boolean): Promise<LibraryItems>;
   refresh(): Promise<{ status: 'refreshed' | 'suppressed'; retryAfterSeconds?: number }>;
@@ -14,12 +15,29 @@ export interface LibraryAdapter {
   getSettings(expectedToken?: string): Promise<Record<string, unknown>>;
   invalidateSettings(expectedToken?: string): Promise<void>;
   write(path: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }, token?: string): Promise<unknown>;
+  accountId(): Promise<string>;
+  customListRequest(path: string, options: CustomListRequestOptions): Promise<CustomListResponse>;
+}
+
+/**
+ * Only a known AUTH V2 read-only grant (`media:read` without `media:write`) is
+ * refused locally. Unknown or V1 (`public`) scopes are left for Simkl to judge.
+ */
+export function hasMediaWriteScope(scope: unknown): boolean {
+  if (typeof scope !== 'string') return true;
+  const scopes = scope.split(/[\s,]+/).filter(Boolean);
+  return !scopes.includes('media:read') || scopes.includes('media:write');
 }
 export const verifiedAccountId = normalizeSimklId;
 function restoreRpcError(error: unknown): unknown {
-  if (error instanceof SimklApiError || error instanceof LibrarySyncLimitError) return error;
+  if (error instanceof SimklApiError || error instanceof LibrarySyncLimitError || error instanceof CustomListCooldownError) return error;
   if (!error || typeof error !== 'object') return error;
   const remote = error as Record<string, unknown>;
+  // Workers RPC may drop custom error names; the message carries the seconds either way.
+  if (remote.name === 'CustomListCooldownError' || /^This Simkl account reached its AUTH V2 daily allowance\. Custom List requests are paused/.test(String(remote.message))) {
+    const seconds = Number(remote.retryAfterSeconds ?? /about (\d+) more seconds/.exec(String(remote.message))?.[1]);
+    return new CustomListCooldownError(Number.isSafeInteger(seconds) && seconds > 0 ? seconds : 60);
+  }
   if (remote.name === 'LibrarySyncLimitError'
     && (remote.phase === 'initial' || remote.phase === 'incremental')
     && ['baseline', 'delta', 'ratings', 'membership'].includes(String(remote.operation))
@@ -48,7 +66,7 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
   async function stub() {
     const props = getProps();
     const token = props?.simklToken;
-    if (!token) throw new Error('Simkl authentication required');
+    if (!token) throw new SimklAuthRequiredError();
     let userId = verifiedAccountId(props?.simklUserId);
     if (!userId) {
       if (!memo || memo.token !== token) {
@@ -117,6 +135,15 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       const { object, token } = await stub();
       if (expectedToken !== undefined && token !== expectedToken) throw new Error('Simkl account token changed during rewatch authorization; retry the operation');
       try { await object.invalidateSettings(token); }
+      catch (error) { throw restoreRpcError(error); }
+    },
+    async accountId() {
+      return (await stub()).userId;
+    },
+    async customListRequest(path, options) {
+      if (options.method !== 'GET' && !hasMediaWriteScope(getProps()?.simklScope)) throw new CustomListScopeError();
+      const { object, token } = await stub();
+      try { return await object.customListRequest(token, path, options); }
       catch (error) { throw restoreRpcError(error); }
     },
     async write(path, options, expectedToken) {

@@ -1,3 +1,5 @@
+import { SimklInputError } from './errors.js';
+
 export type SimklCalendarType = 'tv' | 'anime' | 'movies';
 
 const calendarFileByType: Record<SimklCalendarType, string> = {
@@ -7,10 +9,37 @@ const calendarFileByType: Record<SimklCalendarType, string> = {
 };
 
 const DAY_MS = 86_400_000;
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Simkl publishes monthly v2 archives from July 2024 through the current month + 3.
+// Any other month is a CDN 404, so reject it locally instead of spending a request.
+const FIRST_ARCHIVE_MONTH = 2024 * 12 + 6;
+const FUTURE_ARCHIVE_MONTHS = 3;
+
+function monthIndex(year: number, month: number): number {
+  return year * 12 + (month - 1);
+}
+
+function monthLabel(index: number): string {
+  return `${MONTH_NAMES[index % 12]} ${Math.floor(index / 12)}`;
+}
+
+export function simklCalendarArchiveRange(now = new Date()): { first: number; last: number } {
+  return {
+    first: FIRST_ARCHIVE_MONTH,
+    last: monthIndex(now.getUTCFullYear(), now.getUTCMonth() + 1) + FUTURE_ARCHIVE_MONTHS,
+  };
+}
+
+function isArchivedMonth(year: number, month: number, now: Date): boolean {
+  const { first, last } = simklCalendarArchiveRange(now);
+  const index = monthIndex(year, month);
+  return index >= first && index <= last;
+}
 
 function validExplicitDate(date: string): { day: string; year: number; month: number } {
   const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(date);
-  if (!match) throw new Error('Invalid calendar date: expected today, tomorrow, or DD-MM-YYYY');
+  if (!match) throw new SimklInputError('Invalid calendar date: expected today, tomorrow, or DD-MM-YYYY');
 
   const [, dayText, monthText, yearText] = match;
   const day = Number(dayText);
@@ -20,14 +49,14 @@ function validExplicitDate(date: string): { day: string; year: number; month: nu
   validated.setUTCFullYear(year, month - 1, day);
   if (year < 1 || validated.getUTCFullYear() !== year
     || validated.getUTCMonth() !== month - 1 || validated.getUTCDate() !== day) {
-    throw new Error('Invalid calendar date');
+    throw new SimklInputError('Invalid calendar date');
   }
   return { day: validated.toISOString().slice(0, 10), year, month };
 }
 
 export function simklCalendarPath(type: SimklCalendarType, date?: string): string {
   const calendarFile = calendarFileByType[type];
-  if (!calendarFile) throw new Error(`Unsupported calendar type: ${type}`);
+  if (!calendarFile) throw new SimklInputError(`Unsupported calendar type: ${type}`);
 
   if (!date || date === 'today' || date === 'tomorrow') {
     return `https://data.simkl.in/calendar/v2/${calendarFile}.json`;
@@ -74,7 +103,7 @@ export function resolveSimklCalendarDay(
 ): SimklCalendarDay {
   // Explicitly require an IANA zone, not a machine-local zone or an offset.
   if (!/^(?:UTC|[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+)$/.test(timeZone)) {
-    throw new Error('Invalid calendar time zone: expected an IANA time zone (e.g. America/Sao_Paulo)');
+    throw new SimklInputError('Invalid calendar time zone: expected an IANA time zone (e.g. America/Sao_Paulo)');
   }
   let formatter: Intl.DateTimeFormat;
   try {
@@ -83,7 +112,7 @@ export function resolveSimklCalendarDay(
       calendar: 'gregory', numberingSystem: 'latn',
     });
   } catch {
-    throw new Error('Invalid calendar time zone: expected an IANA time zone (e.g. America/Sao_Paulo)');
+    throw new SimklInputError('Invalid calendar time zone: expected an IANA time zone (e.g. America/Sao_Paulo)');
   }
 
   let day: string;
@@ -92,7 +121,12 @@ export function resolveSimklCalendarDay(
     const utcDay = Date.parse(`${currentDay}T00:00:00.000Z`);
     day = new Date(utcDay + (date === 'tomorrow' ? DAY_MS : 0)).toISOString().slice(0, 10);
   } else {
-    day = validExplicitDate(date).day;
+    const explicit = validExplicitDate(date);
+    if (!isArchivedMonth(explicit.year, explicit.month, now)) {
+      const { first, last } = simklCalendarArchiveRange(now);
+      throw new SimklInputError(`Calendar date ${date} is outside the Simkl calendar archive: use a date from ${monthLabel(first)} through ${monthLabel(last)}, or today/tomorrow.`);
+    }
+    day = explicit.day;
   }
 
   const nextDay = new Date(Date.parse(`${day}T00:00:00.000Z`) + DAY_MS).toISOString().slice(0, 10);
@@ -103,6 +137,7 @@ export function simklCalendarPaths(
   type: SimklCalendarType,
   date: string | undefined,
   interval: SimklCalendarDay,
+  now = new Date(),
 ): string[] {
   const relative = !date || date === 'today' || date === 'tomorrow';
   const paths = relative ? [simklCalendarPath(type)] : [];
@@ -118,6 +153,8 @@ export function simklCalendarPaths(
   if (!relative || months.size > 1) {
     for (const month of months) {
       const [year, monthNumber] = month.split('-');
+      // An adjacent UTC month outside the archive (e.g. June 2024) does not exist.
+      if (!isArchivedMonth(Number(year), Number(monthNumber), now)) continue;
       paths.push(simklCalendarPath(type, `01-${monthNumber}-${year}`));
     }
   }

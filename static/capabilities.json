@@ -134,7 +134,7 @@
             ]
           },
           "sort": {
-            "description": "Result order. `relevance` (default) puts the best match first; `release-date` newest first; `last-air-date` most recently aired first — **TV and anime only**, a `400` on `movie`; `title` A–Z; `rank` m",
+            "description": "Result order. `relevance` (default) puts the best match first; `release-date` newest first; `last-air-date` most recently aired first — **TV and anime only**: a `400` on `movie`, and accepted with `al",
             "type": "string",
             "enum": [
               "relevance",
@@ -351,9 +351,6 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": [
-                  "ids"
-                ],
                 "additionalProperties": {}
               },
               "show": {
@@ -409,9 +406,6 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": [
-                  "ids"
-                ],
                 "additionalProperties": {}
               },
               "anime": {
@@ -476,9 +470,6 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": [
-                  "ids"
-                ],
                 "additionalProperties": {}
               },
               "episode": {
@@ -578,9 +569,6 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": [
-                  "ids"
-                ],
                 "additionalProperties": {}
               },
               "show": {
@@ -636,9 +624,6 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": [
-                  "ids"
-                ],
                 "additionalProperties": {}
               },
               "anime": {
@@ -703,9 +688,6 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": [
-                  "ids"
-                ],
                 "additionalProperties": {}
               },
               "episode": {
@@ -841,9 +823,6 @@
                       "additionalProperties": {}
                     }
                   },
-                  "required": [
-                    "ids"
-                  ],
                   "additionalProperties": {}
                 }
               },
@@ -1015,9 +994,6 @@
                       }
                     }
                   },
-                  "required": [
-                    "ids"
-                  ],
                   "additionalProperties": {}
                 }
               },
@@ -1189,16 +1165,10 @@
                       }
                     }
                   },
-                  "required": [
-                    "ids"
-                  ],
                   "additionalProperties": {}
                 }
               }
             },
-            "required": [
-              "to"
-            ],
             "additionalProperties": {}
           }
         },
@@ -1309,7 +1279,7 @@
                 },
                 "rewatch_id": {
                   "type": "integer",
-                  "minimum": 1,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
                 "rewatch_status": {
@@ -1321,9 +1291,6 @@
                   ]
                 }
               },
-              "required": [
-                "ids"
-              ],
               "additionalProperties": {}
             }
           },
@@ -1499,7 +1466,7 @@
                 },
                 "rewatch_id": {
                   "type": "integer",
-                  "minimum": 1,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
                 "rewatch_status": {
@@ -1511,9 +1478,6 @@
                   ]
                 }
               },
-              "required": [
-                "ids"
-              ],
               "additionalProperties": {}
             }
           },
@@ -1697,7 +1661,7 @@
                 },
                 "rewatch_id": {
                   "type": "integer",
-                  "minimum": 1,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
                 "rewatch_status": {
@@ -1709,9 +1673,6 @@
                   ]
                 }
               },
-              "required": [
-                "ids"
-              ],
               "additionalProperties": {}
             }
           },
@@ -1807,13 +1768,10 @@
                 },
                 "rewatch_id": {
                   "type": "integer",
-                  "minimum": 1,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "ids"
-              ],
               "additionalProperties": {}
             }
           },
@@ -1986,13 +1944,10 @@
                 },
                 "rewatch_id": {
                   "type": "integer",
-                  "minimum": 1,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "ids"
-              ],
               "additionalProperties": {}
             }
           },
@@ -2165,13 +2120,10 @@
                 },
                 "rewatch_id": {
                   "type": "integer",
-                  "minimum": 1,
+                  "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "ids"
-              ],
               "additionalProperties": {}
             }
           },
@@ -2474,13 +2426,13 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "rating": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 10
-                    },
-                    "rated_at": {
+                    "title": {
                       "type": "string"
+                    },
+                    "year": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "ids": {
                       "type": "object",
@@ -2542,10 +2494,6 @@
                       "additionalProperties": {}
                     }
                   },
-                  "required": [
-                    "rating",
-                    "ids"
-                  ],
                   "additionalProperties": {}
                 }
               },
@@ -2554,13 +2502,13 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "rating": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 10
-                    },
-                    "rated_at": {
+                    "title": {
                       "type": "string"
+                    },
+                    "year": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "ids": {
                       "type": "object",
@@ -2620,12 +2568,103 @@
                         }
                       },
                       "additionalProperties": {}
+                    },
+                    "seasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "number": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "episodes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "season": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "number": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "watched_at": {
+                                  "type": "string"
+                                },
+                                "ids": {
+                                  "type": "object",
+                                  "properties": {
+                                    "simkl": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "slug": {
+                                      "type": "string"
+                                    },
+                                    "imdb": {
+                                      "type": "string"
+                                    },
+                                    "tmdb": {
+                                      "type": "string"
+                                    },
+                                    "tvdb": {
+                                      "type": "string"
+                                    },
+                                    "mal": {
+                                      "type": "string"
+                                    },
+                                    "anidb": {
+                                      "type": "string"
+                                    },
+                                    "anilist": {
+                                      "type": "string"
+                                    },
+                                    "kitsu": {
+                                      "type": "string"
+                                    },
+                                    "anisearch": {
+                                      "type": "string"
+                                    },
+                                    "animeplanet": {
+                                      "type": "string"
+                                    },
+                                    "livechart": {
+                                      "type": "string"
+                                    },
+                                    "letterboxd": {
+                                      "type": "string"
+                                    },
+                                    "netflix": {
+                                      "type": "string"
+                                    },
+                                    "hulu": {
+                                      "type": "string"
+                                    },
+                                    "crunchyroll": {
+                                      "type": "string"
+                                    },
+                                    "traktslug": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "additionalProperties": {}
+                            }
+                          }
+                        },
+                        "additionalProperties": {}
+                      }
                     }
                   },
-                  "required": [
-                    "rating",
-                    "ids"
-                  ],
                   "additionalProperties": {}
                 }
               },
@@ -2634,13 +2673,13 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "rating": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 10
-                    },
-                    "rated_at": {
+                    "title": {
                       "type": "string"
+                    },
+                    "year": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "ids": {
                       "type": "object",
@@ -2700,12 +2739,103 @@
                         }
                       },
                       "additionalProperties": {}
+                    },
+                    "seasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "number": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "episodes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "season": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "number": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "watched_at": {
+                                  "type": "string"
+                                },
+                                "ids": {
+                                  "type": "object",
+                                  "properties": {
+                                    "simkl": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "slug": {
+                                      "type": "string"
+                                    },
+                                    "imdb": {
+                                      "type": "string"
+                                    },
+                                    "tmdb": {
+                                      "type": "string"
+                                    },
+                                    "tvdb": {
+                                      "type": "string"
+                                    },
+                                    "mal": {
+                                      "type": "string"
+                                    },
+                                    "anidb": {
+                                      "type": "string"
+                                    },
+                                    "anilist": {
+                                      "type": "string"
+                                    },
+                                    "kitsu": {
+                                      "type": "string"
+                                    },
+                                    "anisearch": {
+                                      "type": "string"
+                                    },
+                                    "animeplanet": {
+                                      "type": "string"
+                                    },
+                                    "livechart": {
+                                      "type": "string"
+                                    },
+                                    "letterboxd": {
+                                      "type": "string"
+                                    },
+                                    "netflix": {
+                                      "type": "string"
+                                    },
+                                    "hulu": {
+                                      "type": "string"
+                                    },
+                                    "crunchyroll": {
+                                      "type": "string"
+                                    },
+                                    "traktslug": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "additionalProperties": {}
+                            }
+                          }
+                        },
+                        "additionalProperties": {}
+                      }
                     }
                   },
-                  "required": [
-                    "rating",
-                    "ids"
-                  ],
                   "additionalProperties": {}
                 }
               }
@@ -3685,6 +3815,1353 @@
         "required": [
           "body"
         ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_user_custom_lists",
+      "description": "List a user’s custom lists with pagination. Omit user_id for your own account (includes private/unlisted lists and pinned flags). Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Call only on explicit user request: every call spends the user’s shared daily allowance, so never poll or re-read lists on a schedule.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "description": "Numeric Simkl user ID. Omit for the authenticated account.",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "description": "1-based page; page × limit cannot exceed 10000.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "description": "Items per page, 1-500. Defaults to 50.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "updated",
+              "created",
+              "name",
+              "likes",
+              "followers",
+              "items",
+              "popularity"
+            ]
+          },
+          "followed": {
+            "description": "Include lists the user follows.",
+            "type": "boolean"
+          },
+          "collaborants": {
+            "description": "Include lists the user collaborates on (own account only).",
+            "type": "boolean"
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_get_custom_list",
+      "description": "Get one custom list’s details and a page of its titles. A free account receives an upgrade placeholder, reported as an error rather than list data. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Call only on explicit user request: every call spends the user’s shared daily allowance, so never poll or re-read lists on a schedule.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric Simkl custom list ID."
+          },
+          "page": {
+            "description": "1-based page; page × limit cannot exceed 10000.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "description": "Items per page, 1-500. Defaults to 50.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "sort": {
+            "description": "Free-form order token; unknown tokens silently fall back. Omit to use the owner’s order.",
+            "type": "string",
+            "maxLength": 40
+          },
+          "extended": {
+            "description": "Add an overview to every item.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_create_custom_list",
+      "description": "Create a custom list. name and media_type are required; media_type cannot change later. New lists are public unless privacy is set. Plan limits: 30 lists on PRO, 1,000 on VIP. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "movies",
+              "tv",
+              "anime"
+            ]
+          },
+          "privacy": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ]
+          },
+          "description": {
+            "description": "Send either key alone; the other is kept. \"\" clears one.",
+            "type": "object",
+            "properties": {
+              "short": {
+                "type": "string",
+                "maxLength": 140
+              },
+              "full": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "note": {
+            "description": "Owner’s private note on the whole list. \"\" clears it.",
+            "type": "string"
+          },
+          "display_number": {
+            "description": "Show rank numbers beside titles.",
+            "type": "boolean"
+          },
+          "sort": {
+            "description": "The list’s own default order. Refused on auto lists.",
+            "type": "object",
+            "properties": {
+              "by": {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]{1,40}$",
+                "description": "Order token, e.g. position (manual order), rating, title, added."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "by"
+            ],
+            "additionalProperties": false
+          },
+          "tags": {
+            "description": "REPLACES the whole public tag set; [] removes all tags.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^[^,\"'<>]+$"
+            }
+          },
+          "private_tags": {
+            "description": "REPLACES the whole private tag set; [] removes all.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^[^,\"'<>]+$"
+            }
+          },
+          "collaborators": {
+            "description": "REPLACES the whole collaborator set: anyone omitted is removed, [] removes everyone. Adding someone new needs VIP.",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Simkl user ID the caller follows."
+                },
+                "permissions": {
+                  "description": "Omit or [] for read-only access.",
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "full",
+                      "privacy",
+                      "list_type",
+                      "default_sort",
+                      "title",
+                      "description",
+                      "public_tags",
+                      "private_tags",
+                      "background",
+                      "add",
+                      "suggest",
+                      "delete",
+                      "rearrange",
+                      "import",
+                      "public_notes",
+                      "read_private_notes",
+                      "edit_private_notes",
+                      "comments"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "user"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "media_type"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_update_custom_list",
+      "description": "Edit a custom list’s details. Send only fields that change; omitted fields are kept. tags, private_tags and collaborators each REPLACE the whole set: read the list first and send the complete desired set. media_type cannot change; titles are edited with simkl_add_custom_list_items. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric Simkl custom list ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "privacy": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ]
+          },
+          "description": {
+            "description": "Send either key alone; the other is kept. \"\" clears one.",
+            "type": "object",
+            "properties": {
+              "short": {
+                "type": "string",
+                "maxLength": 140
+              },
+              "full": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "note": {
+            "description": "Owner’s private note on the whole list. \"\" clears it.",
+            "type": "string"
+          },
+          "display_number": {
+            "description": "Show rank numbers beside titles.",
+            "type": "boolean"
+          },
+          "sort": {
+            "description": "The list’s own default order. Refused on auto lists.",
+            "type": "object",
+            "properties": {
+              "by": {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]{1,40}$",
+                "description": "Order token, e.g. position (manual order), rating, title, added."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "by"
+            ],
+            "additionalProperties": false
+          },
+          "tags": {
+            "description": "REPLACES the whole public tag set; [] removes all tags.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^[^,\"'<>]+$"
+            }
+          },
+          "private_tags": {
+            "description": "REPLACES the whole private tag set; [] removes all.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "pattern": "^[^,\"'<>]+$"
+            }
+          },
+          "collaborators": {
+            "description": "REPLACES the whole collaborator set: anyone omitted is removed, [] removes everyone. Adding someone new needs VIP.",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Simkl user ID the caller follows."
+                },
+                "permissions": {
+                  "description": "Omit or [] for read-only access.",
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "full",
+                      "privacy",
+                      "list_type",
+                      "default_sort",
+                      "title",
+                      "description",
+                      "public_tags",
+                      "private_tags",
+                      "background",
+                      "add",
+                      "suggest",
+                      "delete",
+                      "rearrange",
+                      "import",
+                      "public_notes",
+                      "read_private_notes",
+                      "edit_private_notes",
+                      "comments"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "user"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_delete_custom_list",
+      "description": "Permanently delete a custom list with its titles, likes, follows and comments. There is no undo. Owner or a collaborator with full permission only. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric Simkl custom list ID."
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_add_custom_list_items",
+      "description": "Add titles to a custom list, move them with user_position, or set their notes, in one request (up to 1000 titles). New titles go to the end in posted order; titles already on the list keep their place unless user_position or allow_reorder is used. Titles of the wrong media type come back in wrong_type. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric Simkl custom list ID."
+          },
+          "allow_reorder": {
+            "description": "Let the posted order move titles already on the list. Without it, existing titles stay put and only user_position moves a title.",
+            "type": "boolean"
+          },
+          "movies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "note": {
+                  "description": "Public note shown to everyone who can see the list; private note for the owner and permitted collaborators.",
+                  "type": "object",
+                  "properties": {
+                    "public": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "private": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "user_position": {
+                  "description": "1-based position in the list’s own order. Titles after it shift down; past the end means the end.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "note": {
+                  "description": "Public note shown to everyone who can see the list; private note for the owner and permitted collaborators.",
+                  "type": "object",
+                  "properties": {
+                    "public": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "private": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "user_position": {
+                  "description": "1-based position in the list’s own order. Titles after it shift down; past the end means the end.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "note": {
+                  "description": "Public note shown to everyone who can see the list; private note for the owner and permitted collaborators.",
+                  "type": "object",
+                  "properties": {
+                    "public": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "private": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "user_position": {
+                  "description": "1-based position in the list’s own order. Titles after it shift down; past the end means the end.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_remove_custom_list_items",
+      "description": "Remove titles from a custom list (up to 1000). Titles not on the list come back in not_found. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Numeric Simkl custom list ID."
+          },
+          "movies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "list_id"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_add_favorites",
+      "description": "Favorite titles (the heart on simkl.com). Each title goes to the account’s favorite list of its own media type, creating it if needed. Same ordering rules as simkl_add_custom_list_items. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "allow_reorder": {
+            "description": "Let the posted order move titles already on the list. Without it, existing titles stay put and only user_position moves a title.",
+            "type": "boolean"
+          },
+          "movies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "note": {
+                  "description": "Public note shown to everyone who can see the list; private note for the owner and permitted collaborators.",
+                  "type": "object",
+                  "properties": {
+                    "public": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "private": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "user_position": {
+                  "description": "1-based position in the list’s own order. Titles after it shift down; past the end means the end.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "note": {
+                  "description": "Public note shown to everyone who can see the list; private note for the owner and permitted collaborators.",
+                  "type": "object",
+                  "properties": {
+                    "public": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "private": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "user_position": {
+                  "description": "1-based position in the list’s own order. Titles after it shift down; past the end means the end.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "note": {
+                  "description": "Public note shown to everyone who can see the list; private note for the owner and permitted collaborators.",
+                  "type": "object",
+                  "properties": {
+                    "public": {
+                      "type": "string",
+                      "maxLength": 4096
+                    },
+                    "private": {
+                      "type": "string",
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "user_position": {
+                  "description": "1-based position in the list’s own order. Titles after it shift down; past the end means the end.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "destructiveHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "simkl_remove_favorites",
+      "description": "Unfavorite titles. Titles that are not favorites come back in not_found. Simkl Custom Lists are a beta PRO/VIP feature and need the user’s AUTH V2 token. Requires the media:write scope. Writes for one account run one at a time; an ambiguous failure is never replayed automatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "movies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "anime": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "description": "Any supported write ID: simkl (or simkl_id), imdb, tmdb, tvdb, mal, anidb, anilist, kitsu, livechart, anisearch, animeplanet, netflix, letterboxd, traktslug, crunchyroll, hulu. Send every ID you have. slug is response-only and is rejected."
+                },
+                "title": {
+                  "description": "Title fallback when no ID is known; add year to disambiguate.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "season": {
+                  "description": "Anime only: add the entry covering this season. 0 means no hint.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "seasons": {
+                  "description": "Anime only: several seasons at once; each becomes its own entry.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "number"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {

@@ -7,7 +7,8 @@ export interface MediaItem {
   date?: string;
   ids?: { simkl_id?: number; simkl?: number; imdb?: string; slug?: string };
   ratings?: { simkl?: { rating?: number } };
-  episode?: { episode?: number };
+  anime_type?: string;
+  episode?: { season?: number; episode?: number };
 }
 
 export type SimklMediaType = 'tv' | 'movies' | 'anime';
@@ -50,8 +51,18 @@ export const asAiring: ItemFormatter = (item, index, type) => {
   const id = simklId(item);
   const url = type ? simklItemUrl(type, id, item.ids?.slug) : undefined;
   const label = url ? `[SIMKL #${id}](${url})` : `[SIMKL #${id ?? 'unknown'}]`;
-  return `${index}: ${label} - ${item.title} - ep ${item.episode?.episode || '?'} at ${item.date || 'TBA'}`;
+  return `${index}: ${label} - ${item.title} - ${airingSlot(item)} at ${item.date || 'TBA'}`;
 };
+
+// Movie releases (and anime movies) have no episode object: never invent "ep ?".
+function airingSlot(item: MediaItem): string {
+  const episode = item.episode;
+  if (!episode || item.anime_type === 'movie') {
+    return item.anime_type ? `${item.anime_type} release` : 'release';
+  }
+  const number = episode.episode === undefined ? '?' : String(episode.episode);
+  return episode.season === 0 ? `special ep ${number}` : `ep ${number}`;
+}
 
 export function formatList(
   items: MediaItem[],

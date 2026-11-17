@@ -84,11 +84,13 @@ export const toolsWhitelist: ToolConfig[] = [
   },
 
   // scrobble
-  { path: '/scrobble/start', method: 'post', responseFormat: {
+  // Simkl documents allow_rewatch as a /scrobble/stop flag; on start/pause it
+  // silently applies to the previous playback, so only simkl_stop_watching exposes it.
+  { path: '/scrobble/start', method: 'post', omitParams: ['allow_rewatch'], responseFormat: {
     type: 'simple',
     template: (_: any, args: any) => `started: ${args.movie?.title || args.show?.title}`
   }},
-  { path: '/scrobble/pause', method: 'post', responseFormat: {
+  { path: '/scrobble/pause', method: 'post', omitParams: ['allow_rewatch'], responseFormat: {
     type: 'simple',
     template: (_: any, args: any) => {
       const body = args.body || args;

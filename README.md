@@ -130,11 +130,25 @@ commit no longer matches `main` skip deployment, including retries of old runs.
 - **Sync/tracking**: `simkl_add_to_watchlist`, `simkl_mark_watched`, `simkl_remove_from_history`, `simkl_add_rating`, `simkl_get_watchlist`
 - **Discovery**: `simkl_get_trending_by_genre`, `simkl_get_trending_shows`, `simkl_get_trending_movies`, `simkl_get_trending_anime`, `simkl_get_best_shows`, `simkl_get_best_anime`, `simkl_get_show_by_id`, `simkl_get_movie_by_id`, `simkl_get_anime_by_id`, `simkl_get_show_episodes`, `simkl_get_anime_episodes`, `simkl_get_shows_by_genre`, `simkl_get_movies_by_genre`, `simkl_get_anime_by_genre`, `simkl_get_airing_shows`, `simkl_get_airing_anime`
 
-Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) accept `date: today | tomorrow | DD-MM-YYYY` and optional `timeZone` (IANA, for example `America/Sao_Paulo`). **Default: UTC** for backwards compatibility. Results are filtered by the requested **local calendar day**, respecting daylight saving time. Returned airing timestamps remain in UTC (`Z`).
+Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) accept `date: today | tomorrow | DD-MM-YYYY` and optional `timeZone` (IANA, for example `America/Sao_Paulo`). **Default: UTC** for backwards compatibility. Results are filtered by the requested **local calendar day**, respecting daylight saving time. Returned airing timestamps remain in UTC (`Z`). Explicit dates must fall within Simkl's monthly archives, July 2024 through the current month + 3; other dates are rejected locally. Anime movies and other releases without an `episode` are shown as releases, specials (`season: 0`) as `special ep N`, and sparse or older archive records remain readable.
 
 - **User**: `simkl_get_user_stats`, `simkl_my_stats`
 - **Rewatches**: `simkl_start_rewatch`, `simkl_update_rewatch`, `simkl_delete_rewatch`, `simkl_get_rewatches`, and `simkl_stop_watching` with optional explicit rewatch intent
+- **Custom Lists** (beta, PRO/VIP): `simkl_get_user_custom_lists`, `simkl_get_custom_list`, `simkl_create_custom_list`, `simkl_update_custom_list`, `simkl_delete_custom_list`, `simkl_add_custom_list_items`, `simkl_remove_custom_list_items`, `simkl_add_favorites`, `simkl_remove_favorites`
 - **Resources**: `watchlist/{type}/{status}`, `trending/{type}/{interval}`
+
+Under AUTH V2, search, best, live genre, user stats, Custom Lists and all writes need the user's access token; without one these tools fail locally with a clear message and send nothing. Title details, episode lists, `/redirect` ID lookups and `data.simkl.in` files (trending, calendar) stay public and never send a token.
+
+### Custom Lists
+
+Custom Lists need a Simkl PRO or VIP account and an AUTH V2 token; writes also need the `media:write` scope, which this server requests at sign-in. A free account receives an HTTP 200 `premium_only` placeholder on reads; the tools report it as an error and never as list data.
+
+- `simkl_update_custom_list` sends only the fields you pass. `tags`, `private_tags` and `collaborators` **replace the whole set**, so read the list first and send the complete desired set.
+- New titles are appended in posted order; existing titles keep their place unless `user_position` or `allow_reorder` is used.
+- Item IDs accept Simkl's supported write keys (`simkl`, `imdb`, `tmdb`, `tvdb`, `mal`, …). `slug` is response-only and is rejected.
+- Writes for one account run one at a time through the account's Durable Object, and an ambiguous failure is never replayed automatically.
+- After a `429 user_limit_exceeded`, Custom List requests for that account pause until `Retry-After` has passed (or the New York midnight reset when no header is sent).
+- List bodies are never cached, mirrored or polled. Each call spends the user's shared daily allowance, so call these tools only on explicit request.
 
 ### Rewatch sessions
 
@@ -156,7 +170,7 @@ Keep the live `simkl_get_shows_by_genre`, `simkl_get_movies_by_genre`, and `simk
 
 ### API response caching
 
-Public catalog GET responses are cached in the Cloudflare Workers Cache API using the complete request URL, including query parameters. Authorization headers are never part of the cache key. Search, best, and genre results are cached for **1 hour**; detail and episode responses for **6 hours**. The trending data index and genre files are cached for at most **1 hour**, in line with Simkl's CDN freshness guidance. Cached trending responses retain the upstream `Last-Modified` header. User-specific endpoints and failed upstream responses are not cached.
+Public catalog GET responses are cached in the Cloudflare Workers Cache API using the complete request URL, including query parameters. Authorization headers are never part of the cache key. Search (`tv`, `movie`, `anime`, `all`, `id`), best, and genre results are catalog data that does not depend on the caller, so they are cached for **1 hour** even though AUTH V2 requires a user token to request them; the token is checked before the cache is consulted; detail and episode responses for **6 hours**. The trending data index and genre files are cached for at most **1 hour**, in line with Simkl's CDN freshness guidance. Cached trending responses retain the upstream `Last-Modified` header. User-specific endpoints and failed upstream responses are not cached.
 
 ## Authentication
 - Public requests add `client_id` as a query param; authenticated calls use `Authorization: Bearer <token>`.

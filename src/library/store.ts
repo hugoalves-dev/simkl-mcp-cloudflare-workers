@@ -74,6 +74,24 @@ export class LibraryStore {
     });
   }
 
+  /** Epoch ms until which Custom List requests stay paused after a 429 user_limit_exceeded. */
+  loadCustomListCooldown(): number {
+    const row = this.storage.sql.exec<{ value_json: string }>(
+      "SELECT value_json FROM library_metadata WHERE key = 'custom-lists-cooldown'",
+    ).toArray()[0];
+    if (!row) return 0;
+    const value: unknown = JSON.parse(row.value_json);
+    return isRecord(value) && Number.isFinite(value.until) ? value.until as number : 0;
+  }
+
+  saveCustomListCooldown(until: number): void {
+    if (!Number.isFinite(until) || until < 0) throw new Error('Invalid custom list cooldown');
+    this.storage.sql.exec(
+      "INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('custom-lists-cooldown', ?)",
+      JSON.stringify({ until }),
+    );
+  }
+
   commit(candidate: LibraryCandidate, freshness?: { checkedAt: number; forceCheck: boolean }): LibraryInitialization {
     const metadata = JSON.stringify({ activities: candidate.activities, completedAt: Date.now(), itemCount: candidate.items.length, ...freshness });
     if (jsonBytes(metadata) > MAX_ROW_JSON_BYTES) throw new Error('Library metadata too large');

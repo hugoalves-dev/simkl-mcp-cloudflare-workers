@@ -13,13 +13,14 @@ interface CalendarItem extends MediaItem {
 interface CalendarEntry {
   simkl_id: number;
   date: string;
-  episode?: { season?: number; episode?: number; title?: string };
+  episode?: { season?: unknown; episode?: unknown; title?: unknown } | null;
 }
 
 interface CalendarMetadata {
   title?: string;
   year?: number;
   rank?: number | null;
+  anime_type?: string | null;
   ids?: MediaItem['ids'];
 }
 
@@ -50,15 +51,18 @@ function parseCalendarPayload(value: unknown): CalendarPayload {
   return { calendar: value.calendar, metadata: value.metadata };
 }
 
+// Only the join key and air time are required. Episode fields, finale_type,
+// runtime and status-like values are sparse/open-ended in v2 and archived files.
 function isCalendarEntry(value: unknown): value is CalendarEntry {
   if (!isRecord(value) || !Number.isSafeInteger(value.simkl_id) || (value.simkl_id as number) <= 0
     || typeof value.date !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(value.date)) {
     return false;
   }
-  if (value.episode === undefined || value.episode === null) return true;
-  if (!isRecord(value.episode)) return false;
-  return (value.episode.episode === undefined || (Number.isInteger(value.episode.episode) && (value.episode.episode as number) > 0))
-    && (value.episode.season === undefined || (Number.isInteger(value.episode.season) && (value.episode.season as number) >= 0));
+  return value.episode === undefined || value.episode === null || isRecord(value.episode);
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? value as number : undefined;
 }
 
 function enrichCalendarEntry(entry: CalendarEntry, rawMetadata: unknown): CalendarItem {
@@ -70,9 +74,11 @@ function enrichCalendarEntry(entry: CalendarEntry, rawMetadata: unknown): Calend
     ...(typeof rawIds.imdb === 'string' ? { imdb: rawIds.imdb } : {}),
   };
   const rawEpisode = entry.episode;
+  const season = nonNegativeInteger(rawEpisode?.season);
+  const number = nonNegativeInteger(rawEpisode?.episode);
   const episode = rawEpisode && {
-    ...(typeof rawEpisode.season === 'number' ? { season: rawEpisode.season } : {}),
-    ...(typeof rawEpisode.episode === 'number' ? { episode: rawEpisode.episode } : {}),
+    ...(season === undefined ? {} : { season }),
+    ...(number === undefined ? {} : { episode: number }),
     ...(typeof rawEpisode.title === 'string' ? { title: rawEpisode.title } : {}),
   };
 
@@ -81,6 +87,7 @@ function enrichCalendarEntry(entry: CalendarEntry, rawMetadata: unknown): Calend
     title: typeof metadata.title === 'string' && metadata.title.trim() ? metadata.title : 'Unknown title',
     ...(typeof metadata.year === 'number' ? { year: metadata.year } : {}),
     ...(typeof metadata.rank === 'number' && Number.isFinite(metadata.rank) ? { rank: metadata.rank } : {}),
+    ...(typeof metadata.anime_type === 'string' && metadata.anime_type ? { anime_type: metadata.anime_type } : {}),
     date: entry.date,
     ...(episode ? { episode } : {}),
   };
@@ -95,7 +102,7 @@ export async function getAiringItems(
   timeZone = 'UTC',
 ): Promise<CalendarItem[]> {
   const interval = resolveSimklCalendarDay(date, timeZone, now);
-  const paths = simklCalendarPaths(type, date, interval);
+  const paths = simklCalendarPaths(type, date, interval, now);
   const payloads = await Promise.all(paths.map(async path =>
     parseCalendarPayload(await client.request<unknown>(path, {
       method: 'GET',
@@ -121,7 +128,7 @@ export async function getAiringItems(
       if (instant < interval.start || instant >= interval.end) continue;
 
       // Current and monthly calendar files may contain the same airing.
-      const key = `${rawEntry.simkl_id}:${instant}:${rawEntry.episode?.season ?? ''}:${rawEntry.episode?.episode ?? ''}`;
+      const key = `${rawEntry.simkl_id}:${instant}:${nonNegativeInteger(rawEntry.episode?.season) ?? ''}:${nonNegativeInteger(rawEntry.episode?.episode) ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
 

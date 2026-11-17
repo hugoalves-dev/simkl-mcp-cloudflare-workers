@@ -37,7 +37,9 @@ export function getResponseCachePolicy(url: URL, method: string): ResponseCacheP
 
   const path = url.pathname;
   if (
-    /^\/search(?:\/(?:tv|movies|anime|id))?$/.test(path) ||
+    // AUTH V2 requires a user token here, but results are catalog data, not
+    // per-user data. Callers must still hold a token before a cache lookup.
+    /^\/search(?:\/(?:tv|movie|anime|all|id))?$/.test(path) ||
     /^\/(?:tv|anime)\/best\//.test(path) ||
     /^\/(?:tv|anime|movies)\/genres\//.test(path)
   ) {
