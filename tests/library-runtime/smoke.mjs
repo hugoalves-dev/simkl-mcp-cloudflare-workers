@@ -34,6 +34,10 @@ function runtime() {
       calls.push(url.pathname); active++; peak = Math.max(peak, active);
       try {
         await new Promise(resolve => setTimeout(resolve, 15));
+        if (url.pathname === '/users/47/stats') return Response.json({ error: 'user_limit_exceeded' }, { status: 429, headers: { 'Retry-After': '120' } });
+        if (url.pathname === '/sync/history') return new Response('upstream down', { status: 502 });
+        if (url.pathname === '/lists/404') return Response.json({ error: 'url_failed', code: 404, message: 'List not found' }, { status: 404 });
+        if (url.pathname === '/lists/429') return Response.json({ error: 'user_limit_exceeded' }, { status: 429, headers: { 'Retry-After': '600' } });
         if (url.pathname === '/sync/activities') return Response.json({ all: '2026-10-09T12:00:00Z', settings: { all: '2026-10-09T12:00:00Z' } });
         if (url.pathname === '/users/settings') return Response.json({ account: { id: 42 }, timezone: 'UTC' });
         if (/^\/users\/\d+\/stats$/.test(url.pathname)) return Response.json({ total_mins: 120 });
@@ -116,6 +120,25 @@ try {
   await mf.dispose(); mf = runtime();
   await settings('45');
   assert.equal(calls.length, 16, 'new session after restart must reuse settings-only profile without fetching statistics');
+  // Workers RPC drops error classes and fields; list errors must still be recognizable.
+  const listError = async id => (await mf.dispatchFetch(`https://fixture.worker.invalid/?user=46&list=${id}`)).json();
+  assert.deepEqual(await listError(404), { name: 'SimklApiError', statusCode: 404, upstreamCode: 'url_failed', text: 'Simkl list not found.' });
+  const quota = await listError(429);
+  assert.equal(quota.upstreamCode, 'user_limit_exceeded');
+  const paused = await listError(404);
+  assert.equal(paused.name, 'CustomListCooldownError', 'quota cooldown must block the next list request across RPC');
+  assert.match(paused.text, /paused for this account for about 600 more seconds/);
+  assert.equal(calls.filter(path => path.startsWith('/lists/')).length, 2, 'no upstream request during the cooldown');
+  // Library calls through the real adapter keep their Simkl error details across RPC.
+  const probe = async (kind, user) => (await mf.dispatchFetch(`https://fixture.worker.invalid/?user=${user}&adapter=${kind}`)).json();
+  const quotaStats = await probe('stats', '47');
+  assert.equal(quotaStats.name, 'SimklApiError');
+  assert.equal(quotaStats.upstreamCode, 'user_limit_exceeded');
+  assert.match(quotaStats.text, /daily allowance[\s\S]*Retry-After: 120 seconds/);
+  const ambiguousWrite = await probe('write', '48');
+  assert.equal(ambiguousWrite.writeMayHaveSucceeded, true);
+  assert.match(ambiguousWrite.text, /may have succeeded/);
+  assert.equal(calls.filter(path => path === '/sync/history').length, 1, 'an ambiguous write must not be replayed');
   console.log('PASS: Worker RPC, coalescing, per-user isolation, settings eligibility, and SQLite persistence after reconstruction');
 } finally {
   if (mf) await mf.dispose();

@@ -15,6 +15,7 @@ import {
   CustomListCooldownError, customListCooldownSeconds, isCustomListRoute,
   type CustomListRequestOptions, type CustomListResponse,
 } from '../api/custom-lists.js';
+import { encodeRpcError } from '../api/rpc-errors.js';
 
 export interface LibraryCacheEnv {
   SIMKL_CLIENT_ID: string;
@@ -51,11 +52,13 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     };
     const result = this.queuedOperations === 1 ? run() : previous.then(run);
     this.queue = result.then(() => undefined, () => undefined);
-    return result;
+    // enqueue is only used at the public RPC surface: Workers RPC drops error
+    // classes and fields, so encode what the adapter needs to rebuild them.
+    return result.catch(error => { throw encodeRpcError(error); });
   }
 
   ensureInitialized(accessToken: string): Promise<LibraryInitialization> {
-    if (this.initialization) return this.initialization;
+    if (this.initialization) return this.initialization.catch(error => { throw encodeRpcError(error); });
     return this.enqueue(() => this.ensureInitializedInternal(accessToken));
   }
 
@@ -168,7 +171,8 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
         throw error;
       }
     };
-    return options.method === 'GET' ? run() : this.enqueue(run);
+    const result = options.method === 'GET' ? run() : this.enqueue(run);
+    return result.catch(error => { throw encodeRpcError(error); });
   }
 
   /** All callers share the existing /sync/activities throttle and this DO queue. */

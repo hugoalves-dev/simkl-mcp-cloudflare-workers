@@ -110,3 +110,12 @@ test('mixed search never creates an invented /all or unknown-type link', async (
   const unknown = { title: 'Mystery', endpoint_type: 'unknown', ids: { simkl: 9 } };
   expect(() => formatList([unknown], withImdb, 10, 'all')).toThrow('Invalid Simkl search endpoint_type');
 });
+
+test('already-encoded Simkl slugs are not double-encoded in links', async () => {
+  const { simklItemUrl } = await import('../src/format/media');
+  expect(simklItemUrl('anime', 3050960, 'battle-spirits-%5Bre%5D-zekkai-no-kuu'))
+    .toBe('https://simkl.com/anime/3050960/battle-spirits-%5Bre%5D-zekkai-no-kuu');
+  expect(simklItemUrl('anime', 1, 'battle-spirits-[re]')).toBe('https://simkl.com/anime/1/battle-spirits-%5Bre%5D');
+  expect(simklItemUrl('tv', 2, '100%-real')).toBe('https://simkl.com/tv/2/100%25-real');
+  expect(simklItemUrl('movies', 3, 'a/b')).toBe('https://simkl.com/movies/3/a%2Fb');
+});

@@ -1,5 +1,6 @@
 import { SimklApiError, type RequestOptions, type SimklResponseHeaders, type SimklClient } from '../api/client';
 import { normalizeSimklId } from './identity';
+import { decodeRpcError } from '../api/rpc-errors.js';
 import { CustomListCooldownError, CustomListScopeError, type CustomListRequestOptions, type CustomListResponse } from '../api/custom-lists.js';
 type SimklAuthProps = { simklToken: string; simklUserId?: string; simklScope?: string };
 import type { SimklLibraryCache } from './cache';
@@ -29,15 +30,11 @@ export function hasMediaWriteScope(scope: unknown): boolean {
   return !scopes.includes('media:read') || scopes.includes('media:write');
 }
 export const verifiedAccountId = normalizeSimklId;
-function restoreRpcError(error: unknown): unknown {
+function restoreRpcError(rpcError: unknown): unknown {
+  const error = decodeRpcError(rpcError);
   if (error instanceof SimklApiError || error instanceof LibrarySyncLimitError || error instanceof CustomListCooldownError) return error;
   if (!error || typeof error !== 'object') return error;
   const remote = error as Record<string, unknown>;
-  // Workers RPC may drop custom error names; the message carries the seconds either way.
-  if (remote.name === 'CustomListCooldownError' || /^This Simkl account reached its AUTH V2 daily allowance\. Custom List requests are paused/.test(String(remote.message))) {
-    const seconds = Number(remote.retryAfterSeconds ?? /about (\d+) more seconds/.exec(String(remote.message))?.[1]);
-    return new CustomListCooldownError(Number.isSafeInteger(seconds) && seconds > 0 ? seconds : 60);
-  }
   if (remote.name === 'LibrarySyncLimitError'
     && (remote.phase === 'initial' || remote.phase === 'incremental')
     && ['baseline', 'delta', 'ratings', 'membership'].includes(String(remote.operation))
@@ -83,7 +80,8 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     }
     return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token, userId };
   }
-  function restoreRemoteError(error: unknown): never {
+  function restoreRemoteError(rpcError: unknown): never {
+    const error = decodeRpcError(rpcError);
     if (error instanceof SimklApiError || error instanceof LibraryWriteInvalidationError) throw error;
     if (error && typeof error === 'object') {
       const remote = error as Record<string, unknown>;
@@ -119,7 +117,11 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       try { return await object.readRewatches(token); }
       catch (error) { throw restoreRpcError(error); }
     },
-    async invalidate() { const { object } = await stub(); await object.invalidate(); },
+    async invalidate() {
+      const { object } = await stub();
+      try { await object.invalidate(); }
+      catch (error) { throw restoreRpcError(error); }
+    },
     async getStats() {
       const { object, token, userId } = await stub();
       try { return await object.getStats(token, userId); }
@@ -144,7 +146,7 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       if (options.method !== 'GET' && !hasMediaWriteScope(getProps()?.simklScope)) throw new CustomListScopeError();
       const { object, token } = await stub();
       try { return await object.customListRequest(token, path, options); }
-      catch (error) { throw restoreRpcError(error); }
+      catch (error) { throw decodeRpcError(error); }
     },
     async write(path, options, expectedToken) {
       const { object, token } = await stub();
