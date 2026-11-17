@@ -1,6 +1,9 @@
 import { SimklLibraryCache } from '../../src/library/cache';
 import { decodeRpcError } from '../../src/api/rpc-errors';
 import { customListErrorResult } from '../../src/api/custom-lists';
+import { createLibraryAdapter } from '../../src/library/adapter';
+import { SimklClient } from '../../src/api/client';
+import { toMcpErrorResult } from '../../src/api/errors';
 export { SimklLibraryCache };
 export default {
   async fetch(request: Request, env: { SIMKL_LIBRARY_CACHE: DurableObjectNamespace<SimklLibraryCache> }) {
@@ -12,6 +15,20 @@ export default {
     if (new URL(request.url).searchParams.get('invalidate-settings') === '1') {
       await object.invalidateSettings('fixture-operation-token');
       return Response.json({ ok: true });
+    }
+    const adapterProbe = new URL(request.url).searchParams.get('adapter');
+    if (adapterProbe) {
+      // Full worker path: adapter -> Durable Object RPC -> adapter error restoration.
+      const client = new SimklClient({ baseUrl: 'https://fixture.simkl.invalid', clientId: 'fixture-app' });
+      const adapter = createLibraryAdapter(env as any, client, () => ({ simklToken: 'fixture-operation-token', simklUserId: userId }));
+      try {
+        if (adapterProbe === 'stats') await adapter.getStats();
+        else await adapter.write('/sync/history', { method: 'POST', body: { movies: [{ ids: { simkl: 1 } }] } });
+        return Response.json({ ok: true });
+      } catch (error) {
+        const e = error as { name?: string; statusCode?: number; upstreamCode?: string; writeMayHaveSucceeded?: boolean };
+        return Response.json({ name: e?.name, statusCode: e?.statusCode, upstreamCode: e?.upstreamCode, writeMayHaveSucceeded: e?.writeMayHaveSucceeded, text: toMcpErrorResult(error).content[0].text });
+      }
     }
     const list = new URL(request.url).searchParams.get('list');
     if (list) {

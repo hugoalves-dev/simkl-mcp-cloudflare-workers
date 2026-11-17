@@ -20,7 +20,14 @@ export function simklItemUrl(type: SimklMediaType, id: string | number | undefin
   if (id === undefined || id === null || String(id) === '') return undefined;
   const base = `https://simkl.com/${type}/${encodeURIComponent(String(id))}`;
   const safeSlug = typeof slug === 'string' && slug.trim() ? slug : undefined;
-  return safeSlug ? `${base}/${encodeURIComponent(safeSlug)}` : base;
+  return safeSlug ? `${base}/${encodeURIComponent(decodeSlug(safeSlug))}` : base;
+}
+
+// Simkl sometimes returns slugs that are already percent-encoded (e.g. "%5Bre%5D").
+// Decode once so encoding below never turns "%5B" into "%255B".
+function decodeSlug(slug: string): string {
+  try { return decodeURIComponent(slug); }
+  catch { return slug; }
 }
 
 export function addSimklItemLinks<T extends MediaItem>(items: T[], type: SimklMediaType): Array<T & { simkl_url?: string }> {

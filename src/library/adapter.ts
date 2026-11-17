@@ -30,7 +30,8 @@ export function hasMediaWriteScope(scope: unknown): boolean {
   return !scopes.includes('media:read') || scopes.includes('media:write');
 }
 export const verifiedAccountId = normalizeSimklId;
-function restoreRpcError(error: unknown): unknown {
+function restoreRpcError(rpcError: unknown): unknown {
+  const error = decodeRpcError(rpcError);
   if (error instanceof SimklApiError || error instanceof LibrarySyncLimitError || error instanceof CustomListCooldownError) return error;
   if (!error || typeof error !== 'object') return error;
   const remote = error as Record<string, unknown>;
@@ -79,7 +80,8 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
     }
     return { object: env.SIMKL_LIBRARY_CACHE.get(env.SIMKL_LIBRARY_CACHE.idFromName(`simkl-library:v1:${userId}`)), token, userId };
   }
-  function restoreRemoteError(error: unknown): never {
+  function restoreRemoteError(rpcError: unknown): never {
+    const error = decodeRpcError(rpcError);
     if (error instanceof SimklApiError || error instanceof LibraryWriteInvalidationError) throw error;
     if (error && typeof error === 'object') {
       const remote = error as Record<string, unknown>;
@@ -115,7 +117,11 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       try { return await object.readRewatches(token); }
       catch (error) { throw restoreRpcError(error); }
     },
-    async invalidate() { const { object } = await stub(); await object.invalidate(); },
+    async invalidate() {
+      const { object } = await stub();
+      try { await object.invalidate(); }
+      catch (error) { throw restoreRpcError(error); }
+    },
     async getStats() {
       const { object, token, userId } = await stub();
       try { return await object.getStats(token, userId); }
