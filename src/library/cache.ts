@@ -15,6 +15,7 @@ import {
   CustomListCooldownError, customListCooldownSeconds, isCustomListRoute,
   type CustomListRequestOptions, type CustomListResponse,
 } from '../api/custom-lists.js';
+import { encodeRpcError } from '../api/rpc-errors.js';
 
 export interface LibraryCacheEnv {
   SIMKL_CLIENT_ID: string;
@@ -168,7 +169,8 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
         throw error;
       }
     };
-    return options.method === 'GET' ? run() : this.enqueue(run);
+    const result = options.method === 'GET' ? run() : this.enqueue(run);
+    return result.catch(error => { throw encodeRpcError(error); });
   }
 
   /** All callers share the existing /sync/activities throttle and this DO queue. */
