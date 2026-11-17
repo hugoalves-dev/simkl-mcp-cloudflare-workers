@@ -73,7 +73,7 @@ test('search accepts specific types and all only as a documented unknown-type fa
     registerTool(name: string, config: any, handler: (args: any) => Promise<any>) {
       registrations.set(name, { config, handler });
     },
-  } as any, client, () => undefined);
+  } as any, client, () => 'user-token');
 
   const search = registrations.get('simkl_search_by_text')!;
   expect(search.config.description).toContain('Prefer tv');

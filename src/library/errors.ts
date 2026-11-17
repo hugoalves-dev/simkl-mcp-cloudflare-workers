@@ -19,3 +19,11 @@ export class LibrarySyncLimitError extends Error {
     this.name = 'LibrarySyncLimitError';
   }
 }
+
+/** No AUTH V2 user token is available for a protected Simkl call. */
+export class SimklAuthRequiredError extends Error {
+  constructor() {
+    super('Simkl authentication required');
+    this.name = 'SimklAuthRequiredError';
+  }
+}

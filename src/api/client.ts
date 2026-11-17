@@ -519,6 +519,14 @@ function isSimklTimestamp(value: unknown): value is string {
     && Number.isFinite(Date.parse(value));
 }
 
+// Finite, documented codes only: the raw upstream body is never retained.
+const KNOWN_UPSTREAM_ERROR_CODES = new Set([
+  'rate_limit', 'user_limit_exceeded', 'app_limit_exceeded', 'user_token_required', 'max_items',
+  'user_token_failed', 'invalid_token', 'oauth2_token_required', 'insufficient_scope', 'premium_only',
+  'private_list', 'no_access', 'max_lists', 'max_items_total', 'list_error', 'wrong_parameter',
+  'empty_field', 'url_failed',
+]);
+
 export class SimklApiError extends Error {
   public upstreamCode: string;
 
@@ -537,7 +545,7 @@ export class SimklApiError extends Error {
       if (statusCode === 400 && (parsed.error === 'RATE_LIMIT' || parsed.error === 'write_lock')) {
         // Simkl's uppercase 400 code is a temporary write lock, not a quota signal.
         code = 'write_lock';
-      } else if (typeof parsed.error === 'string' && ['rate_limit', 'user_limit_exceeded', 'app_limit_exceeded', 'user_token_required', 'max_items'].includes(parsed.error)) {
+      } else if (typeof parsed.error === 'string' && KNOWN_UPSTREAM_ERROR_CODES.has(parsed.error)) {
         code = parsed.error;
       }
     } catch {

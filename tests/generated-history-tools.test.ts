@@ -8,10 +8,12 @@ describe('generated history request schemas', () => {
 
     const history = tools.get('simkl_mark_watched').inputSchema;
     const movie = history.movies.unwrap().element;
-    expect(movie.safeParse({ rewatch_id: 2 }).success).toBe(false);
+    // The current OpenAPI contract makes ids optional (title/year fallback) and no
+    // longer declares a rewatch_id minimum; simkl_*_rewatch tools still require > 0.
+    expect(movie.safeParse({ title: 'Heat', year: 1995 }).success).toBe(true);
     expect(movie.shape.is_rewatch.parse(true)).toBe(true);
     expect(movie.shape.rewatch_id.safeParse(2).success).toBe(true);
-    expect(movie.shape.rewatch_id.safeParse(0).success).toBe(false);
+    expect(movie.shape.rewatch_id.safeParse(1.5).success).toBe(false);
     expect(movie.shape.rewatch_status.safeParse('closed').success).toBe(true);
     expect(movie.shape.rewatch_status.safeParse('ignored').success).toBe(false);
     for (const key of ['shows', 'anime']) {
@@ -29,8 +31,7 @@ describe('generated history request schemas', () => {
     const removal = tools.get('simkl_remove_from_history').inputSchema;
     const removalMovie = removal.movies.unwrap().element;
     expect(removalMovie.shape.rewatch_id.parse(42)).toBe(42);
-    expect(removalMovie.safeParse({ rewatch_id: 42 }).success).toBe(false);
-    expect(removalMovie.safeParse({ ids: { simkl: 1 }, rewatch_id: 0 }).success).toBe(false);
+    expect(removalMovie.safeParse({ ids: { simkl: 1 }, rewatch_id: 'x' }).success).toBe(false);
   });
 
   test('does not expose rewatch opt-in on start or pause scrobble tools', () => {

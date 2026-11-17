@@ -343,9 +343,15 @@ function generateHandler(path: string, method: string, params: any[], responseFo
       ? `let result: any;\n      let responseHeaders: any;\n      if (hooks.getWatchlist) {\n        result = await hooks.getWatchlist(args);\n      } else {\n        const response = ${request};\n        result = response.data;\n        responseHeaders = response.headers;\n      }`
       : `const response = ${request};\n      const result = response.data;\n      const responseHeaders = response.headers;`;
 
+  // AUTH V2 requires the user token on every non-public route. Fail before the
+  // shared response cache or Simkl is reached; public routes keep working anonymously.
+  const tokenGuard = authorization === 'none' || toolName === 'simkl_get_watchlist'
+    ? ''
+    : 'if (!getToken()) return missingUserTokenResult();\n      ';
+
   return `async (args: any) => {
     try {
-      ${handlerPrelude}
+      ${tokenGuard}${handlerPrelude}
       const formatted = ${formatResponse};
       return {
         _meta: responseHeaders?.rateLimitRemaining === undefined ? undefined : { simklRateLimitRemaining: responseHeaders.rateLimitRemaining },
@@ -409,7 +415,8 @@ for (const config of toolsWhitelist) {
   }
 
   const { schema, flattenedFields } = generateParamSchema(config.path, params, config.omitParams, config.extraQueryParams, config.batchArrayFields, config.legacyEpisodeAlias);
-  const handler = generateHandler(config.path, config.method, params, config.responseFormat, toolName, flattenedFields, config.requestPath, config.authorization, config.extraQueryParams);
+  const handlerParams = params.filter((param: any) => !(param.in === 'query' && config.omitParams?.includes(param.name)));
+  const handler = generateHandler(config.path, config.method, handlerParams, config.responseFormat, toolName, flattenedFields, config.requestPath, config.authorization, config.extraQueryParams);
 
   // extract clean description
   const summary = operation.summary || '';
@@ -448,7 +455,7 @@ import { z } from 'zod';
 import { asAiring, formatList, withImdb, withRating, withSimklItemLink } from '../src/format/media.js';
 ${toolsWhitelist.some(config => config.responseFormat?.type === 'json' && config.responseFormat.tvFinaleDescriptions) ? "import { withTvFinaleDescriptions } from '../src/format/episodes.js';" : ''}
 ${toolsWhitelist.some(config => config.requestPath?.helper === 'simklTrendingPath') ? "import { simklTrendingPath } from '../src/api/trending.js';" : ''}
-import { toMcpErrorResult } from '../src/api/errors.js';
+import { missingUserTokenResult, toMcpErrorResult } from '../src/api/errors.js';
 import { LibraryQueryError } from '../src/library/watchlist.js';
 import { LibraryWriteInvalidationError } from '../src/library/errors.js';
 ${customImports.join('\n')}

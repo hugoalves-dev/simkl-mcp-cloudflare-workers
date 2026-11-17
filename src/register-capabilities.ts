@@ -4,6 +4,8 @@ import type { SimklClient } from './api/client.js';
 import { simklTrendingPath } from './api/trending.js';
 import { RewatchService } from './api/rewatches.js';
 import { registerRewatchTools } from './tools/rewatches.js';
+import { CustomListsService } from './api/custom-lists.js';
+import { registerCustomListTools } from './tools/custom-lists.js';
 import { registerTools } from '../generated/tools.js';
 import type { LibraryAdapter } from './library/adapter';
 import { toMcpErrorResult } from './api/errors';
@@ -25,6 +27,11 @@ export function registerCapabilities(server: McpServer, client: SimklClient, lib
       write: (path, options) => library.write(path, options),
     });
     registerRewatchTools(server, rewatchService);
+    // Resolved lazily: discovery registers tools without touching the library.
+    registerCustomListTools(server, new CustomListsService(
+      (path, options) => library.customListRequest(path, options),
+      () => library.accountId(),
+    ));
     registerCustomTools(server, library);
     registerResources(server, client, library);
 }

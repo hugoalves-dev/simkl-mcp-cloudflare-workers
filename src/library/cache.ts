@@ -10,7 +10,11 @@ import { normalizeSimklId } from './identity.js';
 import { refreshRewatches } from './rewatches.js';
 import { LibraryWriteInvalidationError } from './errors.js';
 import type { LibraryInitialization, LibraryItemRow } from './types.js';
-import type { RequestOptions } from '../api/client.js';
+import { SimklApiError, type RequestOptions } from '../api/client.js';
+import {
+  CustomListCooldownError, customListCooldownSeconds, isCustomListRoute,
+  type CustomListRequestOptions, type CustomListResponse,
+} from '../api/custom-lists.js';
 
 export interface LibraryCacheEnv {
   SIMKL_CLIENT_ID: string;
@@ -132,6 +136,39 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
       }
       return result;
     });
+  }
+
+  /**
+   * Custom Lists do not touch the library snapshot. Writes share this account's
+   * queue so they run one at a time; reads skip it. Both honor a durable
+   * user_limit_exceeded cooldown. No list body is cached, mirrored or polled.
+   */
+  customListRequest(accessToken: string, path: string, options: CustomListRequestOptions): Promise<CustomListResponse> {
+    if (!accessToken) return Promise.reject(new Error('Simkl authentication required'));
+    if (!isCustomListRoute(path, options.method)) return Promise.reject(new Error('Unsupported Simkl custom list route'));
+    const run = async (): Promise<CustomListResponse> => {
+      const now = Date.now();
+      const until = this.store.loadCustomListCooldown();
+      if (until > now) throw new CustomListCooldownError(Math.ceil((until - now) / 1000));
+      try {
+        return await this.client.requestWithMetadata(path, {
+          method: options.method,
+          token: accessToken,
+          ...(options.query ? { query: options.query } : {}),
+          ...(options.body !== undefined ? { body: options.body } : {}),
+          // A list write is never replayed: 400 rate_limit means "try again in a minute".
+          ...(options.method === 'GET' ? {} : { rateLimitRetry: false }),
+        });
+      } catch (error) {
+        if (error instanceof SimklApiError && error.statusCode === 429 && error.upstreamCode === 'user_limit_exceeded') {
+          const seconds = customListCooldownSeconds(error.headers.retryAfter, now);
+          this.store.saveCustomListCooldown(now + seconds * 1000);
+          console.info(JSON.stringify({ component: 'simkl_custom_lists', event: 'quota_cooldown', seconds }));
+        }
+        throw error;
+      }
+    };
+    return options.method === 'GET' ? run() : this.enqueue(run);
   }
 
   /** All callers share the existing /sync/activities throttle and this DO queue. */
