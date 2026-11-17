@@ -11,6 +11,7 @@ import {
   registerCustomListTools,
 } from '../src/tools/custom-lists';
 import { createLibraryAdapter, hasMediaWriteScope } from '../src/library/adapter';
+import { decodeRpcError, encodeRpcError } from '../src/api/rpc-errors';
 
 mock.module('cloudflare:workers', () => ({ DurableObject: class {}, WorkerEntrypoint: class {}, RpcTarget: class {}, exports: {}, env: {} }));
 const { SimklLibraryCache } = await import('../src/library/cache');
@@ -247,7 +248,7 @@ describe('Custom Lists account queue and quota', () => {
     await a;
     while (releases.length < 1) await Promise.resolve();
     releases.shift()!();
-    await expect(b).rejects.toBeInstanceOf(SimklApiError);
+    expect(decodeRpcError(await b.catch(error => error))).toBeInstanceOf(SimklApiError);
     expect(events).toEqual(['start:a', 'end:a', 'start:b', 'end:b']);
   });
 
@@ -259,10 +260,13 @@ describe('Custom Lists account queue and quota', () => {
       calls++;
       return Response.json({ error: 'user_limit_exceeded' }, { status: 429, headers: { 'Retry-After': '600' } });
     }) as typeof fetch;
-    await expect(cache.customListRequest('token', '/lists/1', { method: 'GET' })).rejects.toBeInstanceOf(SimklApiError);
-    await expect(cache.customListRequest('token', '/lists/1', { method: 'GET' })).rejects.toBeInstanceOf(CustomListCooldownError);
-    await expect(object(storage.storage).customListRequest('token', '/lists/1/items', { method: 'POST', body: { movies: [] } }))
-      .rejects.toBeInstanceOf(CustomListCooldownError);
+    const failure = (promise: Promise<unknown>) => promise.then(() => undefined, error => decodeRpcError(error));
+    const quota = await failure(cache.customListRequest('token', '/lists/1', { method: 'GET' }));
+    expect(quota).toBeInstanceOf(SimklApiError);
+    expect((quota as SimklApiError).upstreamCode).toBe('user_limit_exceeded');
+    expect(await failure(cache.customListRequest('token', '/lists/1', { method: 'GET' }))).toBeInstanceOf(CustomListCooldownError);
+    expect(await failure(object(storage.storage).customListRequest('token', '/lists/1/items', { method: 'POST', body: { movies: [] } })))
+      .toBeInstanceOf(CustomListCooldownError);
     expect(calls).toBe(1);
     expect(JSON.stringify(storage.db.query('SELECT * FROM library_metadata').all())).not.toContain('token');
 
@@ -307,8 +311,14 @@ describe('Custom Lists adapter', () => {
     expect(hasMediaWriteScope(scope)).toBe(allowed);
   });
 
-  test('cooldown errors survive the Workers RPC boundary', async () => {
-    const remote = Object.assign(new Error(new CustomListCooldownError(42).message), { name: 'Error' });
+  test('errors survive the Workers RPC boundary, which keeps only "<name>: <message>"', async () => {
+    const rpc = (error: Error) => new Error(`${error.name}: ${error.message}`);
+    const notFound = decodeRpcError(rpc(encodeRpcError(new SimklApiError('x', 404, JSON.stringify({ error: 'url_failed' }), { retryAfter: '5' })) as Error));
+    expect(notFound).toBeInstanceOf(SimklApiError);
+    expect(customListErrorResult(notFound, false).content[0].text).toBe('Simkl list not found.');
+    const ambiguous = decodeRpcError(rpc(encodeRpcError(new SimklApiError('x', 502, null, {}, true)) as Error)) as SimklApiError;
+    expect(ambiguous.writeMayHaveSucceeded).toBe(true);
+    const remote = rpc(encodeRpcError(new CustomListCooldownError(42)) as Error);
     const namespace = { idFromName: () => 'id', get: () => ({ customListRequest: async () => { throw remote; } }) } as any;
     const adapter = createLibraryAdapter({ SIMKL_LIBRARY_CACHE: namespace }, {} as any, () => ({ simklToken: 'token', simklUserId: '7' }));
     const error = await adapter.customListRequest('/lists/1', { method: 'GET' }).catch(caught => caught);

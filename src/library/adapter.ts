@@ -1,5 +1,6 @@
 import { SimklApiError, type RequestOptions, type SimklResponseHeaders, type SimklClient } from '../api/client';
 import { normalizeSimklId } from './identity';
+import { decodeRpcError } from '../api/rpc-errors.js';
 import { CustomListCooldownError, CustomListScopeError, type CustomListRequestOptions, type CustomListResponse } from '../api/custom-lists.js';
 type SimklAuthProps = { simklToken: string; simklUserId?: string; simklScope?: string };
 import type { SimklLibraryCache } from './cache';
@@ -33,11 +34,6 @@ function restoreRpcError(error: unknown): unknown {
   if (error instanceof SimklApiError || error instanceof LibrarySyncLimitError || error instanceof CustomListCooldownError) return error;
   if (!error || typeof error !== 'object') return error;
   const remote = error as Record<string, unknown>;
-  // Workers RPC may drop custom error names; the message carries the seconds either way.
-  if (remote.name === 'CustomListCooldownError' || /^This Simkl account reached its AUTH V2 daily allowance\. Custom List requests are paused/.test(String(remote.message))) {
-    const seconds = Number(remote.retryAfterSeconds ?? /about (\d+) more seconds/.exec(String(remote.message))?.[1]);
-    return new CustomListCooldownError(Number.isSafeInteger(seconds) && seconds > 0 ? seconds : 60);
-  }
   if (remote.name === 'LibrarySyncLimitError'
     && (remote.phase === 'initial' || remote.phase === 'incremental')
     && ['baseline', 'delta', 'ratings', 'membership'].includes(String(remote.operation))
@@ -144,7 +140,7 @@ export function createLibraryAdapter(env: { SIMKL_LIBRARY_CACHE: DurableObjectNa
       if (options.method !== 'GET' && !hasMediaWriteScope(getProps()?.simklScope)) throw new CustomListScopeError();
       const { object, token } = await stub();
       try { return await object.customListRequest(token, path, options); }
-      catch (error) { throw restoreRpcError(error); }
+      catch (error) { throw decodeRpcError(error); }
     },
     async write(path, options, expectedToken) {
       const { object, token } = await stub();
