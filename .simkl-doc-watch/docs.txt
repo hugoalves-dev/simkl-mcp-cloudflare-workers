@@ -1,3 +1,9 @@
+# Simkl API
+
+> This file is very large and may be truncated. For an index of this content, please refer to https://api.simkl.org/llms.txt instead.
+
+> Build apps that track Movies, TV Shows, and Anime — scrobble playback, sync watch history, and pull rich metadata from the Simkl API.
+
 # All endpoints
 Source: https://api.simkl.org/all-endpoints
 
@@ -5297,40 +5303,40 @@ Top-level keys per media type, each carrying an array of items:
 
 ```json
 {
- "movies": [
- {
- "rating": 8,
- "ids": {
- "simkl": 53536
- }
- }
- ],
- "shows": [
- {
- "rating": 9,
- "ids": {
- "tmdb": "1399"
- }
- }
- ],
- "anime": [
- {
- "rating": 10,
- "ids": {
- "mal": "11757"
- },
- "rated_at": "2026-05-15T20:00:00Z"
- }
- ]
+  "movies": [
+    {
+      "rating": 8,
+      "ids": {
+        "simkl": 53536
+      }
+    }
+  ],
+  "shows": [
+    {
+      "rating": 9,
+      "ids": {
+        "tmdb": "1399"
+      }
+    }
+  ],
+  "anime": [
+    {
+      "rating": 10,
+      "ids": {
+        "mal": "11757"
+      },
+      "rated_at": "2026-05-15T20:00:00Z"
+    }
+  ]
 }
 ```
 
 Per-item fields:
 
-| Field | Type | Required | Notes |
+| Field      | Type    | Required | Notes |
 |---|---|---|---|
-| `rating` | int 1-10 | yes | Out-of-range values (`0`, `11`, negatives) are **silently ignored** — see **Out-of-range** below. |
-| `ids` | object | yes | Any [supported ID](/conventions/standard-media-objects#supported-id-keys): `simkl`, `imdb`, `tmdb`, `tvdb`, `mal`, `anidb`, `anilist`, `kitsu`, `livechart`, `anisearch`, `animeplanet`. Plus optional `title`+`year` fallback. |
+| `rating`   | int 1-10 | yes | Out-of-range values (`0`, `11`, negatives) are **silently ignored** — see **Out-of-range** below. |
+| `ids`      | object  | yes | Any [supported ID](/conventions/standard-media-objects#supported-id-keys): `simkl`, `imdb`, `tmdb`, `tvdb`, `mal`, `anidb`, `anilist`, `kitsu`, `livechart`, `anisearch`, `animeplanet`. Plus optional `title`+`year` fallback. |
 | `rated_at` | ISO-8601 | no | Defaults to "now". Use to back-date imports from another tracker. |
 
 Re-rating an item **overwrites** the prior value — no need to call `/sync/ratings/remove` first.
@@ -5339,12 +5345,12 @@ Re-rating an item **overwrites** the prior value — no need to call `/sync/rati
 
 Rating an item that's not yet on the user's list **auto-files it** based on airing status:
 
-| Item kind | New status |
+| Item kind                                                    | New status     |
 |---|---|
-| Released movie | `completed` |
-| Unreleased / upcoming movie | `plantowatch` |
-| Single-episode show | `completed` |
-| Multi-episode show or anime (any other case) | `watching` |
+| Released movie                                                | `completed`    |
+| Unreleased / upcoming movie                                   | `plantowatch`  |
+| Single-episode show                                           | `completed`    |
+| Multi-episode show or anime (any other case)                  | `watching`     |
 
 The corresponding list timestamp on [`/sync/activities`](/api-reference/simkl/get-activities) bumps, so a rated item shows up in the next `date_from` delta even though the user only rated it. Treat the delta as authoritative.
 
@@ -5352,27 +5358,27 @@ The corresponding list timestamp on [`/sync/activities`](/api-reference/simkl/ge
 
 ```json
 {
- "added": {
- "movies": 1,
- "shows": 1,
- "statuses": [
- {
- "request": {
- "rating": 8,
- "ids": {
- "simkl": 53536
- }
- },
- "response": {
- "status": "completed"
- }
- }
- ]
- },
- "not_found": {
- "movies": [],
- "shows": []
- }
+  "added": {
+    "movies": 1,
+    "shows": 1,
+    "statuses": [
+      {
+        "request": {
+          "rating": 8,
+          "ids": {
+            "simkl": 53536
+          }
+        },
+        "response": {
+          "status": "completed"
+        }
+      }
+    ]
+  },
+  "not_found": {
+    "movies": [],
+    "shows": []
+  }
 }
 ```
 
@@ -5390,9 +5396,9 @@ Any `rating` outside 1-10 (including `0`, `11`, `-1`, `100`) is **silently rejec
 
 ```json
 {
- "movies": [ {..., "user_rating": 8, "user_rated_at": "2026-05-13T..." } ],
- "shows": [ {..., "user_rating": 9,... } ],
- "anime": [ {..., "user_rating": 10,... } ]
+  "movies": [ { ..., "user_rating": 8, "user_rated_at": "2026-05-13T..." } ],
+  "shows":  [ { ..., "user_rating": 9, ... } ],
+  "anime":  [ { ..., "user_rating": 10, ... } ]
 }
 ```
 
@@ -5409,7 +5415,7 @@ Use [`POST /sync/ratings/remove`](/api-reference/simkl/remove-ratings) with the 
 If you're recording a watch event and want to attach a rating in the same call, use [`POST /sync/history`](/api-reference/simkl/add-to-history) — it accepts a `rating` field per item. One round-trip instead of two.
 
 <Card title="Sync guide — full walkthrough" icon="arrows-rotate" href="/guides/sync" horizontal>
- Two-phase model (initial pull -> activities-checked delta loop), `date_from` semantics, deletion reconciliation, edge cases, and reference implementations in Node and Python.
+  Two-phase model (initial pull -> activities-checked delta loop), `date_from` semantics, deletion reconciliation, edge cases, and reference implementations in Node and Python.
 </Card>
 
 <Tip>
@@ -5452,17 +5458,17 @@ The body shape determines whether you mark a single episode, a season, or a whol
 
 ```json
 {
- "shows": [{
- "ids": {...},
- "seasons": [{
- "number": 1,
- "episodes": [{ "number": 1 }, { "number": 2 }]
- }]
- }]
+  "shows": [{
+    "ids": {...},
+    "seasons": [{
+      "number": 1,
+      "episodes": [{ "number": 1 }, { "number": 2 }]
+    }]
+  }]
 }
 ```
 
-**Top-level `episodes[]` shorthand** — auto-wraps to `seasons: [{ number: 1,... }]`. Useful for anime sequential numbering and single-season shows.
+**Top-level `episodes[]` shorthand** — auto-wraps to `seasons: [{ number: 1, ... }]`. Useful for anime sequential numbering and single-season shows.
 
 ```json
 { "shows": [{ "ids": {...}, "episodes": [{ "number": 1 }] }] }
@@ -5478,11 +5484,11 @@ To set or update a memo without recording a watch event, send `ids` + `status` +
 
 ```json
 {
- "movies": [{
- "ids": { "simkl": 53536 },
- "status": "plantowatch",
- "memo": { "text": "Remind me why I added this", "is_private": true }
- }]
+  "movies": [{
+    "ids": { "simkl": 53536 },
+    "status": "plantowatch",
+    "memo": { "text": "Remind me why I added this", "is_private": true }
+  }]
 }
 ```
 
@@ -5529,27 +5535,27 @@ The response carries `rewatch_id` and `rewatch_status` in `added.statuses[].resp
 
 ```json
 {
- "added": {
- "movies": <int count>,
- "shows": <int count>,
- "episodes": <int count>,
- "statuses": [
- {
- "request": { /* echo of input item, with type added */ },
- "response": {
- "status": "completed",
- "simkl_type": "tv" | "anime" | "movie",
- "anime_type": "tv" | "movie" | "ova" | null,
- "rewatch_id": <int>,  "rewatch_status": "active" | "completed" | "closed"   (rewatch writes only)
- }
- }
- ]
- },
- "not_found": {
- "movies": [...],
- "shows": [...],
- "episodes": [...]
- }
+  "added": {
+    "movies": <int count>,
+    "shows": <int count>,
+    "episodes": <int count>,
+    "statuses": [
+      {
+        "request": { /* echo of input item, with type added */ },
+        "response": {
+          "status": "completed",
+          "simkl_type": "tv" | "anime" | "movie",
+          "anime_type": "tv" | "movie" | "ova" | null,
+          "rewatch_id": <int>,  "rewatch_status": "active" | "completed" | "closed"   (rewatch writes only)
+        }
+      }
+    ]
+  },
+  "not_found": {
+    "movies": [...],
+    "shows": [...],
+    "episodes": [...]
+  }
 }
 ```
 
@@ -5631,32 +5637,32 @@ See the [Sync guide](/guides/sync) for the two-phase pull/delta pattern.
 
 ```json
 {
- "movies": [
- {
- "to": "completed",
- "title": "Inception",
- "year": 2010,
- "ids": {
- "simkl": 472214,
- "imdb": "tt1375666",
- "tmdb": "27205"
- }
- }
- ],
- "shows": [
- {
- "to": "watching",
- "title": "Game of Thrones",
- "year": 2011,
- "ids": {
- "simkl": 17465,
- "slug": "game-of-thrones",
- "imdb": "tt0944947",
- "tmdb": "1399",
- "tvdb": "121361"
- }
- }
- ]
+  "movies": [
+    {
+      "to": "completed",
+      "title": "Inception",
+      "year": 2010,
+      "ids": {
+        "simkl": 472214,
+        "imdb": "tt1375666",
+        "tmdb": "27205"
+      }
+    }
+  ],
+  "shows": [
+    {
+      "to": "watching",
+      "title": "Game of Thrones",
+      "year": 2011,
+      "ids": {
+        "simkl": 17465,
+        "slug": "game-of-thrones",
+        "imdb": "tt0944947",
+        "tmdb": "1399",
+        "tvdb": "121361"
+      }
+    }
+  ]
 }
 ```
 
@@ -5672,14 +5678,14 @@ The response always returns 201 (even on partial failures) with two arrays per m
 
 ```json
 {
- "added": {
- "movies": [{ "to": "completed", "ids": {...}, "type": "movie" }],
- "shows": [{ "to": "watching", "ids": {...}, "type": "show" }]
- },
- "not_found": {
- "movies": [{ "title": "Definitely Not A Real Movie", "year": 9999 }],
- "shows": []
- }
+  "added": {
+    "movies": [{ "to": "completed", "ids": {...}, "type": "movie" }],
+    "shows": [{ "to": "watching", "ids": {...}, "type": "show" }]
+  },
+  "not_found": {
+    "movies": [{ "title": "Definitely Not A Real Movie", "year": 9999 }],
+    "shows": []
+  }
 }
 ```
 
@@ -5736,12 +5742,12 @@ YOUR_REDIRECT_URI?code=AUTHORIZATION_CODE&state=YOUR_STATE
 Exchange the `code` for an `access_token` via [`POST /oauth/token`](/api-reference/simkl/exchange-token). Codes are short-lived; exchange immediately.
 
 <CardGroup cols={2}>
- <Card title="OAuth 2.0 walkthrough" icon="lock" href="/api-reference/oauth" horizontal>
- Confidential-client (server-side) flow with `client_secret`.
- </Card>
- <Card title="Public PKCE walkthrough" icon="shield-keyhole" href="/api-reference/oauth-pkce" horizontal>
- Public-client (mobile / SPA / desktop) flow with `code_verifier` + `code_challenge`.
- </Card>
+  <Card title="OAuth 2.0 walkthrough" icon="lock" href="/api-reference/oauth" horizontal>
+    Confidential-client (server-side) flow with `client_secret`.
+  </Card>
+  <Card title="Public PKCE walkthrough" icon="shield-keyhole" href="/api-reference/oauth-pkce" horizontal>
+    Public-client (mobile / SPA / desktop) flow with `code_verifier` + `code_challenge`.
+  </Card>
 </CardGroup>
 
 **An AUTH V2 `client_id` cannot use this endpoint.** It is refused with `400 unauthorized_client` and a message pointing at `GET /oauth2/authorize`. A registration is V1 or V2, never both.
@@ -5857,12 +5863,12 @@ All failures return JSON with an `error` field (and usually a `message` field to
 | 401 | `grant_error` | The `code` is invalid, expired, or already used. Codes are single-use — restart from `/oauth/authorize`. |
 
 <CardGroup cols={2}>
- <Card title="OAuth 2.0 walkthrough" icon="lock" href="/api-reference/oauth" horizontal>
- Confidential-client (server-side) flow.
- </Card>
- <Card title="Public PKCE walkthrough" icon="shield-keyhole" href="/api-reference/oauth-pkce" horizontal>
- Public-client flow with `code_verifier`.
- </Card>
+  <Card title="OAuth 2.0 walkthrough" icon="lock" href="/api-reference/oauth" horizontal>
+    Confidential-client (server-side) flow.
+  </Card>
+  <Card title="Public PKCE walkthrough" icon="shield-keyhole" href="/api-reference/oauth-pkce" horizontal>
+    Public-client flow with `code_verifier`.
+  </Card>
 </CardGroup>
 
 **An AUTH V2 `client_id` cannot use this endpoint.** It is refused with `400 unauthorized_client` and a message pointing at `POST /oauth2/token`. A registration is V1 or V2, never both.
@@ -6042,21 +6048,21 @@ Both forms still need the standard URL params on every request — `client_id`, 
 
 ```json
 {
- "title": "string",
- "year": "integer | null",
- "date": "ISO-8601 string with -05:00 offset | null",
- "poster": "string (relative path; prepend https://simkl.in/posters/ + size)",
- "rank": "integer | null",
- "url": "string (relative simkl.com URL)",
- "ids": {
- "simkl_id": "integer",
- "slug": "string"
- },
- "episode": {
- "episode": "integer",
- "url": "string"
- },
- "anime_type": "tv | ona | ova | movie | special | music"
+  "title": "string",
+  "year": "integer | null",
+  "date": "ISO-8601 string with -05:00 offset | null",
+  "poster": "string  (relative path; prepend https://simkl.in/posters/ + size)",
+  "rank": "integer | null",
+  "url": "string  (relative simkl.com URL)",
+  "ids": {
+    "simkl_id": "integer",
+    "slug": "string"
+  },
+  "episode": {
+    "episode": "integer",
+    "url": "string"
+  },
+  "anime_type": "tv | ona | ova | movie | special | music"
 }
 ```
 
@@ -6090,20 +6096,20 @@ Returns the full episode list for a Simkl anime ID, including specials. For anim
 
 ```json
 {
- "title": "To You, in 2000 Years",
- "description": "...",
- "episode": 1,
- "type": "episode",
- "aired": true,
- "img": "https://wsrv.nl/?url=https://simkl.in/episodes/...&q=90",
- "date": "2013-04-07T00:00:00+09:00",
- "ids": {
- "simkl_id": 1010234
- },
- "tvdb": {
- "season": 1,
- "episode": 1
- }
+  "title": "To You, in 2000 Years",
+  "description": "...",
+  "episode": 1,
+  "type": "episode",
+  "aired": true,
+  "img": "https://wsrv.nl/?url=https://simkl.in/episodes/...&q=90",
+  "date": "2013-04-07T00:00:00+09:00",
+  "ids": {
+    "simkl_id": 1010234
+  },
+  "tvdb": {
+    "season": 1,
+    "episode": 1
+  }
 }
 ```
 
@@ -6309,7 +6315,7 @@ Treat it like Sync: **trigger on a user-visible event, never on a background tim
 
 | Trigger | What to do |
 |---|---|
-| App launch / wake-from-background | If `now − last_changes_poll ≥ 24 h`, run the loop below and save `now` as `last_changes_poll`. If less than 24 h, skip — the 14-day response window means the same IDs will still be there tomorrow. |
+| App launch / wake-from-background | If `now() − last_changes_poll ≥ 24 h`, run the loop below and save `now()` as `last_changes_poll`. If less than 24 h, skip — the 14-day response window means the same IDs will still be there tomorrow. |
 | Manual refresh button | Always allow — bypasses the 24 h gate so the user can force a check. |
 | Never | Background `setInterval` timers, per-user crons, real-time loops, polling on every screen transition. These will get the `client_id` rate-limited. |
 
@@ -6326,7 +6332,7 @@ Treat it like Sync: **trigger on a user-visible event, never on a background tim
 | TV show metadata + new episode counts / status | [`GET /tv/{id}`](/api-reference/simkl/get-tv-show) and/or [`GET /tv/episodes/{id}`](/api-reference/simkl/get-tv-episodes) |
 | Anime metadata + new episodes | [`GET /anime/{id}`](/api-reference/simkl/get-anime) and/or [`GET /anime/episodes/{id}`](/api-reference/simkl/get-anime-episodes) |
 
-The detail endpoints are edge-cached by Simkl ID, so popular titles come straight from Cloudflare without hitting origin. **When an item's metadata or episodes change, Simkl automatically purges its Cloudflare cache entry** — so a refetch right after `/changes` flagged the ID is guaranteed to return the fresh data, never a stale edge copy. After the refetch, save `now` as `last_changes_poll`.
+The detail endpoints are edge-cached by Simkl ID, so popular titles come straight from Cloudflare without hitting origin. **When an item's metadata or episodes change, Simkl automatically purges its Cloudflare cache entry** — so a refetch right after `/changes` flagged the ID is guaranteed to return the fresh data, never a stale edge copy. After the refetch, save `now()` as `last_changes_poll`.
 
 #### Skip rules — when not to refetch
 
@@ -6359,17 +6365,17 @@ An object with up to three keys (`movies`, `shows`, `anime`), each an array of i
 
 ```json
 {
- "movies": [
- 56145,
- 1029384
- ],
- "shows": [
- 17465,
- 92834
- ],
- "anime": [
- 39687
- ]
+  "movies": [
+    56145,
+    1029384
+  ],
+  "shows": [
+    17465,
+    92834
+  ],
+  "anime": [
+    39687
+  ]
 }
 ```
 
@@ -6576,26 +6582,26 @@ The response shape is identical across the three forms; only the included items 
 
 ```json
 {
- "id": 12345,
- "progress": 42.2,
- "paused_at": "2024-04-30T22:13:00Z",
- "type": "episode",
- "episode": {
- "season": 1,
- "number": 3,
- "title": "Chapter Three: Holly Jolly",
- "tvdb_season": 1,
- "tvdb_number": 3
- },
- "show": {
- "title": "Stranger Things",
- "year": 2016,
- "ids": {
- "simkl": 39687,
- "imdb": "tt4574334",
- "tvdb": 305288
- }
- }
+  "id": 12345,
+  "progress": 42.2,
+  "paused_at": "2024-04-30T22:13:00Z",
+  "type": "episode",
+  "episode": {
+    "season": 1,
+    "number": 3,
+    "title": "Chapter Three: Holly Jolly",
+    "tvdb_season": 1,
+    "tvdb_number": 3
+  },
+  "show": {
+    "title": "Stranger Things",
+    "year": 2016,
+    "ids": {
+      "simkl": 39687,
+      "imdb": "tt4574334",
+      "tvdb": 305288
+    }
+  }
 }
 ```
 
@@ -6685,11 +6691,11 @@ The no-param mode returns the same image keys as the redirect modes — concaten
 
 ```json
 {
- "id": 17465,
- "url": "https://simkl.com/tv/17465/game-of-thrones",
- "title": "Game of Thrones",
- "poster": "17/17465posterkey",
- "fanart": "17/17465fanartkey"
+  "id": 17465,
+  "url": "https://simkl.com/tv/17465/game-of-thrones",
+  "title": "Game of Thrones",
+  "poster": "17/17465posterkey",
+  "fanart": "17/17465fanartkey"
 }
 ```
 
@@ -6720,21 +6726,21 @@ Both forms still need the standard URL params on every request — `client_id`, 
 
 ```json
 {
- "title": "string",
- "year": "integer | null (extracted from the episode air time)",
- "date": "ISO-8601 string with -05:00 offset | null",
- "poster": "string (relative path; prepend https://simkl.in/posters/ + size)",
- "rank": "integer | null (Simkl popularity rank; null when not yet ranked)",
- "url": "string (relative simkl.com URL)",
- "ids": {
- "simkl_id": "integer",
- "slug": "string"
- },
- "episode": {
- "season": "integer",
- "episode": "integer",
- "url": "string"
- }
+  "title": "string",
+  "year": "integer | null  (extracted from the episode air time)",
+  "date": "ISO-8601 string with -05:00 offset | null",
+  "poster": "string  (relative path; prepend https://simkl.in/posters/ + size)",
+  "rank": "integer | null  (Simkl popularity rank; null when not yet ranked)",
+  "url": "string  (relative simkl.com URL)",
+  "ids": {
+    "simkl_id": "integer",
+    "slug": "string"
+  },
+  "episode": {
+    "season": "integer",
+    "episode": "integer",
+    "url": "string"
+  }
 }
 ```
 
@@ -7008,20 +7014,20 @@ Returns the authenticated user's profile (name, avatar, bio, location, age) and 
 
 ```json
 {
- "user": {
- "name": "username",
- "joined_at": "2018-01-15T00:00:00Z",
- "gender": "Male",
- "avatar": "https://simkl.in/avatars/.../user_100.jpg",
- "bio": "I like anime.",
- "loc": "Spain",
- "age": 28
- },
- "account": {
- "id": 12345,
- "timezone": "Europe/Madrid",
- "type": "vip"
- }
+  "user": {
+    "name": "username",
+    "joined_at": "2018-01-15T00:00:00Z",
+    "gender": "Male",
+    "avatar": "https://simkl.in/avatars/.../user_100.jpg",
+    "bio": "I like anime.",
+    "loc": "Spain",
+    "age": 28
+  },
+  "account": {
+    "id": 12345,
+    "timezone": "Europe/Madrid",
+    "type": "vip"
+  }
 }
 ```
 
@@ -7055,19 +7061,19 @@ Public profiles can be fetched without a bearer token (clientId-only). Private p
 
 ```json
 {
- "total_mins": 78230,
- "movies": {
- "total_mins": 18000,
- "plantowatch": { "mins": 0, "count": 12 },
- "completed": { "mins": 18000, "count": 200 },
- "dropped": { "mins": 0, "count": 1 }
- },
- "tv": {
- "total_mins": 35000,
- "watching": { "watched_episodes_count": 23, "count": 4, "left_to_watch_episodes": 12, "left_to_watch_mins": 600, "total_episodes_count": 35 }
- },
- "anime": {... },
- "watched_last_week": { "total_mins": 320, "movies_mins": 60, "tv_mins": 200, "anime_mins": 60 }
+  "total_mins": 78230,
+  "movies": {
+    "total_mins": 18000,
+    "plantowatch": { "mins": 0, "count": 12 },
+    "completed": { "mins": 18000, "count": 200 },
+    "dropped": { "mins": 0, "count": 1 }
+  },
+  "tv": {
+    "total_mins": 35000,
+    "watching": { "watched_episodes_count": 23, "count": 4, "left_to_watch_episodes": 12, "left_to_watch_mins": 600, "total_episodes_count": 35 }
+  },
+  "anime": {... },
+  "watched_last_week": { "total_mins": 320, "movies_mins": 60, "tv_mins": 200, "anime_mins": 60 }
 }
 ```
 
@@ -7155,7 +7161,7 @@ Returns an array of `{id, simkl: {rating, votes, droprate}}` for every item in t
 
 | Segment | Values | Notes |
 |---|---|---|
-| `type` | `movies`, `tv`, `anime`, `all` | Required. Use `/ratings/all` to get every type in one response. |
+| `type`  | `movies`, `tv`, `anime`, `all` | Required. Use `/ratings/all` to get every type in one response. |
 
 #### Query
 
@@ -7169,11 +7175,11 @@ Returns an array of `{id, simkl: {rating, votes, droprate}}` for every item in t
 | `fields` value | Adds |
 |---|---|
 | `simkl` *(default)* | `simkl: {rating, votes, droprate}` per item. |
-| `ext` | `imdb: {rating, votes}` and/or `mal: {rating, votes, rank}` (only the providers Simkl has on file for the title). |
-| `rank` | `rank` integer — Simkl's catalog rank for the item. |
+| `ext`               | `imdb: {rating, votes}` and/or `mal: {rating, votes, rank}` (only the providers Simkl has on file for the title). |
+| `rank`              | `rank` integer — Simkl's catalog rank for the item. |
 | `release_status` | Release status, lower-case: `released` (movies), `ended`, `returning series` (TV) or `ongoing` (anime). Titles not out yet: `upcoming`, `planned`, `in production`, `post production`, `rumored` or `canceled`. |
 | `year` | `release_year` integer. |
-| `link` | Canonical Simkl URL for the item. |
+| `link`              | Canonical Simkl URL for the item. |
 
 Combine multiple with commas: `fields=simkl,ext,year,rank`. Unknown values (including `reactions` and `has_trailer`, which are valid on the hidden single-item rating endpoint but **not** here) are silently ignored.
 
@@ -7411,13 +7417,13 @@ What you send determines what gets removed.
 
 ```json
 {
- "shows": [{
- "ids": {...},
- "seasons": [{
- "number": 1,
- "episodes": [{ "number": 1 }, { "number": 2 }]
- }]
- }]
+  "shows": [{
+    "ids": {...},
+    "seasons": [{
+      "number": 1,
+      "episodes": [{ "number": 1 }, { "number": 2 }]
+    }]
+  }]
 }
 ```
 
@@ -7465,12 +7471,12 @@ Status: **201 Created**.
 **Anime titles** can go in `shows[]` or a top-level `anime[]` array, with anime IDs like `mal` / `anidb` / `anilist` inside `ids` — both are treated the same, and anime is counted and reported under `shows`. See [Anime under shows[]](/conventions/standard-media-objects#anime).
 
 <CardGroup cols={2}>
- <Card title="POST /sync/history" icon="clock" href="/api-reference/simkl/add-to-history" horizontal>
- The mirror endpoint that adds history. Same body shape; this page is the removal side.
- </Card>
- <Card title="Sync guide — full walkthrough" icon="arrows-rotate" href="/guides/sync" horizontal>
- Two-phase model (initial pull → activities-checked delta loop), deletion reconciliation, and reference implementations.
- </Card>
+  <Card title="POST /sync/history" icon="clock" href="/api-reference/simkl/add-to-history" horizontal>
+    The mirror endpoint that adds history. Same body shape; this page is the removal side.
+  </Card>
+  <Card title="Sync guide — full walkthrough" icon="arrows-rotate" href="/guides/sync" horizontal>
+    Two-phase model (initial pull → activities-checked delta loop), deletion reconciliation, and reference implementations.
+  </Card>
 </CardGroup>
 
 <Tip>
@@ -7503,14 +7509,14 @@ Status: **201 Created**.
 
 ```json
 {
- "deleted": {
- "movies": <number of movies un-rated>,
- "shows": <number of shows un-rated (anime included)>
- },
- "not_found": {
- "movies": [<items Simkl could not match>],
- "shows": [<items Simkl could not match>]
- }
+  "deleted": {
+    "movies": <number of movies un-rated>,
+    "shows":  <number of shows un-rated (anime included)>
+  },
+  "not_found": {
+    "movies": [<items Simkl could not match>],
+    "shows":  [<items Simkl could not match>]
+  }
 }
 ```
 
@@ -7519,12 +7525,12 @@ Status: **201 Created**.
 **`deleted` counts matched items**, not items that actually had a rating. If you send a movie that Simkl resolves to a canonical record but the user never rated it, that movie still counts in `deleted.movies`. The call is idempotent — sending the same body twice has the same end state on the second call as on the first.
 
 <CardGroup cols={2}>
- <Card title="POST /sync/ratings" icon="star" href="/api-reference/simkl/add-ratings" horizontal>
- The mirror endpoint that sets ratings. Same body shape minus the `rating` field on each item.
- </Card>
- <Card title="Sync guide — full walkthrough" icon="arrows-rotate" href="/guides/sync" horizontal>
- The two-phase sync model and how rating activity surfaces in `/sync/activities`.
- </Card>
+  <Card title="POST /sync/ratings" icon="star" href="/api-reference/simkl/add-ratings" horizontal>
+    The mirror endpoint that sets ratings. Same body shape minus the `rating` field on each item.
+  </Card>
+  <Card title="Sync guide — full walkthrough" icon="arrows-rotate" href="/guides/sync" horizontal>
+    The two-phase sync model and how rating activity surfaces in `/sync/activities`.
+  </Card>
 </CardGroup>
 
 <Tip>
@@ -7678,8 +7684,8 @@ Stopping a session that's already been finalized within the past hour returns **
 
 ```json
 {
- "watched_at": "2024-05-01T18:00:00-05:00",
- "expires_at": "2024-05-01T19:00:00-05:00"
+  "watched_at": "2024-05-01T18:00:00-05:00",
+  "expires_at": "2024-05-01T19:00:00-05:00"
 }
 ```
 
@@ -7854,21 +7860,21 @@ Look up Simkl records by any external ID — IMDB, TMDB, TVDB, MAL, AniDB, AniLi
 
 ```json
 {
- "type": "anime",
- "title": "Attack on Titan",
- "poster": "39/396870bc78f2ba7e",
- "year": 2013,
- "status": "ended",
- "total_episodes": 75,
- "anime_type": "tv",
- "ids": {
- "simkl": 39687,
- "slug": "attack-on-titan"
- },
- "mal": {
- "id": 16498,
- "type": "tv"
- }
+  "type": "anime",
+  "title": "Attack on Titan",
+  "poster": "39/396870bc78f2ba7e",
+  "year": 2013,
+  "status": "ended",
+  "total_episodes": 75,
+  "anime_type": "tv",
+  "ids": {
+    "simkl": 39687,
+    "slug": "attack-on-titan"
+  },
+  "mal": {
+    "id": 16498,
+    "type": "tv"
+  }
 }
 ```
 
@@ -8045,7 +8051,7 @@ All filters can be sent as either query parameters or a JSON body — both forms
 | Shape | When |
 |---|---|
 | `{ simkl_id, simkl_url }` | `limit` omitted → single random item. |
-| `[{ simkl_id, simkl_url },...]` | `limit` set → array of up to `limit` items. |
+| `[{ simkl_id, simkl_url }, ...]` | `limit` set → array of up to `limit` items. |
 | `{ error: "not_found" }` | Filters matched nothing. Still status `200` (no 404). |
 
 When `service != simkl` and a matching service link exists, the item gains `{service}_id` and `{service}_url`. When no link exists, the item still returns but without those extra keys.
