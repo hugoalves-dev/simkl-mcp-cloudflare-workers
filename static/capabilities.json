@@ -160,7 +160,7 @@
     },
     {
       "name": "simkl_search_by_id",
-      "description": "Resolve a supported media ID through Simkl’s public redirect endpoint, then return the matching cached detail record.",
+      "description": "Look up one title by a supported media ID (or title) and return its cached Simkl detail record. For occasional lookups only: bulk catalog mapping is unsupported and a shared daily budget blocks it. Pass simkl with type movie/tv/anime to skip resolution. Write tools (scrobble, history, ratings, lists) need no Simkl ID: send the external IDs you already have directly.",
       "inputSchema": {
         "type": "object",
         "properties": {

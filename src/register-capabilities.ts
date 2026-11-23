@@ -11,9 +11,10 @@ import type { LibraryAdapter } from './library/adapter';
 import { toMcpErrorResult } from './api/errors';
 import { selectWatchlist, watchlistResourceContents } from './library/watchlist';
 import { withRating } from './format/media';
+import type { RedirectGuard } from './api/id-resolution';
 
 // Both the deployed agent and build-time MCP discovery use this registration path.
-export function registerCapabilities(server: McpServer, client: SimklClient, library: LibraryAdapter, getToken: () => string | undefined) {
+export function registerCapabilities(server: McpServer, client: SimklClient, library: LibraryAdapter, getToken: () => string | undefined, redirectGuard?: RedirectGuard) {
     const rewatchService = new RewatchService(client, getToken, Date.now,
       (path, options) => library.write(path, options, options.token),
       token => library.getSettings(token),
@@ -25,6 +26,7 @@ export function registerCapabilities(server: McpServer, client: SimklClient, lib
         return lines.length ? lines.join('\n') : 'no watchlist items matched';
       },
       write: (path, options) => library.write(path, options),
+      redirectGuard,
     });
     registerRewatchTools(server, rewatchService);
     // Resolved lazily: discovery registers tools without touching the library.

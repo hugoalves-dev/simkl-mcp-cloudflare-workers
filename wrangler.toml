@@ -26,6 +26,10 @@ new_sqlite_classes = ["SimklMCP"]
 tag = "v2"
 new_sqlite_classes = ["SimklLibraryCache"]
 
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["SimklIdResolutionGuard"]
+
 [[durable_objects.bindings]]
 name = "MCP_OBJECT"
 class_name = "SimklMCP"
@@ -33,6 +37,11 @@ class_name = "SimklMCP"
 [[durable_objects.bindings]]
 name = "SIMKL_LIBRARY_CACHE"
 class_name = "SimklLibraryCache"
+
+# Application-wide /redirect budget and public ID-resolution cache (no user data).
+[[durable_objects.bindings]]
+name = "SIMKL_ID_RESOLUTION"
+class_name = "SimklIdResolutionGuard"
 
 # Generate metadata before local development, dry runs and all deployments.
 [build]
@@ -49,6 +58,11 @@ run_worker_first = true
 SIMKL_API_BASE_URL = "https://api.simkl.com"
 # Minimum lazy activity-check interval; invalid values fall back to 300 seconds.
 SIMKL_LIBRARY_CACHE_TTL_SECONDS = "300"
+# Simkl blocks a client_id from the whole API above 1,000-10,000 /redirect calls
+# a day. Rolling 24h ceiling on upstream attempts; values above 999 are clamped.
+SIMKL_REDIRECT_DAILY_BUDGET = "500"
+# How long successful external ID -> Simkl ID resolutions are reused (30 days).
+SIMKL_ID_CACHE_TTL_SECONDS = "2592000"
 
 # OAuth callback URLs contain one-time credentials. Always redact them.
 [observability]

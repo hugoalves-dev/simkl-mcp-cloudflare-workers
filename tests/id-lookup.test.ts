@@ -1,5 +1,21 @@
 import { describe, expect, test } from 'bun:test';
 import { getMediaById, parseSimklRedirect } from '../src/api/id-lookup';
+import { sqliteStorage } from './helpers/library-storage';
+import { IdResolutionStore } from '../src/api/id-resolution-store';
+import { SimklRedirectBudgetError, type RedirectGuard } from '../src/api/id-resolution';
+
+function memoryGuard(limit = 500) {
+  const store = new IdResolutionStore(sqliteStorage().storage);
+  const guard: RedirectGuard = {
+    async lookup(key) { return store.lookup(key, Date.now()); },
+    async reserve() {
+      const reservation = store.reserve(Date.now(), limit);
+      if (!reservation.allowed) throw new SimklRedirectBudgetError(reservation.retryAfterSeconds);
+    },
+    async store(key, value) { store.store(key, value, Date.now(), 3600); },
+  };
+  return guard;
+}
 
 describe('parseSimklRedirect', () => {
   test.each([
@@ -31,7 +47,7 @@ describe('getMediaById', () => {
       },
     } as any;
 
-    const result = await getMediaById(client, { imdb: 'tt1375666' });
+    const result = await getMediaById(client, { imdb: 'tt1375666' }, memoryGuard());
     expect(result).toEqual({ title: 'Inception', ids: { simkl: 472214 }, simkl_url: 'https://simkl.com/movies/472214/inception' });
     expect(calls).toHaveLength(2);
     expect(calls[0]).toEqual({
@@ -41,6 +57,7 @@ describe('getMediaById', () => {
         authorization: 'none',
         redirect: 'manual',
         query: { to: 'simkl', imdb: 'tt1375666' },
+        beforeAttempt: expect.any(Function),
       },
     });
     expect(calls[1]).toEqual({ path: '/movies/472214', options: { method: 'GET', authorization: 'none' } });
@@ -54,7 +71,7 @@ describe('getMediaById', () => {
         return path === '/redirect' ? { redirectUrl: 'https://simkl.com/anime/2345/title' } : { title: 'Anime' };
       },
     } as any;
-    const result = await getMediaById(client, { mal: 1 });
+    const result = await getMediaById(client, { mal: 1 }, memoryGuard());
     expect(paths).toEqual(['/redirect', '/anime/2345']);
     expect(result).toEqual({ title: 'Anime', simkl_url: 'https://simkl.com/anime/2345/title' });
   });
@@ -73,7 +90,7 @@ describe('getMediaById', () => {
     const client = {
       request: async () => { requests++; return { redirectUrl: 'https://simkl.com/search' }; },
     } as any;
-    await expect(getMediaById(client, { tmdb: 123, type: 'movie' })).rejects.toThrow('No matching Simkl title was found');
+    await expect(getMediaById(client, { tmdb: 123, type: 'movie' }, memoryGuard())).rejects.toThrow('No matching Simkl title was found');
     expect(requests).toBe(1);
   });
 

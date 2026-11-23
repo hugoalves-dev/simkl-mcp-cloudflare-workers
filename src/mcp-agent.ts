@@ -5,6 +5,7 @@ import { McpAgent } from 'agents/mcp';
 import { SimklClient } from './api/client.js';
 import { createLibraryAdapter } from './library/adapter';
 import { registerCapabilities } from './register-capabilities';
+import { createRedirectGuard } from './api/id-resolution';
 
 interface Env extends WorkerEnv, SimklOAuthEnv {}
 
@@ -25,6 +26,6 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
       clientId: this.env?.SIMKL_CLIENT_ID || '',
     });
     const library = createLibraryAdapter(this.env, client, () => this.props);
-    registerCapabilities(this.server, client, library, () => this.props?.simklToken);
+    registerCapabilities(this.server, client, library, () => this.props?.simklToken, createRedirectGuard(this.env?.SIMKL_ID_RESOLUTION));
   }
 }

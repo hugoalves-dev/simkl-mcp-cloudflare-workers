@@ -6,13 +6,16 @@ interface __BaseEnv_WorkerEnv {
 	ASSETS: Fetcher;
 	SIMKL_API_BASE_URL: "https://api.simkl.com";
 	SIMKL_LIBRARY_CACHE_TTL_SECONDS: "300";
+	SIMKL_REDIRECT_DAILY_BUDGET: "500";
+	SIMKL_ID_CACHE_TTL_SECONDS: "2592000";
 	MCP_OBJECT: DurableObjectNamespace<import("./src/index").SimklMCP>;
 	SIMKL_LIBRARY_CACHE: DurableObjectNamespace<import("./src/index").SimklLibraryCache>;
+	SIMKL_ID_RESOLUTION: DurableObjectNamespace<import("./src/index").SimklIdResolutionGuard>;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "SimklMCP" | "SimklLibraryCache";
+		durableNamespaces: "SimklMCP" | "SimklLibraryCache" | "SimklIdResolutionGuard";
 	}
 	interface Env extends __BaseEnv_WorkerEnv {}
 }

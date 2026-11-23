@@ -139,6 +139,15 @@ Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) ac
 
 Under AUTH V2, search, best, live genre, user stats, Custom Lists and all writes need the user's access token; without one these tools fail locally with a clear message and send nothing. Title details, episode lists, `/redirect` ID lookups and `data.simkl.in` files (trending, calendar) stay public and never send a token.
 
+### ID lookups (`simkl_search_by_id`)
+
+Simkl blocks a client from **the entire API** once it sends more than 1,000–10,000 `/redirect` requests a day, so ID lookups are for the occasional title only. **Catalog imports and bulk ID mapping are unsupported.** To scrobble, mark watched, rate or add to a list, pass the IMDB/TMDB/TVDB/MAL IDs you already have to the write tools directly; Simkl matches them without a Simkl ID.
+
+- A `simkl` ID with `type` `movie`, `tv` or `anime` fetches the detail record directly, without `/redirect`.
+- Successful resolutions are cached in the `SimklIdResolutionGuard` Durable Object (public catalog data only, separate from per-user library storage) for `SIMKL_ID_CACHE_TTL_SECONDS` (default 30 days). Unresolved lookups are not cached.
+- Every upstream `/redirect` attempt, retries included, reserves one unit of a shared, application-wide budget of `SIMKL_REDIRECT_DAILY_BUDGET` (default 500, clamped to 999) over a rolling 24-hour window. Once spent, new lookups fail with a non-retryable `SIMKL_ID_RESOLUTION_BUDGET_EXHAUSTED` error; cached lookups keep working. There is no `/search/id` fallback.
+- The budget is per Worker deployment. Deployments that share one Simkl `client_id` (e.g. staging and production) each get their own counter, so split the budget between them or use separate client IDs.
+
 ### Custom Lists
 
 Custom Lists need a Simkl PRO or VIP account and an AUTH V2 token; writes also need the `media:write` scope, which this server requests at sign-in. A free account receives an HTTP 200 `premium_only` placeholder on reads; the tools report it as an error and never as list data.

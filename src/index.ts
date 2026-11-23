@@ -8,6 +8,7 @@ import { refreshSimklToken, type SimklAuthProps, type SimklOAuthEnv, type SimklT
 
 export { SimklMCP };
 export { SimklLibraryCache } from './library/cache.js';
+export { SimklIdResolutionGuard } from './api/id-resolution-object.js';
 
 type Env = WorkerEnv & SimklOAuthEnv;
 
