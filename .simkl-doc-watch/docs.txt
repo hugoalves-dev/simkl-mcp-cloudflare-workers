@@ -4752,6 +4752,14 @@ Two jobs: link from anywhere into the right Simkl page (no API call), or resolve
 
 `GET /redirect` is a passive helper that **`301`-redirects** to a Simkl URL given any combination of identifiers. It's designed for two distinct situations — pick the one that matches your job.
 
+> [!CAUTION]
+>
+> **`/redirect` is not a catalog-mapping service.** It is for links people click and for looking up the occasional title. Do not use it to translate a streaming catalog, an addon's library or any other bulk list of TMDB / IMDb IDs into Simkl IDs.
+>
+> **Clients sending more than 1,000–10,000 `/redirect` requests a day are blocked automatically from the entire Simkl API** — every endpoint, not only this one.
+>
+> You do not need a Simkl ID to scrobble, mark something watched, rate it or add it to a list: send the IDs you already have and Simkl matches them. If you need Simkl IDs for many titles, [talk to us on Discord](https://discord.gg/MJsWNE4) first.
+
 ## Two use cases
 
 > [card] [1. Link to Simkl without an API call](#use-case-1-%E2%80%94-link-to-simkl-when-you-don%E2%80%99t-have-a-simkl-id)
@@ -4893,6 +4901,10 @@ The `slug` is **technically optional, but always include it when you have it.** 
 ***
 
 ## Use case 2 — Resolve an external ID to a Simkl ID
+
+> [!WARNING]
+>
+> **One title at a time, not a catalog.** More than 1,000–10,000 `/redirect` requests a day gets the client blocked from the entire API — see [the daily limit](#daily-limit).
 
 You have an external ID (IMDB, TMDB, TVDB, MAL, AniDB, AniList, Kitsu, etc.) and you need the **Simkl ID** so you can fetch the full record from `/movies/{id}`, `/tv/{id}`, or `/anime/{id}`. **This is the recommended path** — `/redirect` returns a tiny redirect with the Simkl ID baked into the URL, and the detail endpoints are aggressively cached on Cloudflare by Simkl ID.
 
@@ -7320,6 +7332,14 @@ Every `/oauth2/*` response is sent with `Cache-Control: no-store` and `Pragma: n
 Source: https://api.simkl.org/api-reference/simkl/redirect
 
 /openapi.json get /redirect
+<Danger>
+**`/redirect` is not a catalog-mapping service.** It is for links people click and for looking up the occasional title. Do not use it to translate a streaming catalog, an addon's library or any other bulk list of TMDB / IMDb IDs into Simkl IDs.
+
+**Clients sending more than 1,000–10,000 `/redirect` requests a day are blocked automatically from the entire Simkl API** — every endpoint, not only this one.
+
+You do not need a Simkl ID to scrobble, mark something watched, rate it or add it to a list: send the IDs you already have and Simkl matches them. If you need Simkl IDs for many titles, [talk to us on Discord](https://discord.gg/MJsWNE4) first.
+</Danger>
+
 A passive helper endpoint that **`301`-redirects** to a Simkl page (or an action) given any combination of IDs or a title.
 
 It's designed for two situations:
@@ -16643,6 +16663,10 @@ If you've already called `/movies/:id`, `/tv/:id`, `/anime/:id`, or any sync end
 ## Need the Simkl ID for an API call?
 
 `/redirect` is also the **cheapest way** to resolve an external ID into a Simkl ID — much lighter than `GET /search/id`. Issue a HEAD request, parse the `Location` header for the numeric ID, then call `/movies/{id}` / `/tv/{id}` / `/anime/{id}` to get the full record. The follow-up call is Cloudflare-cached by Simkl ID, so repeat lookups of the same title cost almost nothing.
+
+> [!CAUTION]
+>
+> **This is for the occasional title, not for mapping a catalog.** Clients sending more than 1,000–10,000 `/redirect` requests a day are blocked automatically from the entire Simkl API. To scrobble, mark watched, rate or add to a list you need no Simkl ID at all — send the IDs you have. See [the daily limit](/api-reference/redirect#daily-limit).
 
 > [card] [External ID → Simkl ID — full reference](/api-reference/redirect#use-case-2)
 >
