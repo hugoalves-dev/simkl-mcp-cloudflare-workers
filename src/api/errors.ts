@@ -1,6 +1,8 @@
 import { SimklApiError } from './client.js';
 import { SimklGenreInputError } from './trending.js';
 import { LibrarySyncLimitError, SimklAuthRequiredError } from '../library/errors.js';
+import { SimklRedirectBudgetError, SimklRedirectGuardUnavailableError } from './id-resolution.js';
+import { SimklIdLookupError } from './id-lookup.js';
 
 interface McpErrorResult {
   isError: true;
@@ -29,6 +31,15 @@ export function toMcpErrorResult(error: unknown): McpErrorResult {
   }
   if (error instanceof LibrarySyncLimitError) {
     return { isError: true, content: [{ type: 'text', text: `SIMKL_SYNC_PARTITION_EXHAUSTED: ${error.message}` }] };
+  }
+  if (error instanceof SimklRedirectBudgetError) {
+    return { isError: true, content: [{ type: 'text', text: `SIMKL_ID_RESOLUTION_BUDGET_EXHAUSTED: this server's shared daily budget for new Simkl ID lookups is spent; no request was sent to Simkl. Do not retry or loop: bulk catalog mapping is unsupported. Previously resolved IDs still work. To scrobble, mark watched, rate or add to a list, send the IMDB/TMDB/TVDB/MAL IDs you already have directly; Simkl matches them. New lookups resume in about ${Math.ceil(error.retryAfterSeconds / 60)} minutes.` }] };
+  }
+  if (error instanceof SimklRedirectGuardUnavailableError) {
+    return { isError: true, content: [{ type: 'text', text: 'Simkl ID lookup is temporarily unavailable because its request budget cannot be checked; no request was sent to Simkl. Send the IDs you already have directly to write tools instead.' }] };
+  }
+  if (error instanceof SimklIdLookupError) {
+    return { isError: true, content: [{ type: 'text', text: error.message }] };
   }
   if (error instanceof SimklGenreInputError) {
     return { isError: true, content: [{ type: 'text', text: error.message }] };

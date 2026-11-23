@@ -20,6 +20,8 @@ export interface RequestOptions {
   redirect?: 'follow' | 'error' | 'manual';
   responseProfile?: 'library';
   rateLimitRetry?: boolean;
+  /** Runs before every upstream fetch, retries included; throwing aborts the request. */
+  beforeAttempt?: () => Promise<void>;
   body?: unknown;
   query?: Record<string, string | number | undefined>;
 }
@@ -204,6 +206,7 @@ export class SimklClient {
       let serverRetries = 0;
       let rateLimitRetried = false;
       while (true) {
+        if (options.beforeAttempt) await options.beforeAttempt();
         try {
           response = await fetch(url, init);
         } catch {

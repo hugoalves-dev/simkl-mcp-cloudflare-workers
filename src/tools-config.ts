@@ -67,14 +67,14 @@ export const toolsWhitelist: ToolConfig[] = [
   {
     path: '/search/id',
     method: 'get',
-    description: 'Resolve a supported media ID through Simkl’s public redirect endpoint, then return the matching cached detail record.',
+    description: 'Look up one title by a supported media ID (or title) and return its cached Simkl detail record. For occasional lookups only: bulk catalog mapping is unsupported and a shared daily budget blocks it. Pass simkl with type movie/tv/anime to skip resolution. Write tools (scrobble, history, ratings, lists) need no Simkl ID: send the external IDs you already have directly.',
     custom: {
       name: 'simkl_search_by_id',
       schema: "z.object({ simkl: z.number().int().positive().optional(), hulu: z.number().int().positive().optional(), netflix: z.number().int().positive().optional(), mal: z.number().int().positive().optional(), tvdb: z.string().optional(), tmdb: z.number().int().positive().optional(), imdb: z.string().regex(/^tt\\d+$/).optional(), anidb: z.number().int().positive().optional(), crunchyroll: z.string().optional(), anilist: z.number().int().positive().optional(), kitsu: z.number().int().positive().optional(), livechart: z.number().int().positive().optional(), anisearch: z.number().int().positive().optional(), animeplanet: z.string().optional(), anfo: z.string().optional(), ann: z.number().int().positive().optional(), tvcom: z.string().optional(), zap2it: z.string().optional(), traktslug: z.string().optional(), letterboxd: z.string().optional(), boxd: z.string().optional(), mdl: z.string().optional(), type: z.enum(['show', 'tv', 'movie', 'anime']).optional(), title: z.string().optional(), year: z.number().int().optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() })",
-      imports: ["import { getMediaById } from '../src/api/id-lookup.js';"],
+      imports: ["import { getMediaById } from '../src/api/id-lookup.js';", "import type { RedirectGuard } from '../src/api/id-resolution.js';"],
       handler: `async (args: any) => {
         try {
-          const result = await getMediaById(client, args);
+          const result = await getMediaById(client, args, hooks.redirectGuard);
           return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         } catch (error) {
           return toMcpErrorResult(error);

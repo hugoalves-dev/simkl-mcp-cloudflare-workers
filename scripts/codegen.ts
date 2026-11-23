@@ -475,6 +475,7 @@ export interface LibraryToolHooks {
   getWatchlist?: (args: Record<string, unknown>) => Promise<string>;
   afterLibraryWrite?: () => Promise<void>;
   write?: (path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown }) => Promise<unknown>;
+  redirectGuard?: RedirectGuard;
 }
 async function requestWrite(client: any, hooks: LibraryToolHooks, path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown; authorization?: 'bearer' | 'none' }, token: string | undefined) {
   if (hooks.write) return hooks.write(path, options);

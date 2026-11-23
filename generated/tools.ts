@@ -11,6 +11,7 @@ import { LibraryQueryError } from '../src/library/watchlist.js';
 import { LibraryWriteInvalidationError } from '../src/library/errors.js';
 import { getTrendingByGenre } from '../src/api/trending.js';
 import { getMediaById } from '../src/api/id-lookup.js';
+import type { RedirectGuard } from '../src/api/id-resolution.js';
 import { formatAiringTool } from '../src/api/airing.js';
 
 const formatters: Record<string, (result: any, args: any) => string> = {
@@ -42,6 +43,7 @@ export interface LibraryToolHooks {
   getWatchlist?: (args: Record<string, unknown>) => Promise<string>;
   afterLibraryWrite?: () => Promise<void>;
   write?: (path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown }) => Promise<unknown>;
+  redirectGuard?: RedirectGuard;
 }
 async function requestWrite(client: any, hooks: LibraryToolHooks, path: string, options: { method: 'POST'; query?: Record<string, string | number | undefined>; body?: unknown; authorization?: 'bearer' | 'none' }, token: string | undefined) {
   if (hooks.write) return hooks.write(path, options);
@@ -103,10 +105,10 @@ export function registerTools(server: McpServer, client: any, getToken: () => st
 
     server.registerTool(
       'simkl_search_by_id',
-      { description: 'Resolve a supported media ID through Simkl’s public redirect endpoint, then return the matching cached detail record.', inputSchema: z.object({ simkl: z.number().int().positive().optional(), hulu: z.number().int().positive().optional(), netflix: z.number().int().positive().optional(), mal: z.number().int().positive().optional(), tvdb: z.string().optional(), tmdb: z.number().int().positive().optional(), imdb: z.string().regex(/^tt\d+$/).optional(), anidb: z.number().int().positive().optional(), crunchyroll: z.string().optional(), anilist: z.number().int().positive().optional(), kitsu: z.number().int().positive().optional(), livechart: z.number().int().positive().optional(), anisearch: z.number().int().positive().optional(), animeplanet: z.string().optional(), anfo: z.string().optional(), ann: z.number().int().positive().optional(), tvcom: z.string().optional(), zap2it: z.string().optional(), traktslug: z.string().optional(), letterboxd: z.string().optional(), boxd: z.string().optional(), mdl: z.string().optional(), type: z.enum(['show', 'tv', 'movie', 'anime']).optional(), title: z.string().optional(), year: z.number().int().optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
+      { description: 'Look up one title by a supported media ID (or title) and return its cached Simkl detail record. For occasional lookups only: bulk catalog mapping is unsupported and a shared daily budget blocks it. Pass simkl with type movie/tv/anime to skip resolution. Write tools (scrobble, history, ratings, lists) need no Simkl ID: send the external IDs you already have directly.', inputSchema: z.object({ simkl: z.number().int().positive().optional(), hulu: z.number().int().positive().optional(), netflix: z.number().int().positive().optional(), mal: z.number().int().positive().optional(), tvdb: z.string().optional(), tmdb: z.number().int().positive().optional(), imdb: z.string().regex(/^tt\d+$/).optional(), anidb: z.number().int().positive().optional(), crunchyroll: z.string().optional(), anilist: z.number().int().positive().optional(), kitsu: z.number().int().positive().optional(), livechart: z.number().int().positive().optional(), anisearch: z.number().int().positive().optional(), animeplanet: z.string().optional(), anfo: z.string().optional(), ann: z.number().int().positive().optional(), tvcom: z.string().optional(), zap2it: z.string().optional(), traktslug: z.string().optional(), letterboxd: z.string().optional(), boxd: z.string().optional(), mdl: z.string().optional(), type: z.enum(['show', 'tv', 'movie', 'anime']).optional(), title: z.string().optional(), year: z.number().int().optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() }), annotations: { readOnlyHint: true, idempotentHint: true } },
       async (args: any) => {
         try {
-          const result = await getMediaById(client, args);
+          const result = await getMediaById(client, args, hooks.redirectGuard);
           return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         } catch (error) {
           return toMcpErrorResult(error);

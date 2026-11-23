@@ -1,6 +1,10 @@
 import { withSimklItemLink } from '../format/media';
+import {
+  idResolutionKey, SimklRedirectGuardUnavailableError,
+  type RedirectGuard, type ResolvedSimklId, type SimklDetailType,
+} from './id-resolution';
 
-export type SimklDetailType = 'movies' | 'tv' | 'anime';
+export type { SimklDetailType } from './id-resolution';
 
 interface SimklRedirectResult {
   redirectUrl?: string | null;
@@ -50,6 +54,7 @@ export async function getMediaById(
     request<T = unknown>(path: string, options: Record<string, unknown>): Promise<T>;
   },
   args: Record<string, unknown>,
+  guard?: RedirectGuard,
 ): Promise<unknown> {
   const query: Record<string, string | number> = {};
   let hasLookupValue = false;
@@ -111,29 +116,54 @@ export async function getMediaById(
     }
   }
 
+  const resolved = await resolveSimklId(client, query, guard);
+  const detail = await client.request<any>(`/${resolved.type}/${resolved.id}`, {
+    method: 'GET',
+    authorization: 'none',
+  });
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return detail;
+  return withSimklItemLink(detail, resolved.type, resolved.id, resolved.slug);
+}
+
+const directDetailTypes: Record<string, SimklDetailType> = { movie: 'movies', tv: 'tv', anime: 'anime' };
+
+async function resolveSimklId(
+  client: { request<T = unknown>(path: string, options: Record<string, unknown>): Promise<T> },
+  query: Record<string, string | number>,
+  guard: RedirectGuard | undefined,
+): Promise<ResolvedSimklId> {
+  // A Simkl ID with a concrete type needs no resolution at all.
+  const directType = directDetailTypes[String(query.type)];
+  if (typeof query.simkl === 'number' && directType) return { type: directType, id: query.simkl };
+
+  if (!guard) throw new SimklRedirectGuardUnavailableError();
+  const key = await idResolutionKey(query);
+  const cached = await guard.lookup(key);
+  if (cached) return cached;
+
+  // No /search/id fallback: that would only bypass the /redirect budget.
   const redirect = await client.request<SimklRedirectResult>('/redirect', {
     method: 'GET',
     authorization: 'none',
     redirect: 'manual',
     query: { to: 'simkl', ...query },
+    beforeAttempt: () => guard.reserve(),
   });
-  const resolved = parseSimklRedirect(redirect?.redirectUrl);
-  if (!resolved) throw new SimklIdLookupError('No matching Simkl title was found');
+  const parsed = parseSimklRedirect(redirect?.redirectUrl);
+  if (!parsed) throw new SimklIdLookupError('No matching Simkl title was found');
 
-  const detail = await client.request<any>(`/${resolved.type}/${resolved.id}`, {
-    method: 'GET',
-    authorization: 'none',
-  });
-  let slug: string | undefined;
-  if (redirect?.redirectUrl) {
-    try {
-      const redirectUrl = redirect.redirectUrl.startsWith('//') ? `https:${redirect.redirectUrl}` : redirect.redirectUrl;
-      slug = new URL(redirectUrl).pathname.split('/')[3];
-      if (slug) slug = decodeURIComponent(slug);
-    } catch {
-      slug = undefined;
-    }
+  const resolved: ResolvedSimklId = { ...parsed, ...redirectSlug(redirect?.redirectUrl) };
+  await guard.store(key, resolved);
+  return resolved;
+}
+
+function redirectSlug(location?: string | null): { slug?: string } {
+  if (!location) return {};
+  try {
+    const raw = new URL(location.startsWith('//') ? `https:${location}` : location).pathname.split('/')[3];
+    const slug = raw ? decodeURIComponent(raw) : '';
+    return slug && slug.length <= 512 ? { slug } : {};
+  } catch {
+    return {};
   }
-  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return detail;
-  return withSimklItemLink(detail, resolved.type, resolved.id, slug);
 }
