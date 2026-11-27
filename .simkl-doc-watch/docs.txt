@@ -111,6 +111,8 @@ Every endpoint Simkl exposes, grouped by category. Use this page as a skim/grep 
 | `GET` | [`/sync/all-items/{type}/{status}`](/api-reference/simkl/get-all-items) | **Bearer.** Read a user's library, filtered by type and status. Pair with `date_from` for deltas. |
 | `POST` | [`/sync/history`](/api-reference/simkl/add-to-history) | **Bearer.** Mark items watched. Top-level `movies` / `shows` / `episodes` arrays. |
 | `POST` | [`/sync/history/remove`](/api-reference/simkl/remove-from-history) | **Bearer.** Un-mark items watched. |
+| `POST` | [`/sync/history/edit-dates`](/api-reference/simkl/edit-history-dates) | **Bearer.** Change watch dates, added dates and rewatch-session dates on titles already in the library. |
+| `POST` | [`/sync/history/edit-memos`](/api-reference/simkl/edit-memos) | **Bearer.** Set, change or clear the memo on titles already in the library. |
 | `POST` | [`/sync/ratings`](/api-reference/simkl/add-ratings) | **Bearer.** Rate items 1–10. |
 | `POST` | [`/sync/ratings/remove`](/api-reference/simkl/remove-ratings) | **Bearer.** Clear user-set ratings. |
 | `GET` | [`/sync/ratings/{type}/{rating}`](/api-reference/simkl/get-user-ratings) | **Bearer.** List items the user has rated, optionally filtered by rating value. |
@@ -5837,6 +5839,76 @@ Removes a saved playback session by its `id`. **HTTP method is `DELETE`** — us
  Real-time playback tracking — `/start`, `/pause`, `/stop` lifecycle, paused-playback resumption across devices, when scrobble auto-completes, and the difference between `/scrobble/checkin` (fire-and-forget) and `/scrobble/start` (active tracking).
 </Card>
 
+# Edit watch dates
+Source: https://api.simkl.org/api-reference/simkl/edit-history-dates
+
+/openapi.json post /sync/history/edit-dates
+Needs an [AUTH V2](/api-reference/auth-v2) user token with the `media:write` [scope](/api-reference/oauth2-scopes).
+
+Changes the dates on titles that are **already in the user's library** — when a movie was watched, when episodes were watched, when a title was added, or the dates of a rewatch session. **Nothing is marked watched, added or removed:** status, progress and counts stay as they are. To record a new watch use [`POST /sync/history`](/api-reference/simkl/add-to-history).
+
+#### What each field changes
+
+| Send | Changes | Applies to |
+|---|---|---|
+| `added_at` | When the title was added to the library — `added_to_watchlist_at` in [`/sync/all-items`](/api-reference/simkl/get-all-items) | Any movie or show in the library |
+| `watched_at` on a movie | The movie's watch date — `last_watched_at` | Completed movies. Any other status is refused in `errors` as `not_completed` |
+| `seasons[].episodes[].watched_at` | Those episodes' watch dates (read them with `extended=full&episode_watched_at=yes`). The show's `last_watched_at` follows its latest episode | Watched episodes. Unwatched ones come back in `not_found.episodes` |
+| `rewatch_id` with `watched_at` / `added_at` | That rewatch session's date, and when it started. The original watch is not touched | The user's own sessions |
+| `rewatch_id` with `seasons` | Those episodes' dates inside that session. The session's date follows its latest episode | Episodes in that session |
+
+A show has no watch date of its own to set: it always follows its latest episode.
+
+Titles are matched by their IDs exactly as on `POST /sync/history`. A flat `episodes[]` on a show is shorthand for season 1, and anime accept TVDB numbering with `use_tvdb_anime_seasons`.
+
+#### Dates
+
+ISO 8601 in UTC, e.g. `2024-04-04T10:00:00Z`. A date in the future is saved as now. Sending the date a title already has counts as updated. The ["Very long time ago"](/conventions/dates#very-long-time-ago) placeholder cannot be set here as a movie's or episode's watch date.
+
+#### Rewatch rules
+
+A rewatch date follows the same rules as [recording a rewatch](/guides/rewatches#the-2-day-gap): it cannot be earlier than the original watch (`before_original`), or within 2 days of the original watch or of another session (`too_soon`). Inside a session the check runs for each episode. `ref_date` is the date it clashes with, `min_gap_days` the required gap.
+
+<Note>
+**One call at a time per user.** A second `edit-dates` call for the same user waits for the first to finish; after 20 seconds it is refused with `400` `RATE_LIMIT`. Retry it then.
+</Note>
+
+#### Response
+
+Always `201`, whatever happened to each item. `updated.statuses[]` echoes every title that was updated; `not_found` echoes what could not be used; `errors[]` holds items that were found but refused, with the reason. Check all three.
+
+**Every change moves that title's status bucket in [`/sync/activities`](/api-reference/simkl/get-activities)** (`movies.completed` for a completed movie, and so on). Save the new timestamps after writing, so your next sync does not refetch what you just changed. One item can appear in two places — a plan-to-watch movie whose `added_at` was saved is in `updated`, and its refused `watched_at` in `errors`.
+
+# Edit memos
+Source: https://api.simkl.org/api-reference/simkl/edit-memos
+
+/openapi.json post /sync/history/edit-memos
+Needs an [AUTH V2](/api-reference/auth-v2) user token with the `media:write` [scope](/api-reference/oauth2-scopes).
+
+Sets, changes or clears the **memo** — the user's short note — on titles **already in the user's library**, in any status. Nothing else about the title changes. (A memo can also be set while recording a watch, with `memo` on [`POST /sync/history`](/api-reference/simkl/add-to-history).)
+
+| Send `memo` as | Result |
+|---|---|
+| `"Rewatch with subtitles"` | Sets the text. Privacy stays as it was; a new memo is public |
+| `{"text": "Only for me", "is_private": true}` | Sets the text and the privacy. A private memo is shown only to the user |
+| `""` | Clears the memo. With no memo to clear, the item comes back in `not_found` |
+
+#### Rules
+
+- The text is trimmed, HTML tags and emoji are removed, and it is **cut to 140 characters**.
+- **At most 5 line breaks, and no more than 2 in a row.** More is refused in `errors` (`memo_newlines`, `memo_newline_run`) and the old memo stays.
+- `is_private` must be `true` or `false`. Anything else sends the item to `not_found` — it is never guessed.
+- Memos belong to movies, shows and anime. Episodes and rewatch sessions have none: they come back in `not_found`.
+- A text that is empty once cleaned (only HTML or emoji) comes back in `not_found`.
+
+Read memos back with `memos=yes` on [`GET /sync/all-items`](/api-reference/simkl/get-all-items): `memo: {"text": "…", "is_private": false}`, or `{}` when there is none.
+
+#### Response
+
+Always `201`, whatever happened to each item. `updated.statuses[]` echoes every title that was updated; `not_found` echoes what could not be used; `errors[]` holds items that were found but refused, with the reason. Check all three.
+
+**Every change moves that title's status bucket in [`/sync/activities`](/api-reference/simkl/get-activities)** (`movies.completed` for a completed movie, and so on). Save the new timestamps after writing, so your next sync does not refetch what you just changed.
+
 # Exchange an authorization code for an access token
 Source: https://api.simkl.org/api-reference/simkl/exchange-token
 
@@ -8158,6 +8230,14 @@ Every Sync write endpoint matches items by the `ids` object. See the full key li
 > [card] [Remove history](/api-reference/simkl/remove-from-history)
 >
 > `POST /sync/history/remove` — un-mark watched.
+
+> [card] [Edit watch dates](/api-reference/simkl/edit-history-dates)
+>
+> `POST /sync/history/edit-dates` — change watch and added dates, and rewatch-session dates, without marking anything watched.
+
+> [card] [Edit memos](/api-reference/simkl/edit-memos)
+>
+> `POST /sync/history/edit-memos` — set, change or clear the user's note on a title.
 
 > [card] [Add to watchlist](/api-reference/simkl/add-to-list)
 >
@@ -12297,6 +12377,23 @@ What's new across the Simkl API and these docs.
 For broader Simkl product news — apps, features, releases — follow [**@Simkl**](https://twitter.com/Simkl) on X.
 
 Use the **filter** in the right rail to narrow this changelog by tag.
+
+**2026-11-27**
+
+Edit watch dates and memos
+
+New feature
+
+**Change dates and memos on titles already in the library**
+
+Two new endpoints change what is already there, without marking anything watched:
+
+| | |
+| - | - |
+| [`POST /sync/history/edit-dates`](/api-reference/simkl/edit-history-dates) | A completed movie's watch date, watched episodes' dates, the date any title was added, and — with `rewatch_id` — a rewatch session's dates |
+| [`POST /sync/history/edit-memos`](/api-reference/simkl/edit-memos) | Set, change or clear the user's memo on a movie, show or anime, public or private |
+
+Both take the same `movies` / `shows` / `anime` body as [`POST /sync/history`](/api-reference/simkl/add-to-history) and answer `201` with `updated`, `not_found` and `errors`. They need an [AUTH V2](/api-reference/auth-v2) token with `media:write`, and every change moves `/sync/activities`.
 
 **2026-11-13**
 
@@ -17332,6 +17429,10 @@ A **rewatch** is a separate viewing session for an item the user already complet
 >
 > Delete a session, or episodes from it, by its `rewatch_id`. The original watch stays.
 
+> [card] [POST /sync/history/edit-dates](/api-reference/simkl/edit-history-dates)
+>
+> Change a session's dates, or its episodes' dates, by its `rewatch_id`. The [2-day gap](#the-2-day-gap) still applies.
+
 ## Adding a rewatch toggle to your app
 
 Rewatch tracking is opt-in twice over: once by the user in your settings, and once by Simkl's plan gate. Wire both before you send `?allow_rewatch=yes` anywhere.
@@ -19349,6 +19450,30 @@ Real users do unusual things, clients have bugs, and networks drop. The behaviou
 >
 > `POST /sync/history/remove` — same shape as `/sync/history`, but removes the items.
 
+> [accordion] Correct a watch date or an added date
+>
+> [`POST /sync/history/edit-dates`](/api-reference/simkl/edit-history-dates) changes dates on titles already in the library, without marking anything watched: `watched_at` on a completed movie, `watched_at` on watched episodes, `added_at` on any movie or show, and — with `rewatch_id` — a rewatch session's dates.
+>
+> ```json theme={"theme":{"light":"github-light","dark":"vesper"}}
+> {
+>   "movies": [
+>     { "ids": { "imdb": "tt0390384" }, "watched_at": "2024-04-04T10:00:00Z", "added_at": "2023-12-24T18:30:00Z" }
+>   ],
+>   "shows": [
+>     {
+>       "ids": { "imdb": "tt5687612" },
+>       "seasons": [{ "number": 1, "episodes": [{ "number": 2, "watched_at": "2024-04-04T10:00:00Z" }] }]
+>     }
+>   ]
+> }
+> ```
+>
+> Use it rather than removing and re-adding a watch: removing takes the title out of the library, memo included.
+
+> [accordion] Set or clear a memo
+>
+> [`POST /sync/history/edit-memos`](/api-reference/simkl/edit-memos) sets the user's note on any title in the library: a string, or `{ "text": "…", "is_private": true }`. `""` clears it. Up to 140 characters; read memos back with `memos=yes` on `/sync/all-items`.
+
 > [accordion] Move an item to a Watchlist status
 >
 > `POST /sync/add-to-list` with `to` set to one of `watching`, `plantowatch`, `hold`, `dropped`, `completed` (see [Watchlist statuses](/conventions/list-statuses) — movies skip `watching` and `hold`):
@@ -20663,6 +20788,8 @@ This is why `X-RateLimit-Remaining` is the number to trust: a client that increm
 > **`400` with `{"error": "RATE_LIMIT"}` is not a rate limit.** Despite the name, it means *"your previous write for this user is still running"*. It is a 20-second lock held per user on [`/scrobble`](/api-reference/scrobble) and [`POST /sync/history`](/api-reference/simkl/add-to-history) so that two writes for the same user cannot interleave.
 >
 > **Do not treat it as a quota error and back off for minutes.** Serialise your writes for that user and retry shortly — the lock clears as soon as the in-flight write finishes. Backing off exponentially on this one makes your app slower for no reason, and retrying in parallel will just hit it again.
+>
+> [`POST /sync/history/edit-dates`](/api-reference/simkl/edit-history-dates) holds a separate 20-second lock of the same kind, so two date edits for one user run one after the other.
 >
 > The [Custom Lists write endpoints](/guides/custom-lists#edit-a-custom-list) have a lock of their own, shared by all of that user's list writes on the website and the API: a write waits for it up to five seconds, then gets `400` with lowercase `rate_limit` and *Your lists are being updated, try again in a minute*. Same fix.
 >

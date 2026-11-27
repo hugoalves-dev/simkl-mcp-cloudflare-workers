@@ -5551,6 +5551,468 @@
         },
         "type": "object"
       },
+      "HistoryEditDateError": {
+        "properties": {
+          "code": {
+            "description": "`not_completed` — the movie is not completed, so it has no watch date to move. `too_soon` — a rewatch date within `min_gap_days` of the original watch or of another session. `before_original` — a rewatch date earlier than the original watch.",
+            "enum": [
+              "not_completed",
+              "too_soon",
+              "before_original"
+            ],
+            "type": "string"
+          },
+          "min_gap_days": {
+            "description": "Type 4 null — not a gap error. See [Null and missing values](/conventions/null-values). The minimum gap, in days, between watches of the same title: `2`.",
+            "example": 2,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ref_date": {
+            "description": "Type 4 null — `not_completed` has no date to clash with. See [Null and missing values](/conventions/null-values). The date the requested one clashes with.",
+            "example": "2024-05-01T10:00:00Z",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "ref_date",
+          "min_gap_days"
+        ],
+        "type": "object"
+      },
+      "HistoryEditDatesMovie": {
+        "properties": {
+          "added_at": {
+            "description": "When the movie was added to the library (`added_to_watchlist_at` in `/sync/all-items`). Any listed movie.",
+            "example": "2023-12-24T18:30:00Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "ids": {
+            "$ref": "#/components/schemas/Ids"
+          },
+          "rewatch_id": {
+            "description": "Edit this rewatch session instead of the original watch. Get it from the response of the write that created the session, or from [`GET /sync/all-items?allow_rewatch=yes`](/api-reference/simkl/get-all-items).",
+            "example": 854102,
+            "type": "integer"
+          },
+          "title": {
+            "description": "Optional. Helps the match when the IDs alone are ambiguous.",
+            "type": "string"
+          },
+          "watched_at": {
+            "description": "The movie's watch date (`last_watched_at`). Completed movies only; anything else is reported in `errors` as `not_completed`. With `rewatch_id`, the date of that rewatch session instead.",
+            "example": "2024-04-04T10:00:00Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "year": {
+            "description": "Optional. Helps the match when the IDs alone are ambiguous.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "HistoryEditDatesRequest": {
+        "description": "Titles to re-date, under `movies[]`, `shows[]` or `anime[]`. Each is matched by its IDs, as on `POST /sync/history`.",
+        "properties": {
+          "anime": {
+            "description": "Same shape as `shows[]`.",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEditDatesShow"
+            },
+            "type": "array"
+          },
+          "movies": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEditDatesMovie"
+            },
+            "type": "array"
+          },
+          "shows": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEditDatesShow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HistoryEditDatesResponse": {
+        "properties": {
+          "errors": {
+            "description": "Items that were found but refused, with the reason.",
+            "items": {
+              "properties": {
+                "error": {
+                  "$ref": "#/components/schemas/HistoryEditDateError"
+                },
+                "request": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "not_found": {
+            "description": "Items that are not in the library, are not watched, or could not be matched — echoed as sent.",
+            "properties": {
+              "episodes": {
+                "description": "A show item with only the episodes that are not watched under `seasons`.",
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "movies": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "shows": {
+                "description": "Shows and anime.",
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "movies",
+              "shows",
+              "episodes"
+            ],
+            "type": "object"
+          },
+          "updated": {
+            "properties": {
+              "episodes": {
+                "description": "Episodes found and set, including dates that were already right.",
+                "type": "integer"
+              },
+              "movies": {
+                "description": "Movies found and set, including dates that were already right.",
+                "type": "integer"
+              },
+              "statuses": {
+                "description": "One entry per updated title, echoing the request item (with its `type`).",
+                "items": {
+                  "properties": {
+                    "request": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "movies",
+              "episodes",
+              "statuses"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "updated",
+          "not_found",
+          "errors"
+        ],
+        "type": "object"
+      },
+      "HistoryEditDatesShow": {
+        "properties": {
+          "added_at": {
+            "description": "When the show was added to the library (`added_to_watchlist_at` in `/sync/all-items`). Any listed show. With `rewatch_id`, when that rewatch session started.",
+            "example": "2023-12-24T18:30:00Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "episodes": {
+            "description": "Shorthand for `seasons: [{ number: 1, episodes: [...] }]`.",
+            "items": {
+              "properties": {
+                "number": {
+                  "description": "Episode number.",
+                  "type": "integer"
+                },
+                "watched_at": {
+                  "description": "The new watch date for this episode.",
+                  "example": "2024-04-04T10:00:00Z",
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "number",
+                "watched_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ids": {
+            "$ref": "#/components/schemas/Ids"
+          },
+          "rewatch_id": {
+            "description": "Edit this rewatch session instead of the original watch. Get it from the response of the write that created the session, or from [`GET /sync/all-items?allow_rewatch=yes`](/api-reference/simkl/get-all-items).",
+            "example": 854102,
+            "type": "integer"
+          },
+          "seasons": {
+            "description": "Episodes to re-date, by season. Episodes that are not watched come back in `not_found.episodes`; nothing is marked watched.",
+            "items": {
+              "properties": {
+                "episodes": {
+                  "items": {
+                    "properties": {
+                      "number": {
+                        "description": "Episode number.",
+                        "type": "integer"
+                      },
+                      "watched_at": {
+                        "description": "The new watch date for this episode.",
+                        "example": "2024-04-04T10:00:00Z",
+                        "format": "date-time",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "watched_at"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "number": {
+                  "description": "Season number.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "number",
+                "episodes"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "title": {
+            "description": "Optional. Helps the match when the IDs alone are ambiguous.",
+            "type": "string"
+          },
+          "use_tvdb_anime_seasons": {
+            "description": "Anime only: the season and episode numbers are TVDB's, as on [`POST /sync/history`](/api-reference/simkl/add-to-history).",
+            "type": "boolean"
+          },
+          "watched_at": {
+            "description": "**With `rewatch_id` only:** the date of that rewatch session. A show has no watch date of its own to set; it follows its latest episode.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "year": {
+            "description": "Optional. Helps the match when the IDs alone are ambiguous.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "HistoryEditMemoItem": {
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/Ids"
+          },
+          "memo": {
+            "description": "The new memo. A string sets the text and keeps the current privacy (a new memo is public); an object sets both. `\"\"` clears the memo.",
+            "oneOf": [
+              {
+                "example": "Rewatch with subtitles",
+                "maxLength": 140,
+                "type": "string"
+              },
+              {
+                "properties": {
+                  "is_private": {
+                    "description": "`true` — only the user sees it. Leave it out to keep the current privacy. Anything other than a boolean sends the item to `not_found`.",
+                    "type": "boolean"
+                  },
+                  "text": {
+                    "maxLength": 140,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "title": {
+            "description": "Optional. Helps the match when the IDs alone are ambiguous.",
+            "type": "string"
+          },
+          "year": {
+            "description": "Optional. Helps the match when the IDs alone are ambiguous.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ids",
+          "memo"
+        ],
+        "type": "object"
+      },
+      "HistoryEditMemosRequest": {
+        "description": "Titles whose memo to set, under `movies[]`, `shows[]` or `anime[]`. Each must already be in the library.",
+        "properties": {
+          "anime": {
+            "description": "Same shape as `shows[]`.",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEditMemoItem"
+            },
+            "type": "array"
+          },
+          "movies": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEditMemoItem"
+            },
+            "type": "array"
+          },
+          "shows": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEditMemoItem"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HistoryEditMemosResponse": {
+        "properties": {
+          "errors": {
+            "description": "Memos that were refused. The title keeps its old memo.",
+            "items": {
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "description": "`memo_newlines` — more than 5 line breaks. `memo_newline_run` — more than 2 line breaks in a row.",
+                      "enum": [
+                        "memo_newlines",
+                        "memo_newline_run"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ],
+                  "type": "object"
+                },
+                "request": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "not_found": {
+            "description": "Titles not in the library, episodes, rewatch sessions, a malformed `memo` or `is_private`, or `\"\"` when there is no memo to clear.",
+            "properties": {
+              "episodes": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "movies": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "shows": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "movies",
+              "shows",
+              "episodes"
+            ],
+            "type": "object"
+          },
+          "updated": {
+            "properties": {
+              "movies": {
+                "description": "Movies whose memo was set or cleared, including a memo that was already the same.",
+                "type": "integer"
+              },
+              "shows": {
+                "description": "Shows and anime whose memo was set or cleared.",
+                "type": "integer"
+              },
+              "statuses": {
+                "description": "One entry per updated title, echoing the request item (with its `type`).",
+                "items": {
+                  "properties": {
+                    "request": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "movies",
+              "shows",
+              "statuses"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "updated",
+          "not_found",
+          "errors"
+        ],
+        "type": "object"
+      },
       "HistoryRemoveRequest": {
         "description": "Body for `/sync/history/remove` — the same shape as [`/sync/history`](/api-reference/simkl/add-to-history), plus an optional `rewatch_id` on an item to remove from that rewatch session only. Items go under `movies[]`, `shows[]` or `anime[]`.",
         "properties": {
@@ -27202,6 +27664,785 @@
           "href": "/api-reference/simkl/add-to-history",
           "metadata": {
             "sidebarTitle": "Add to History"
+          }
+        }
+      }
+    },
+    "/sync/history/edit-dates": {
+      "post": {
+        "description": "Needs an [AUTH V2](/api-reference/auth-v2) user token with the `media:write` [scope](/api-reference/oauth2-scopes).\n\nChanges the dates on titles that are **already in the user's library** — when a movie was watched, when episodes were watched, when a title was added, or the dates of a rewatch session. **Nothing is marked watched, added or removed:** status, progress and counts stay as they are. To record a new watch use [`POST /sync/history`](/api-reference/simkl/add-to-history).\n\n#### What each field changes\n\n| Send | Changes | Applies to |\n|---|---|---|\n| `added_at` | When the title was added to the library — `added_to_watchlist_at` in [`/sync/all-items`](/api-reference/simkl/get-all-items) | Any movie or show in the library |\n| `watched_at` on a movie | The movie's watch date — `last_watched_at` | Completed movies. Any other status is refused in `errors` as `not_completed` |\n| `seasons[].episodes[].watched_at` | Those episodes' watch dates (read them with `extended=full&episode_watched_at=yes`). The show's `last_watched_at` follows its latest episode | Watched episodes. Unwatched ones come back in `not_found.episodes` |\n| `rewatch_id` with `watched_at` / `added_at` | That rewatch session's date, and when it started. The original watch is not touched | The user's own sessions |\n| `rewatch_id` with `seasons` | Those episodes' dates inside that session. The session's date follows its latest episode | Episodes in that session |\n\nA show has no watch date of its own to set: it always follows its latest episode.\n\nTitles are matched by their IDs exactly as on `POST /sync/history`. A flat `episodes[]` on a show is shorthand for season 1, and anime accept TVDB numbering with `use_tvdb_anime_seasons`.\n\n#### Dates\n\nISO 8601 in UTC, e.g. `2024-04-04T10:00:00Z`. A date in the future is saved as now. Sending the date a title already has counts as updated. The [\"Very long time ago\"](/conventions/dates#very-long-time-ago) placeholder cannot be set here as a movie's or episode's watch date.\n\n#### Rewatch rules\n\nA rewatch date follows the same rules as [recording a rewatch](/guides/rewatches#the-2-day-gap): it cannot be earlier than the original watch (`before_original`), or within 2 days of the original watch or of another session (`too_soon`). Inside a session the check runs for each episode. `ref_date` is the date it clashes with, `min_gap_days` the required gap.\n\n<Note>\n**One call at a time per user.** A second `edit-dates` call for the same user waits for the first to finish; after 20 seconds it is refused with `400` `RATE_LIMIT`. Retry it then.\n</Note>\n\n#### Response\n\nAlways `201`, whatever happened to each item. `updated.statuses[]` echoes every title that was updated; `not_found` echoes what could not be used; `errors[]` holds items that were found but refused, with the reason. Check all three.\n\n**Every change moves that title's status bucket in [`/sync/activities`](/api-reference/simkl/get-activities)** (`movies.completed` for a completed movie, and so on). Save the new timestamps after writing, so your next sync does not refetch what you just changed. One item can appear in two places — a plan-to-watch movie whose `added_at` was saved is in `updated`, and its refused `watched_at` in `errors`.",
+        "operationId": "post-sync-history-edit-dates",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "episode_not_watched": {
+                  "summary": "An episode that is not watched",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "imdb": "tt5687612"
+                        },
+                        "seasons": [
+                          {
+                            "episodes": [
+                              {
+                                "number": 3,
+                                "watched_at": "2024-04-04T10:00:00Z"
+                              }
+                            ],
+                            "number": 1
+                          }
+                        ],
+                        "title": "Fleabag",
+                        "year": 2016
+                      }
+                    ]
+                  }
+                },
+                "episodes": {
+                  "summary": "Re-date a watched episode",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "imdb": "tt5687612"
+                        },
+                        "seasons": [
+                          {
+                            "episodes": [
+                              {
+                                "number": 2,
+                                "watched_at": "2024-04-04T10:00:00Z"
+                              }
+                            ],
+                            "number": 1
+                          }
+                        ],
+                        "title": "Fleabag",
+                        "year": 2016
+                      }
+                    ]
+                  }
+                },
+                "movie": {
+                  "summary": "Move a movie's watch date and added date",
+                  "value": {
+                    "movies": [
+                      {
+                        "added_at": "2023-12-24T18:30:00Z",
+                        "ids": {
+                          "imdb": "tt0390384"
+                        },
+                        "title": "Primer",
+                        "watched_at": "2024-04-04T10:00:00Z",
+                        "year": 2004
+                      }
+                    ]
+                  }
+                },
+                "movie_not_completed": {
+                  "summary": "A movie that is not completed",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "imdb": "tt2866360"
+                        },
+                        "title": "Coherence",
+                        "watched_at": "2024-04-04T10:00:00Z",
+                        "year": 2013
+                      }
+                    ]
+                  }
+                },
+                "rewatch": {
+                  "summary": "Move a rewatch session's date",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "imdb": "tt0390384"
+                        },
+                        "rewatch_id": 854102,
+                        "title": "Primer",
+                        "watched_at": "2024-05-10T10:00:00Z",
+                        "year": 2004
+                      }
+                    ]
+                  }
+                },
+                "rewatch_too_soon": {
+                  "summary": "A rewatch date too close to another watch",
+                  "value": {
+                    "movies": [
+                      {
+                        "ids": {
+                          "imdb": "tt0390384"
+                        },
+                        "rewatch_id": 854102,
+                        "title": "Primer",
+                        "watched_at": "2024-05-02T10:00:00Z",
+                        "year": 2004
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/HistoryEditDatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "episode_not_watched": {
+                    "description": "Nothing is marked watched: the episode comes back in `not_found.episodes`, under its show.",
+                    "summary": "An episode that is not watched",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [
+                          {
+                            "ids": {
+                              "imdb": "tt5687612"
+                            },
+                            "seasons": [
+                              {
+                                "episodes": [
+                                  {
+                                    "number": 3
+                                  }
+                                ],
+                                "number": 1
+                              }
+                            ],
+                            "title": "Fleabag",
+                            "year": 2016
+                          }
+                        ],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "episodes": 0,
+                        "movies": 0,
+                        "statuses": []
+                      }
+                    }
+                  },
+                  "episodes": {
+                    "description": "`updated.episodes` counts the episodes set. The show's `last_watched_at` follows its latest episode.",
+                    "summary": "Re-date a watched episode",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "episodes": 1,
+                        "movies": 0,
+                        "statuses": [
+                          {
+                            "request": {
+                              "ids": {
+                                "imdb": "tt5687612"
+                              },
+                              "title": "Fleabag",
+                              "type": "show",
+                              "year": 2016
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "movie": {
+                    "description": "Both dates were set. `statuses[]` echoes the request item.",
+                    "summary": "Move a movie's watch date and added date",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "episodes": 0,
+                        "movies": 1,
+                        "statuses": [
+                          {
+                            "request": {
+                              "added_at": "2023-12-24T18:30:00Z",
+                              "ids": {
+                                "imdb": "tt0390384"
+                              },
+                              "title": "Primer",
+                              "type": "movie",
+                              "watched_at": "2024-04-04T10:00:00Z",
+                              "year": 2004
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "movie_not_completed": {
+                    "description": "A plan-to-watch movie has no watch date to move.",
+                    "summary": "A movie that is not completed",
+                    "value": {
+                      "errors": [
+                        {
+                          "error": {
+                            "code": "not_completed",
+                            "min_gap_days": null,
+                            "ref_date": null
+                          },
+                          "request": {
+                            "ids": {
+                              "imdb": "tt2866360"
+                            },
+                            "title": "Coherence",
+                            "watched_at": "2024-04-04T10:00:00Z",
+                            "year": 2013
+                          }
+                        }
+                      ],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "episodes": 0,
+                        "movies": 0,
+                        "statuses": []
+                      }
+                    }
+                  },
+                  "rewatch": {
+                    "description": "Only the session moves; the original watch keeps its date.",
+                    "summary": "Move a rewatch session's date",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "episodes": 0,
+                        "movies": 1,
+                        "statuses": [
+                          {
+                            "request": {
+                              "ids": {
+                                "imdb": "tt0390384"
+                              },
+                              "rewatch_id": 854102,
+                              "title": "Primer",
+                              "watched_at": "2024-05-10T10:00:00Z",
+                              "year": 2004
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "rewatch_too_soon": {
+                    "description": "Within 2 days of the original watch (`ref_date`). Nothing is written.",
+                    "summary": "A rewatch date too close to another watch",
+                    "value": {
+                      "errors": [
+                        {
+                          "error": {
+                            "code": "too_soon",
+                            "min_gap_days": 2,
+                            "ref_date": "2024-05-01T10:00:00Z"
+                          },
+                          "request": {
+                            "ids": {
+                              "imdb": "tt0390384"
+                            },
+                            "rewatch_id": 854102,
+                            "title": "Primer",
+                            "watched_at": "2024-05-02T10:00:00Z",
+                            "year": 2004
+                          }
+                        }
+                      ],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "episodes": 0,
+                        "movies": 0,
+                        "statuses": []
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryEditDatesResponse"
+                }
+              }
+            },
+            "description": "Dates changed where they could be. Read `updated`, `not_found` and `errors`."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "invalid_request",
+                  "message": "Invalid JSON request. Please validate at https://jsonlint.com/"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`invalid_request` — the body is not valid JSON. On `edit-dates`, also `RATE_LIMIT` — another `edit-dates` call for this user was still running after 20 seconds."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_failed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable user token. `user_token_failed` — no bearer token; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "insufficient_scope",
+                  "message": "This action requires the \"media:read media:write\" scope"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`insufficient_scope` — the token lacks `media:write`."
+          },
+          "412": {
+            "$ref": "#/components/responses/ClientIdFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "clientId": []
+          },
+          {
+            "bearerAuth": [],
+            "simklApiKey": []
+          }
+        ],
+        "summary": "Edit watch dates",
+        "tags": [
+          "Sync"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "movie",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-dates?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"title\": \"Primer\",\n      \"year\": 2004,\n      \"ids\": {\n        \"imdb\": \"tt0390384\"\n      },\n      \"watched_at\": \"2024-04-04T10:00:00Z\",\n      \"added_at\": \"2023-12-24T18:30:00Z\"\n    }\n  ]\n}'"
+          },
+          {
+            "label": "episodes",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-dates?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Fleabag\",\n      \"year\": 2016,\n      \"ids\": {\n        \"imdb\": \"tt5687612\"\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 2,\n              \"watched_at\": \"2024-04-04T10:00:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "episode_not_watched",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-dates?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Fleabag\",\n      \"year\": 2016,\n      \"ids\": {\n        \"imdb\": \"tt5687612\"\n      },\n      \"seasons\": [\n        {\n          \"number\": 1,\n          \"episodes\": [\n            {\n              \"number\": 3,\n              \"watched_at\": \"2024-04-04T10:00:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}'"
+          },
+          {
+            "label": "movie_not_completed",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-dates?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"title\": \"Coherence\",\n      \"year\": 2013,\n      \"ids\": {\n        \"imdb\": \"tt2866360\"\n      },\n      \"watched_at\": \"2024-04-04T10:00:00Z\"\n    }\n  ]\n}'"
+          },
+          {
+            "label": "rewatch",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-dates?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"title\": \"Primer\",\n      \"year\": 2004,\n      \"ids\": {\n        \"imdb\": \"tt0390384\"\n      },\n      \"rewatch_id\": 854102,\n      \"watched_at\": \"2024-05-10T10:00:00Z\"\n    }\n  ]\n}'"
+          },
+          {
+            "label": "rewatch_too_soon",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-dates?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"movies\": [\n    {\n      \"title\": \"Primer\",\n      \"year\": 2004,\n      \"ids\": {\n        \"imdb\": \"tt0390384\"\n      },\n      \"rewatch_id\": 854102,\n      \"watched_at\": \"2024-05-02T10:00:00Z\"\n    }\n  ]\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/edit-history-dates",
+          "metadata": {
+            "sidebarTitle": "Edit watch dates"
+          }
+        }
+      }
+    },
+    "/sync/history/edit-memos": {
+      "post": {
+        "description": "Needs an [AUTH V2](/api-reference/auth-v2) user token with the `media:write` [scope](/api-reference/oauth2-scopes).\n\nSets, changes or clears the **memo** — the user's short note — on titles **already in the user's library**, in any status. Nothing else about the title changes. (A memo can also be set while recording a watch, with `memo` on [`POST /sync/history`](/api-reference/simkl/add-to-history).)\n\n| Send `memo` as | Result |\n|---|---|\n| `\"Rewatch with subtitles\"` | Sets the text. Privacy stays as it was; a new memo is public |\n| `{\"text\": \"Only for me\", \"is_private\": true}` | Sets the text and the privacy. A private memo is shown only to the user |\n| `\"\"` | Clears the memo. With no memo to clear, the item comes back in `not_found` |\n\n#### Rules\n\n- The text is trimmed, HTML tags and emoji are removed, and it is **cut to 140 characters**.\n- **At most 5 line breaks, and no more than 2 in a row.** More is refused in `errors` (`memo_newlines`, `memo_newline_run`) and the old memo stays.\n- `is_private` must be `true` or `false`. Anything else sends the item to `not_found` — it is never guessed.\n- Memos belong to movies, shows and anime. Episodes and rewatch sessions have none: they come back in `not_found`.\n- A text that is empty once cleaned (only HTML or emoji) comes back in `not_found`.\n\nRead memos back with `memos=yes` on [`GET /sync/all-items`](/api-reference/simkl/get-all-items): `memo: {\"text\": \"…\", \"is_private\": false}`, or `{}` when there is none.\n\n#### Response\n\nAlways `201`, whatever happened to each item. `updated.statuses[]` echoes every title that was updated; `not_found` echoes what could not be used; `errors[]` holds items that were found but refused, with the reason. Check all three.\n\n**Every change moves that title's status bucket in [`/sync/activities`](/api-reference/simkl/get-activities)** (`movies.completed` for a completed movie, and so on). Save the new timestamps after writing, so your next sync does not refetch what you just changed.",
+        "operationId": "post-sync-history-edit-memos",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientIdQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppNameQuery"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersionQuery"
+          },
+          {
+            "$ref": "#/components/parameters/UserAgentHeader"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "memo_clear": {
+                  "summary": "Clear a memo",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "imdb": "tt5687612"
+                        },
+                        "memo": "",
+                        "title": "Fleabag",
+                        "year": 2016
+                      }
+                    ]
+                  }
+                },
+                "memo_error": {
+                  "summary": "A memo with too many line breaks",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "imdb": "tt5687612"
+                        },
+                        "memo": "a\n\n\nb",
+                        "title": "Fleabag",
+                        "year": 2016
+                      }
+                    ]
+                  }
+                },
+                "memo_private": {
+                  "summary": "Set a private memo",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "imdb": "tt5687612"
+                        },
+                        "memo": {
+                          "is_private": true,
+                          "text": "Only for me"
+                        },
+                        "title": "Fleabag",
+                        "year": 2016
+                      }
+                    ]
+                  }
+                },
+                "memo_set": {
+                  "summary": "Set a memo",
+                  "value": {
+                    "shows": [
+                      {
+                        "ids": {
+                          "imdb": "tt5687612"
+                        },
+                        "memo": "Rewatch with subtitles",
+                        "title": "Fleabag",
+                        "year": 2016
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/HistoryEditMemosRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "memo_clear": {
+                    "description": "`\"\"` removes the memo.",
+                    "summary": "Clear a memo",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "movies": 0,
+                        "shows": 1,
+                        "statuses": [
+                          {
+                            "request": {
+                              "ids": {
+                                "imdb": "tt5687612"
+                              },
+                              "memo": "",
+                              "title": "Fleabag",
+                              "type": "show",
+                              "year": 2016
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "memo_error": {
+                    "description": "Three line breaks in a row: refused, and the old memo stays.",
+                    "summary": "A memo with too many line breaks",
+                    "value": {
+                      "errors": [
+                        {
+                          "error": {
+                            "code": "memo_newline_run"
+                          },
+                          "request": {
+                            "ids": {
+                              "imdb": "tt5687612"
+                            },
+                            "memo": "a\n\n\nb",
+                            "title": "Fleabag",
+                            "type": "show",
+                            "year": 2016
+                          }
+                        }
+                      ],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "movies": 0,
+                        "shows": 0,
+                        "statuses": []
+                      }
+                    }
+                  },
+                  "memo_private": {
+                    "description": "An object sets the text and the privacy together.",
+                    "summary": "Set a private memo",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "movies": 0,
+                        "shows": 1,
+                        "statuses": [
+                          {
+                            "request": {
+                              "ids": {
+                                "imdb": "tt5687612"
+                              },
+                              "memo": {
+                                "is_private": true,
+                                "text": "Only for me"
+                              },
+                              "title": "Fleabag",
+                              "type": "show",
+                              "year": 2016
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "memo_set": {
+                    "description": "A string sets the text and keeps the current privacy; a new memo is public.",
+                    "summary": "Set a memo",
+                    "value": {
+                      "errors": [],
+                      "not_found": {
+                        "episodes": [],
+                        "movies": [],
+                        "shows": []
+                      },
+                      "updated": {
+                        "movies": 0,
+                        "shows": 1,
+                        "statuses": [
+                          {
+                            "request": {
+                              "ids": {
+                                "imdb": "tt5687612"
+                              },
+                              "memo": "Rewatch with subtitles",
+                              "title": "Fleabag",
+                              "type": "show",
+                              "year": 2016
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryEditMemosResponse"
+                }
+              }
+            },
+            "description": "Memos changed where they could be. Read `updated`, `not_found` and `errors`."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 400,
+                  "error": "invalid_request",
+                  "message": "Invalid JSON request. Please validate at https://jsonlint.com/"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`invalid_request` — the body is not valid JSON. On `edit-dates`, also `RATE_LIMIT` — another `edit-dates` call for this user was still running after 20 seconds."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 401,
+                  "error": "user_token_failed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No usable user token. `user_token_failed` — no bearer token; `invalid_token` — the token expired or was revoked (refresh it)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 403,
+                  "error": "insufficient_scope",
+                  "message": "This action requires the \"media:read media:write\" scope"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "`insufficient_scope` — the token lacks `media:write`."
+          },
+          "412": {
+            "$ref": "#/components/responses/ClientIdFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "clientId": []
+          },
+          {
+            "bearerAuth": [],
+            "simklApiKey": []
+          }
+        ],
+        "summary": "Edit memos",
+        "tags": [
+          "Sync"
+        ],
+        "x-codeSamples": [
+          {
+            "label": "memo_set",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-memos?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Fleabag\",\n      \"year\": 2016,\n      \"ids\": {\n        \"imdb\": \"tt5687612\"\n      },\n      \"memo\": \"Rewatch with subtitles\"\n    }\n  ]\n}'"
+          },
+          {
+            "label": "memo_private",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-memos?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Fleabag\",\n      \"year\": 2016,\n      \"ids\": {\n        \"imdb\": \"tt5687612\"\n      },\n      \"memo\": {\n        \"text\": \"Only for me\",\n        \"is_private\": true\n      }\n    }\n  ]\n}'"
+          },
+          {
+            "label": "memo_clear",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-memos?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Fleabag\",\n      \"year\": 2016,\n      \"ids\": {\n        \"imdb\": \"tt5687612\"\n      },\n      \"memo\": \"\"\n    }\n  ]\n}'"
+          },
+          {
+            "label": "memo_error",
+            "lang": "curl",
+            "source": "curl -X POST 'https://api.simkl.com/sync/history/edit-memos?client_id=YOUR_CLIENT_ID&app-name=my-app-name&app-version=1.0' \\\n  -H 'User-Agent: my-app-name/1.0' \\\n  -H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n  \"shows\": [\n    {\n      \"title\": \"Fleabag\",\n      \"year\": 2016,\n      \"ids\": {\n        \"imdb\": \"tt5687612\"\n      },\n      \"memo\": \"a\\n\\n\\nb\"\n    }\n  ]\n}'"
+          }
+        ],
+        "x-mint": {
+          "href": "/api-reference/simkl/edit-memos",
+          "metadata": {
+            "sidebarTitle": "Edit memos"
           }
         }
       }
