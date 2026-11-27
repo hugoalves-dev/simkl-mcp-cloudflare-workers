@@ -30,6 +30,21 @@ export default {
         return Response.json({ name: e?.name, statusCode: e?.statusCode, upstreamCode: e?.upstreamCode, writeMayHaveSucceeded: e?.writeMayHaveSucceeded, text: toMcpErrorResult(error).content[0].text });
       }
     }
+    const edit = new URL(request.url).searchParams.get('edit-memo');
+    if (edit !== null) {
+      const client = new SimklClient({ baseUrl: 'https://fixture.simkl.invalid', clientId: 'fixture-app' });
+      const adapter = createLibraryAdapter(env, client, () => ({ simklToken: 'fixture-operation-token', simklUserId: userId }));
+      try {
+        return Response.json(await adapter.write('/sync/history/edit-memos', {
+          method: 'POST', body: { movies: [{ ids: { simkl: 42 }, memo: { text: edit, is_private: true } }] },
+        }));
+      } catch (error) {
+        return Response.json(toMcpErrorResult(error));
+      }
+    }
+    if (new URL(request.url).searchParams.has('items')) {
+      return Response.json(await object.read('fixture-operation-token'));
+    }
     const list = new URL(request.url).searchParams.get('list');
     if (list) {
       // Exercise the real RPC boundary: errors arrive as plain Errors here.

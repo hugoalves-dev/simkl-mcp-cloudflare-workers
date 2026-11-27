@@ -19,6 +19,9 @@ const persist = await mkdtemp(join(tmpdir(), 'simkl-library-test-'));
 const calls = [];
 let active = 0;
 let peak = 0;
+let memo;
+let failMemoDelta = false;
+let lockOnce = true;
 function runtime() {
   const options = convertV4MiniflareOptions({
     name: 'simkl-library-fixture',
@@ -35,6 +38,26 @@ function runtime() {
       try {
         await new Promise(resolve => setTimeout(resolve, 15));
         if (url.pathname === '/users/47/stats') return Response.json({ error: 'user_limit_exceeded' }, { status: 429, headers: { 'Retry-After': '120' } });
+        if (url.pathname === '/sync/history/edit-memos') {
+          const body = await request.json();
+          const attempted = body.movies[0].memo;
+          if (attempted.text === 'quota') {
+            return Response.json({ error: 'user_limit_exceeded' }, { status: 429, headers: { 'Retry-After': '120' } });
+          }
+          if (lockOnce) {
+            lockOnce = false;
+            return Response.json({ error: 'RATE_LIMIT' }, { status: 400 });
+          }
+          memo = attempted.text ? { text: attempted.text.trim(), is_private: attempted.is_private } : {};
+          return Response.json({ updated: { movies: 1, shows: 0, statuses: [{ request: body.movies[0] }] },
+            not_found: { movies: [], shows: [], episodes: [] }, errors: [] }, { status: 201 });
+        }
+        if (url.pathname === '/sync/all-items/movies' && url.searchParams.has('date_from')) {
+          assert.equal(url.searchParams.get('date_from'), '2026-10-09T11:59:59.000Z');
+          assert.equal(url.searchParams.get('memos'), 'yes');
+          if (failMemoDelta) return new Response('read unavailable', { status: 429 });
+          return Response.json({ movies: [{ movie: { title: 'Fixture', ids: { simkl: 42 } }, status: 'completed', memo }] });
+        }
         if (url.pathname === '/sync/history') return new Response('upstream down', { status: 502 });
         if (url.pathname === '/lists/404') return Response.json({ error: 'url_failed', code: 404, message: 'List not found' }, { status: 404 });
         if (url.pathname === '/lists/429') return Response.json({ error: 'user_limit_exceeded' }, { status: 429, headers: { 'Retry-After': '600' } });
@@ -139,6 +162,24 @@ try {
   assert.equal(ambiguousWrite.writeMayHaveSucceeded, true);
   assert.match(ambiguousWrite.text, /may have succeeded/);
   assert.equal(calls.filter(path => path === '/sync/history').length, 1, 'an ambiguous write must not be replayed');
+  const edit = async text => (await mf.dispatchFetch(`https://fixture.worker.invalid/?edit-memo=${encodeURIComponent(text)}`)).json();
+  const cachedItems = async () => (await mf.dispatchFetch('https://fixture.worker.invalid/?items')).json();
+  const start = calls.length;
+  assert.equal((await edit('  private memo  ')).updated.movies, 1);
+  assert.deepEqual(calls.slice(start), ['/sync/history/edit-memos', '/sync/history/edit-memos', '/sync/activities', '/sync/all-items/movies']);
+  assert.deepEqual((await cachedItems()).movies[0].memo, { text: 'private memo', is_private: true });
+
+  const beforeQuota = calls.length;
+  assert.match((await edit('quota')).content[0].text, /daily allowance[\s\S]*Retry-After: 120 seconds/);
+  assert.deepEqual(calls.slice(beforeQuota), ['/sync/history/edit-memos']);
+
+  failMemoDelta = true;
+  assert.equal((await edit('')).cache_reconciliation, 'pending');
+  await mf.dispose(); mf = runtime();
+  failMemoDelta = false;
+  const beforeRecovery = calls.length;
+  assert.deepEqual((await cachedItems()).movies[0].memo, {});
+  assert.deepEqual(calls.slice(beforeRecovery), ['/sync/activities', '/sync/all-items/movies']);
   console.log('PASS: Worker RPC, coalescing, per-user isolation, settings eligibility, and SQLite persistence after reconstruction');
 } finally {
   if (mf) await mf.dispose();

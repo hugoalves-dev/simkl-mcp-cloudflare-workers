@@ -60,6 +60,7 @@ export async function fetchPartitionedLibrary(
   query: RequestOptions['query'],
   validate: (response: unknown) => LibraryItems,
   run?: LibrarySyncRun,
+  mediaFilter?: readonly MediaType[],
 ): Promise<LibraryItems> {
   const path = operation === 'ratings' ? '/sync/ratings' : '/sync/all-items';
   const telemetry = run ?? createLibrarySyncRun();
@@ -117,17 +118,19 @@ export async function fetchPartitionedLibrary(
   };
 
   // Keep the efficient one-request path; a non-max_items failure is never retried as a split.
-  try {
-    append(await request());
-    return combined;
-  } catch (error) {
-    if (!isMaxItems(error)) throw error;
-    fallbackActive = true;
-    logSyncPartition('incremental', operation, 'all', 'max_items', undefined, undefined, attempts, telemetry);
+  if (!mediaFilter) {
+    try {
+      append(await request());
+      return combined;
+    } catch (error) {
+      if (!isMaxItems(error)) throw error;
+      fallbackActive = true;
+      logSyncPartition('incremental', operation, 'all', 'max_items', undefined, undefined, attempts, telemetry);
+    }
   }
 
   try {
-    for (const media of MEDIA_TYPES) {
+    for (const media of mediaFilter ?? MEDIA_TYPES) {
       try {
         append(await request(media));
       } catch (error) {

@@ -92,7 +92,7 @@ test('delta, ratings and membership each use one unpaginated request in order', 
   expect(result.items.shows[0].status).toBe('completed');
   expect(result.items.shows[0].user_rating).toBeNull();
   expect(calls.map(call => call.url.pathname)).toEqual(['/sync/activities', '/sync/all-items', '/sync/ratings', '/sync/all-items']);
-  expect([...calls[1].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['date_from', oldDate]]);
+  expect([...calls[1].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['date_from', oldDate], ['memos', 'yes']]);
   expect([...calls[2].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['date_from', oldDate]]);
   expect([...calls[3].url.searchParams].filter(([key]) => !['client_id', 'app-name', 'app-version'].includes(key))).toEqual([['extended', 'simkl_ids_only']]);
 });
@@ -125,4 +125,22 @@ test('mixed unknown and recognized membership keys cannot clear the cache', asyn
   const before = previous(), saved = structuredClone(before);
   upstream([{ all: newDate, tv_shows: { watching: oldDate, removed_from_list: newDate } }, { shows: [], error: 'partial upstream error' }]);
   await expect(refreshLibrary(client, 'token', before, opts)).rejects.toThrow(); expect(before).toEqual(saved);
+});
+
+test('post-edit sync reconciles authoritative episode dates and concurrent changes before checkpointing', async () => {
+  const before = previous();
+  const updated = { ...item(1, 'completed'), last_watched_at: newDate,
+    seasons: [{ number: 1, episodes: [{ number: 2, watched_at: newDate }] }] };
+  const other = { status: 'completed', movie: { ids: { simkl: 42 } }, memo: { text: 'External edit', is_private: true } };
+  const activities = { all: newDate, tv_shows: { completed: newDate }, movies: { completed: newDate, rated_at: newDate } };
+  const calls = upstream([activities, { shows: [updated] }, { movies: [other] },
+    { movies: [{ movie: other.movie, user_rating: 7 }] }]);
+  const result = await refreshLibrary(client, 'token', before, { ...opts, force: true, editedMedia: ['shows'] });
+  expect(calls.map(call => call.url.pathname)).toEqual(['/sync/activities', '/sync/all-items/shows', '/sync/all-items/movies', '/sync/ratings']);
+  expect(calls[1].url.searchParams.get('extended')).toBe('full');
+  expect(calls[1].url.searchParams.get('episode_watched_at')).toBe('yes');
+  expect(calls[1].url.searchParams.get('include_all_episodes')).toBe('original');
+  expect(result.items.shows).toEqual([updated]);
+  expect(result.items.movies).toEqual([{ ...other, user_rating: 7 }]);
+  expect(result.activities).toEqual(activities);
 });

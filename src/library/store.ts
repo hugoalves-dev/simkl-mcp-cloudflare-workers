@@ -2,7 +2,7 @@ import { normalizeSimklId } from './identity';
 import type { RewatchRow, RewatchSnapshot } from './rewatches.js';
 import {
   isRecord, jsonBytes, MAX_ROW_JSON_BYTES, MAX_PENDING_ITEM_BYTES,
-  type LibraryActivitySnapshot, type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type UserProfileSnapshot, MEDIA_TYPES,
+  type LibraryActivitySnapshot, type LibraryCandidate, type LibraryInitialization, type LibraryItemRow, type LibrarySnapshot, type LibraryItem, type MediaType, type UserProfileSnapshot, MEDIA_TYPES,
 } from './types.js';
 
 /** Application events are correlated with Cloudflare's $metadata.traceId. No credentials or item details. */
@@ -250,6 +250,28 @@ export class LibraryStore {
     ).toArray();
   }
   /** Separate identity model: canonical (type, id), rewatch (type, id, session). */
+  pendingHistoryEdits(): MediaType[] {
+    const row = this.storage.sql.exec<{ value_json: string }>(
+      "SELECT value_json FROM library_metadata WHERE key = 'history-edits-pending'",
+    ).toArray()[0];
+    const media: unknown = row ? JSON.parse(row.value_json) : [];
+    if (!Array.isArray(media) || media.some(type => !MEDIA_TYPES.includes(type))) {
+      throw new Error('Invalid pending history edit metadata');
+    }
+    return media;
+  }
+
+  savePendingHistoryEdits(media: readonly MediaType[]): void {
+    if (media.length) {
+      this.storage.sql.exec(
+        "INSERT OR REPLACE INTO library_metadata (key, value_json) VALUES ('history-edits-pending', ?)",
+        JSON.stringify(media),
+      );
+    } else {
+      this.storage.sql.exec("DELETE FROM library_metadata WHERE key = 'history-edits-pending'");
+    }
+  }
+
   loadRewatches(): RewatchSnapshot | undefined {
     const row = this.storage.sql.exec<{ value_json: string }>(
       "SELECT value_json FROM library_metadata WHERE key = 'rewatch-snapshot'",

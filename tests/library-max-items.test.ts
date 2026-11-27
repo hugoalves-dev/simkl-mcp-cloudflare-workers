@@ -49,7 +49,7 @@ test('incremental happy path issues one bounded request and applies status trans
   expect(result.items.shows.find(row => row.show?.ids.simkl === 1)?.status).toBe('completed');
   expect(result.activities.all).toBe(newDate);
   expect(s.calls.map(c => c.path)).toEqual(['/sync/activities', '/sync/all-items']);
-  expect(s.calls[1].query).toEqual({ date_from: oldDate });
+  expect(s.calls[1].query).toEqual({ date_from: oldDate, memos: 'yes' });
   expect(s.calls[1].responseProfile).toBe('library');
 });
 
@@ -67,7 +67,7 @@ test('all-type delta max_items falls back to sequential types with original date
   expect(result.items.anime).toEqual([anime(7)]);
   expect(result.activities.all).toBe(newDate);
   expect(s.calls.map(c => c.path)).toEqual(['/sync/activities', '/sync/all-items', '/sync/all-items/shows', '/sync/all-items/movies', '/sync/all-items/anime']);
-  expect(s.calls.slice(1).every(c => JSON.stringify(c.query) === JSON.stringify({ date_from: oldDate }))).toBe(true);
+  expect(s.calls.slice(1).every(c => JSON.stringify(c.query) === JSON.stringify({ date_from: oldDate, memos: 'yes' }))).toBe(true);
   expect(s.peak()).toBe(1);
 });
 

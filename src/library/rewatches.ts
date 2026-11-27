@@ -1,5 +1,6 @@
 import { SimklApiError, type SimklClient } from '../api/client.js';
 import { simklItemUrl } from '../format/media.js';
+import { recordedEpisodeDates } from './sync';
 import { normalizeSimklId } from './identity.js';
 import {
   isRecord, jsonBytes, LIBRARY_STATUSES, MEDIA_TYPES, MAX_PENDING_ITEM_BYTES,
@@ -79,7 +80,7 @@ function collectUnique(rows: RewatchRow[]): RewatchRow[] {
  */
 async function fetchSessions(client: SimklClient, token: string, dateFrom?: string): Promise<RewatchRow[]> {
   const query = {
-    allow_rewatch: 'yes', extended: 'full', episode_watched_at: 'yes',
+    allow_rewatch: 'yes', ...recordedEpisodeDates,
     ...(dateFrom ? { date_from: dateFrom } : {}),
   };
   async function request(path: string): Promise<RewatchRow[]> {
@@ -117,7 +118,7 @@ function bucketChanged(previous: Activities, current: Activities, field: string)
 }
 
 export async function refreshRewatches(
-  client: SimklClient, token: string, previous: RewatchSnapshot | undefined, activities: Activities,
+  client: SimklClient, token: string, previous: RewatchSnapshot | undefined, activities: Activities, dateEdited = false,
 ): Promise<RewatchSnapshot> {
   if (activities.all === null) {
     if (previous?.activities.all !== null) return { rows: [], activities, stale: false };
@@ -126,7 +127,9 @@ export async function refreshRewatches(
   if (previous?.activities.all && Date.parse(activities.all) < Date.parse(previous.activities.all)) {
     throw new Error('Simkl rewatch activity watermark regressed');
   }
-  if (previous && !previous.stale && previous.activities.all === activities.all) return previous;
+  const sameWatermark = previous?.activities.all === activities.all;
+  if (!dateEdited && previous && !previous.stale
+    && sameWatermark && JSON.stringify(previous.activities) === JSON.stringify(activities)) return previous;
 
   const needsBaseline = !previous || previous.activities.all === null;
   const removed = previous && bucketChanged(previous.activities, activities, 'removed_from_list');
@@ -139,8 +142,11 @@ export async function refreshRewatches(
   if (needsBaseline || removed || staleWithoutDelta) {
     // Deletions have no tombstones. Full replacement also removes stale sessions.
     rows = await fetchSessions(client, token);
-  } else if (changed) {
-    const delta = await fetchSessions(client, token, previous.activities.all ?? undefined);
+  } else if (changed || dateEdited) {
+    const cursor = (dateEdited || sameWatermark) && previous.activities.all
+      ? new Date(Date.parse(previous.activities.all) - 1000).toISOString()
+      : previous.activities.all ?? undefined;
+    const delta = await fetchSessions(client, token, cursor);
     const combined = new Map(previous.rows.map(row => [identity(row), row]));
     for (const row of delta) combined.set(identity(row), row);
     rows = collectUnique([...combined.values()]);
