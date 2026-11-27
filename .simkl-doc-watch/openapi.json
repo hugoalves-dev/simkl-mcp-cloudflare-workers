@@ -2715,6 +2715,14 @@
               "null"
             ]
           },
+          "logo": {
+            "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+            "example": "21/211156199585feae79",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "mapped_tvdb_seasons": {
             "description": "AniDB/Simkl season numbers mapped onto the corresponding TVDB season numbers (anime catalogues split seasons differently between databases).",
             "items": {
@@ -2804,6 +2812,14 @@
                 "is_direct": {
                   "type": "boolean"
                 },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values). Poster image path.",
                   "type": [
@@ -2862,6 +2878,14 @@
                 },
                 "ids": {
                   "$ref": "#/components/schemas/Ids"
+                },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values).",
@@ -3005,6 +3029,14 @@
                     }
                   },
                   "type": "object"
+                },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values).",
@@ -3687,6 +3719,14 @@
               "slug"
             ],
             "type": "object"
+          },
+          "logo": {
+            "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+            "example": "21/211156199585feae79",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "network": {
             "description": "Type 4 null — no network on file. See [Null and missing values](/conventions/null-values). **TV and anime only.** Broadcaster or streaming service.",
@@ -6433,6 +6473,14 @@
             "description": "ISO 639-1 language code in UPPERCASE.",
             "type": "string"
           },
+          "logo": {
+            "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+            "example": "21/211156199585feae79",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "original_language": {
             "description": "Type 4 null — no language on file for this title. See [Null and missing values](/conventions/null-values). The title's original language as a lower-case ISO 639-1 code (`en`, `ja`, `ko`) — the same field and format as `original_language` in the [trending](/api-reference/trending) and [calendar](/api-reference/calendar) files. Movies also return `language`: the same code in upper case.",
             "example": "en",
@@ -6550,6 +6598,14 @@
                 "ids": {
                   "$ref": "#/components/schemas/Ids"
                 },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values).",
                   "type": [
@@ -6659,6 +6715,14 @@
                     }
                   },
                   "type": "object"
+                },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values).",
@@ -8577,6 +8641,14 @@
               "null"
             ]
           },
+          "logo": {
+            "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+            "example": "21/211156199585feae79",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "network": {
             "description": "Originating network or streamer (e.g. `HBO`, `Netflix`). Type 4 null when unknown.",
             "type": [
@@ -8648,6 +8720,14 @@
                 },
                 "ids": {
                   "$ref": "#/components/schemas/Ids"
+                },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values).",
@@ -8772,6 +8852,14 @@
                     }
                   },
                   "type": "object"
+                },
+                "logo": {
+                  "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+                  "example": "21/211156199585feae79",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "poster": {
                   "description": "Type 4 null — data not on file in that field's slot. See [Null and missing values](/conventions/null-values).",
@@ -9108,6 +9196,14 @@
               "slug"
             ],
             "type": "object"
+          },
+          "logo": {
+            "description": "Type 4 null — no logo on file. See [Null and missing values](/conventions/null-values). The title's logo: its name as artwork, on a transparent background. A path fragment like `poster`, with one size and one format — **AVIF only**: `https://simkl.in/logos/{logo}_w.avif`, up to 800 px wide. Load it straight from `simkl.in`, not through wsrv.nl, which cannot output AVIF. See [Images → Logos](/conventions/images#logos).",
+            "example": "21/211156199585feae79",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "metadata": {
             "description": "Pre-formatted summary line for display (e.g. `'March 15, 2026 • Budget $200M • Box office $660M'`).",
@@ -10692,6 +10788,7 @@
                         "tvdbslug": "demon-slayer-kimetsu-no-yaiba"
                       },
                       "last_aired": "2024-06-30",
+                      "logo": "21/21278381d6d0592e5c",
                       "mapped_tvdb_seasons": [
                         1
                       ],
@@ -10728,6 +10825,7 @@
                             "tvdb": "348545"
                           },
                           "is_direct": true,
+                          "logo": null,
                           "poster": "12/1285113329e1dc0658",
                           "relation_type": "sequel",
                           "title": "Kimetsu no Yaiba: Mugen Ressha Hen",
@@ -10751,6 +10849,7 @@
                             "tvdbslug": "demon-slayer-kimetsu-no-yaiba-siblings-bond"
                           },
                           "is_direct": true,
+                          "logo": null,
                           "poster": "12/1299271995abee7b32",
                           "relation_type": "summary",
                           "title": "Kimetsu no Yaiba: Kyoudai no Kizuna",
@@ -10776,6 +10875,7 @@
                             "traktslug": "317735",
                             "tvdb": "348545"
                           },
+                          "logo": null,
                           "poster": "11/11861097574d021bdc",
                           "title": "Kimetsu no Yaiba: Yuukaku Hen",
                           "type": "anime",
@@ -10798,6 +10898,7 @@
                             "tvdb": "353712",
                             "tvdbslug": "the-rising-of-the-shield-hero"
                           },
+                          "logo": "21/212739974db5daad44",
                           "poster": "75/759986065421c1d79",
                           "title": "Tate no Yuusha no Nariagari",
                           "type": "anime",
@@ -10820,6 +10921,7 @@
                             "tvdb": "329827",
                             "tvdbslug": "elegant-yokai-apartment-life"
                           },
+                          "logo": null,
                           "poster": "71/71217762212a75abd",
                           "title": "Youkai Apaato no Yuuga na Nichijou",
                           "type": "anime",
@@ -10861,6 +10963,7 @@
                             "tvdb": "377543",
                             "tvdbslug": "jujutsu-kaisen"
                           },
+                          "logo": "21/21150143a7cc69f097",
                           "poster": "11/11393622578cd750c3",
                           "title": "Jujutsu Kaisen",
                           "type": "anime",
@@ -11027,6 +11130,7 @@
                             "traktslug": "jojo-s-bizarre-adventure",
                             "tvdb": "262954"
                           },
+                          "logo": null,
                           "network": null,
                           "original_language": "ja",
                           "plan_to_watch": 1098,
@@ -11100,6 +11204,7 @@
                             "tvdb": "377317",
                             "tvdbslug": "being-heumann"
                           },
+                          "logo": "21/211646951bb10c23e6",
                           "original_language": "en",
                           "plan_to_watch": 83,
                           "poster": "20/207178452e081703b2",
@@ -11182,6 +11287,7 @@
                             "tvdb": "298905",
                             "tvdbslug": "taskmaster"
                           },
+                          "logo": "21/211898891aa0fd5eef",
                           "network": "U&Dave",
                           "original_language": "en",
                           "plan_to_watch": 685,
@@ -11432,6 +11538,7 @@
                             "tvdb": "396081",
                             "tvdbslug": "the-legend-of-hanuman"
                           },
+                          "logo": null,
                           "network": "JioHotstar",
                           "original_language": "hi",
                           "plan_to_watch": 201,
@@ -12289,6 +12396,7 @@
                           "tvdb": "346066",
                           "tvdbslug": "346066-street-fighter"
                         },
+                        "logo": "21/21152293c1f9acc531",
                         "metadata": "October 13, 2026 • Budget $82M • Box office $99M",
                         "original_language": "en",
                         "overview": "In 1993, estranged Street Fighters Ryu and Ken Masters are thrown back into combat when the mysterious Chun-Li recruits them for the next World Warrior Tournament: a brutal clash of fists, fate, and fury. But behind this battle royale lies a deadly conspiracy that forces them to face off against each other and the demons of their past. And if they don't, it's GAME OVER!",
@@ -12507,6 +12615,7 @@
                             "tvdb": "453028",
                             "tvdbslug": "tsuihou-sareta-tensei-juu-kishi-wa-game-chishiki-de-musou-suru"
                           },
+                          "logo": "21/21151149ec68abafcb",
                           "metadata": "2026 - Now • TBS (JP) • 26 episodes",
                           "network": "TBS (JP)",
                           "original_language": "ja",
@@ -12580,6 +12689,7 @@
                             "tvdb": "363878",
                             "tvdbslug": "heart-of-the-beast"
                           },
+                          "logo": "21/21152295a2bfbcead3",
                           "metadata": "September 19, 2026 • Budget $82M • Box office $188M",
                           "original_language": "en",
                           "overview": "After a harrowing plane crash, Special Forces officer James Belmont and his combat dog, Odin, find themselves stranded deep in the Alaskan wilderness. Together, they are forced into a brutal fight for survival against the elements.",
@@ -12637,6 +12747,7 @@
                             "tvdb": "426606",
                             "tvdbslug": "visionquest"
                           },
+                          "logo": "21/212444577bece2c31f",
                           "metadata": "2026 - 2026 • Disney+ • 8 episodes",
                           "network": "Disney+",
                           "original_language": "en",
@@ -12869,6 +12980,7 @@
                           "tvdb": "363878",
                           "tvdbslug": "heart-of-the-beast"
                         },
+                        "logo": "21/21152295a2bfbcead3",
                         "metadata": "September 19, 2026 • Budget $82M • Box office $188M",
                         "original_language": "en",
                         "overview": "After a harrowing plane crash, Special Forces officer James Belmont and his combat dog, Odin, find themselves stranded deep in the Alaskan wilderness. Together, they are forced into a brutal fight for survival against the elements.",
@@ -15834,6 +15946,7 @@
                         "tvdbslug": "the-godfather"
                       },
                       "language": "EN",
+                      "logo": "21/211155339077ceed08",
                       "original_language": "en",
                       "overview": "Spanning the years 1945 to 1955, a chronicle of the fictional Italian-American Corleone crime family. When organized crime family patriarch, Vito Corleone barely survives an attempt on his life, his youngest son, Michael steps in to take care of the would-be killers, launching a campaign of bloody revenge.",
                       "poster": "10/1024475455baeffd1f",
@@ -16227,6 +16340,7 @@
                             "tvdb": "14156",
                             "tvdbslug": "the-irishman"
                           },
+                          "logo": "21/2115420118554bdb97",
                           "poster": "87/8790948137bec1de3",
                           "title": "The Irishman",
                           "type": "movie",
@@ -16244,6 +16358,7 @@
                             "tvdb": "839",
                             "tvdbslug": "american-gangster"
                           },
+                          "logo": "21/211187798456d016be",
                           "poster": "10/10515064950eb9fa77",
                           "title": "American Gangster",
                           "type": "movie",
@@ -16261,6 +16376,7 @@
                             "tvdb": "16779",
                             "tvdbslug": "the-informer-2019"
                           },
+                          "logo": "21/2123743147bc49993c",
                           "poster": "77/7738870688eeddc47",
                           "title": "The Informer",
                           "type": "movie",
@@ -16278,6 +16394,7 @@
                             "tvdb": "355407",
                             "tvdbslug": "alto-knights"
                           },
+                          "logo": "21/21155595bf2f72d936",
                           "poster": "17/174106092647c3da62",
                           "title": "The Alto Knights",
                           "type": "movie",
@@ -16295,6 +16412,7 @@
                             "tvdb": "577",
                             "tvdbslug": "shot-caller"
                           },
+                          "logo": "21/212386518e643525f3",
                           "poster": "57/575092496f4b4cca6",
                           "title": "Shot Caller",
                           "type": "movie",
@@ -16312,6 +16430,7 @@
                             "tvdb": "6684",
                             "tvdbslug": "four-brothers"
                           },
+                          "logo": "21/211197430c3821ff31",
                           "poster": "10/1004334633058fd160",
                           "title": "Four Brothers",
                           "type": "movie",
@@ -16329,6 +16448,7 @@
                             "tvdb": "5847",
                             "tvdbslug": "cold-in-july"
                           },
+                          "logo": "21/211678213391f2230e",
                           "poster": "20/20572037eab2b625b3",
                           "title": "Cold in July",
                           "type": "movie",
@@ -16346,6 +16466,7 @@
                             "tvdb": "340798",
                             "tvdbslug": "a-haunting-in-venice"
                           },
+                          "logo": "21/213081338fe6601ff5",
                           "poster": "14/14719327ed39416ba4",
                           "title": "A Haunting in Venice",
                           "type": "movie",
@@ -16363,6 +16484,7 @@
                             "tvdb": "487",
                             "tvdbslug": "a-walk-among-the-tombstones"
                           },
+                          "logo": "21/21186027aac0dd5a5c",
                           "poster": "97/9758276a55983f3fd",
                           "title": "A Walk Among the Tombstones",
                           "type": "movie",
@@ -16542,6 +16664,7 @@
                             "tvdb": "780",
                             "tvdbslug": "the-godfather-part-ii"
                           },
+                          "logo": "21/2111553724d1a9f83a",
                           "poster": "14/145610937a55e3bf40",
                           "title": "The Godfather Part II",
                           "type": "movie",
@@ -16559,6 +16682,7 @@
                             "tvdb": "228",
                             "tvdbslug": "pulp-fiction"
                           },
+                          "logo": "21/21116137dc8770c381",
                           "poster": "13/13311405613660dcc9",
                           "title": "Pulp Fiction",
                           "type": "movie",
@@ -16576,6 +16700,7 @@
                             "tvdb": "380",
                             "tvdbslug": "goodfellas"
                           },
+                          "logo": "21/21116243d085c101d4",
                           "poster": "15/158523330edcd73239",
                           "title": "GoodFellas",
                           "type": "movie",
@@ -16593,6 +16718,7 @@
                             "tvdb": "223",
                             "tvdbslug": "schindlers-list"
                           },
+                          "logo": "21/21115765e27c1ca32e",
                           "poster": "90/9099504968367c144",
                           "title": "Schindler's List",
                           "type": "movie",
@@ -16610,6 +16736,7 @@
                             "tvdb": "74",
                             "tvdbslug": "the-lord-of-the-rings-the-return-of-the-king"
                           },
+                          "logo": "21/211153598e55cbdeb0",
                           "poster": "63/6395980d37b3d516b",
                           "title": "The Lord of the Rings: The Return of the King",
                           "type": "movie",
@@ -16627,6 +16754,7 @@
                             "tvdb": "2270",
                             "tvdbslug": "the-godfather-part-iii"
                           },
+                          "logo": "21/21115539a3b2fd047e",
                           "poster": "10/107092286cab0db220",
                           "title": "The Godfather Part III",
                           "type": "movie",
@@ -16644,6 +16772,7 @@
                             "tvdb": "268",
                             "tvdbslug": "se7en"
                           },
+                          "logo": "21/21116309be0bb03efa",
                           "poster": "14/144965375ca9fc76fe",
                           "title": "Se7en",
                           "type": "movie",
@@ -16661,6 +16790,7 @@
                             "tvdb": "814",
                             "tvdbslug": "scarface"
                           },
+                          "logo": "21/211153411e30d33669",
                           "poster": "86/8629636763bed5497",
                           "title": "Scarface",
                           "type": "movie",
@@ -16678,6 +16808,7 @@
                             "tvdb": "569",
                             "tvdbslug": "saving-private-ryan"
                           },
+                          "logo": "21/211163937b5de604bb",
                           "poster": "10/103676187457099e54",
                           "title": "Saving Private Ryan",
                           "type": "movie",
@@ -16695,6 +16826,7 @@
                             "tvdb": "590",
                             "tvdbslug": "the-departed"
                           },
+                          "logo": "21/21116797ae4dbfd8aa",
                           "poster": "13/13674473e46f95cdd4",
                           "title": "The Departed",
                           "type": "movie",
@@ -16712,6 +16844,7 @@
                             "tvdb": "308",
                             "tvdbslug": "the-green-mile"
                           },
+                          "logo": "21/2111584937129cce74",
                           "poster": "76/76391421d79530e5a",
                           "title": "The Green Mile",
                           "type": "movie",
@@ -16729,6 +16862,7 @@
                             "tvdb": "302",
                             "tvdbslug": "the-prestige"
                           },
+                          "logo": "21/21116643863bc80642",
                           "poster": "67/6722296cb6c55c210",
                           "title": "The Prestige",
                           "type": "movie",
@@ -16778,6 +16912,7 @@
                         "tvdbslug": "inception"
                       },
                       "language": "EN",
+                      "logo": "21/2115465951840e4fe9",
                       "original_language": "en",
                       "overview": "Cobb, a skilled thief who commits corporate espionage by infiltrating the subconscious of his targets is offered a chance to regain his old life as payment for a task considered to be impossible: \"inception\", the implantation of another person's idea into a target's subconscious.",
                       "poster": "13/134621776735ba40e1",
@@ -17557,6 +17692,7 @@
                             "tvdb": "1998",
                             "tvdbslug": "criminal"
                           },
+                          "logo": "21/2123780979ec85ea31",
                           "poster": "18/184901594aee93759c",
                           "title": "Criminal",
                           "type": "movie",
@@ -17574,6 +17710,7 @@
                             "tvdb": "3628",
                             "tvdbslug": "ballistic-ecks-vs-sever"
                           },
+                          "logo": "21/211220713bf4f06db4",
                           "poster": "54/54657848b24cfff10",
                           "title": "Ballistic: Ecks vs. Sever",
                           "type": "movie",
@@ -17591,6 +17728,7 @@
                             "tvdb": "4964",
                             "tvdbslug": "justice-league-dark"
                           },
+                          "logo": "21/21155173953edd7690",
                           "poster": "10/10158536286812aeb4",
                           "title": "Justice League Dark",
                           "type": "movie",
@@ -17608,6 +17746,7 @@
                             "tvdb": "6898",
                             "tvdbslug": "justice-league-vs-teen-titans"
                           },
+                          "logo": "21/21268311dc89dbaf4e",
                           "poster": "11/11926250e7cdb54de9",
                           "title": "Justice League vs. Teen Titans",
                           "type": "movie",
@@ -17625,6 +17764,7 @@
                             "tvdb": "372238",
                             "tvdbslug": "redux-redux"
                           },
+                          "logo": "21/213207970ee9d064c6",
                           "poster": "19/19486495cb27e71252",
                           "title": "Redux Redux",
                           "type": "movie",
@@ -17642,6 +17782,7 @@
                             "tvdb": "138227",
                             "tvdbslug": "deathstroke-knights-dragons"
                           },
+                          "logo": "21/21240381bea9db47d8",
                           "poster": "10/10148658c2c5ed0fa3",
                           "title": "Deathstroke: Knights & Dragons - The Movie",
                           "type": "movie",
@@ -17659,6 +17800,7 @@
                             "tvdb": "17104",
                             "tvdbslug": "venom-2"
                           },
+                          "logo": "21/21152965aa3fa4417a",
                           "poster": "12/12732067f38bf4f342",
                           "title": "Venom: Let There Be Carnage",
                           "type": "movie",
@@ -17677,6 +17819,7 @@
                             "tvdb": "9836",
                             "tvdbslug": "tokyo-gore-police"
                           },
+                          "logo": "21/21191563f5ab655586",
                           "poster": "15/157027634f27d99218",
                           "title": "Tokyo Gore Police",
                           "type": "movie",
@@ -17694,6 +17837,7 @@
                             "tvdb": "131406",
                             "tvdbslug": "see-you-yesterday"
                           },
+                          "logo": "21/212823716b33ed4b41",
                           "poster": "81/8106922ff058e2af2",
                           "title": "See You Yesterday",
                           "type": "movie",
@@ -17879,6 +18023,7 @@
                             "tvdb": "131079",
                             "tvdbslug": "interstellar"
                           },
+                          "logo": "21/2115272748103f0c5c",
                           "poster": "20/2052598c2716ef054",
                           "title": "Interstellar",
                           "type": "movie",
@@ -17896,6 +18041,7 @@
                             "tvdb": "116",
                             "tvdbslug": "the-dark-knight"
                           },
+                          "logo": "21/21115403a01b6acbf3",
                           "poster": "78/78195185129f87e6a",
                           "title": "The Dark Knight",
                           "type": "movie",
@@ -17913,6 +18059,7 @@
                             "tvdb": "169",
                             "tvdbslug": "the-matrix"
                           },
+                          "logo": "21/211160116990cbb64b",
                           "poster": "80/8008234e702d8ed33",
                           "title": "The Matrix",
                           "type": "movie",
@@ -17930,6 +18077,7 @@
                             "tvdb": "289",
                             "tvdbslug": "django-unchained"
                           },
+                          "logo": "21/21148721bfd40aa1b0",
                           "poster": "96/964479262c48c8a5e",
                           "title": "Django Unchained",
                           "type": "movie",
@@ -17947,6 +18095,7 @@
                             "tvdb": "558",
                             "tvdbslug": "shutter-island"
                           },
+                          "logo": "21/2112306729cf311c65",
                           "poster": "68/6867088e17d089ff2",
                           "title": "Shutter Island",
                           "type": "movie",
@@ -17964,6 +18113,7 @@
                             "tvdb": "389",
                             "tvdbslug": "the-wolf-of-wall-street"
                           },
+                          "logo": "21/211675692b3c501640",
                           "poster": "16/1694116127882f3c7c",
                           "title": "The Wolf of Wall Street",
                           "type": "movie",
@@ -17981,6 +18131,7 @@
                             "tvdb": "222",
                             "tvdbslug": "the-dark-knight-rises"
                           },
+                          "logo": "21/211432031ebdd94a57",
                           "poster": "95/9529508f1dd6603c1",
                           "title": "The Dark Knight Rises",
                           "type": "movie",
@@ -17998,6 +18149,7 @@
                             "tvdb": "590",
                             "tvdbslug": "the-departed"
                           },
+                          "logo": "21/21116797ae4dbfd8aa",
                           "poster": "13/13674473e46f95cdd4",
                           "title": "The Departed",
                           "type": "movie",
@@ -18015,6 +18167,7 @@
                             "tvdb": "293",
                             "tvdbslug": "batman-begins"
                           },
+                          "logo": "21/211155837d33d8c814",
                           "poster": "13/13811455ee24844ab8",
                           "title": "Batman Begins",
                           "type": "movie",
@@ -18032,6 +18185,7 @@
                             "tvdb": "434",
                             "tvdbslug": "memento"
                           },
+                          "logo": "21/2111528729fd6a0abc",
                           "poster": "13/1307188122ff3ea5c9",
                           "title": "Memento",
                           "type": "movie",
@@ -18049,6 +18203,7 @@
                             "tvdb": "287533",
                             "tvdbslug": "oppenheimer"
                           },
+                          "logo": "21/2115263302336bdb15",
                           "poster": "14/14014845db161c4cea",
                           "title": "Oppenheimer",
                           "type": "movie",
@@ -18066,6 +18221,7 @@
                             "tvdb": "148",
                             "tvdbslug": "avengers-endgame"
                           },
+                          "logo": "21/211520617c2d214aa2",
                           "poster": "78/7850544702b693f1f",
                           "title": "Avengers: Endgame",
                           "type": "movie",
@@ -31769,6 +31925,7 @@
                         "tvdbslug": "game-of-thrones"
                       },
                       "last_aired": "2019-05-19",
+                      "logo": "21/21109223c7ff854557",
                       "network": "HBO",
                       "original_language": "en",
                       "overview": "Seven noble families fight for control of the mythical land of Westeros. Friction between the houses leads to full-scale war. All while a very ancient evil awakens in the farthest north.",
@@ -31797,6 +31954,7 @@
                             "tvdb": "371572",
                             "tvdbslug": "house-of-the-dragon"
                           },
+                          "logo": "21/211502412a8bc520e2",
                           "poster": "12/127230752d75bc8c3a",
                           "title": "House of the Dragon",
                           "type": "tv",
@@ -31813,6 +31971,7 @@
                             "tvdb": "433631",
                             "tvdbslug": "a-knight-of-the-seven-kingdoms-the-hedge-knight"
                           },
+                          "logo": "21/21150247c79f5bd98d",
                           "poster": "19/191060957912f3ab36",
                           "title": "A Knight of the Seven Kingdoms",
                           "type": "tv",
@@ -31829,6 +31988,7 @@
                             "tvdb": "350123",
                             "tvdbslug": "the-dragon-prince"
                           },
+                          "logo": "21/21279087bfb9533763",
                           "poster": "10/10504142ed3459ad08",
                           "title": "The Dragon Prince",
                           "type": "tv",
@@ -31895,6 +32055,7 @@
                             "tvdb": "81189",
                             "tvdbslug": "breaking-bad"
                           },
+                          "logo": "21/21108183af2f5fb20e",
                           "poster": "97/978264e8bbc2303",
                           "title": "Breaking Bad",
                           "type": "tv",
@@ -31913,6 +32074,7 @@
                             "tvdb": "153021",
                             "tvdbslug": "the-walking-dead"
                           },
+                          "logo": "21/21105103991ecf6994",
                           "poster": "16/16913426086fc13",
                           "title": "The Walking Dead",
                           "type": "tv",

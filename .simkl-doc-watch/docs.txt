@@ -1521,6 +1521,7 @@ Every `simkl_id` in `calendar` is guaranteed to have a matching `metadata` recor
       ],
       "poster": "12/12634613c2b41dc5a1",
       "fanart": "23/23782f1e28e9ca2",
+      "logo": "21/21105593444dea6329",
       "ids": {
         "simkl_id": 3437,
         "slug": "king-of-the-hill",
@@ -1630,6 +1631,10 @@ Image path fragment. Combine with the prefixes in [Image conventions](/conventio
 **fanart** `string | null`
 
 Backdrop image path fragment. Same prefixing rules as `poster`. Type 4 null when none is on file — commonly absent on new or regional titles.
+
+**logo** `string | null`
+
+The title's logo on a transparent background — **AVIF only**, one size: `https://simkl.in/logos/{logo}_w.avif`. Type 4 null when none is on file; show the title as text instead. Load it straight from `simkl.in`, not through wsrv.nl — see [Images → Logos](/conventions/images#logos).
 
 **ids** `object` *required*
 
@@ -11585,6 +11590,7 @@ Per-title arrays (`movies`, `tv`, `anime`) all share the same base shape, with a
   "url": "/movie/2533163/the-drama",
   "poster": "19/19702715dfee84bd7c",
   "fanart": "19/19840547ea18093f08",
+  "logo": "21/211673338dba8c4330",
   "ids": {
     "simkl_id": 2533163,
     "slug": "the-drama",
@@ -11646,6 +11652,10 @@ Image path fragment. Combine with the prefixes in [Image conventions](/conventio
 **fanart** `string`
 
 Image path fragment for fanart. Same prefixing rules as `poster`. When `null`, hide the fanart element — there's no dedicated fanart placeholder.
+
+**logo** `string | null`
+
+The title's logo on a transparent background — **AVIF only**, one size: `https://simkl.in/logos/{logo}_w.avif`. `null` when none is on file; show the title as text instead. Load it straight from `simkl.in`, not through wsrv.nl — see [Images → Logos](/conventions/images#logos).
 
 **ids** `object`
 
@@ -12380,7 +12390,7 @@ Use the **filter** in the right rail to narrow this changelog by tag.
 
 **2026-11-27**
 
-Edit watch dates and memos
+Edit watch dates and memos, title logos
 
 New feature
 
@@ -12394,6 +12404,12 @@ Two new endpoints change what is already there, without marking anything watched
 | [`POST /sync/history/edit-memos`](/api-reference/simkl/edit-memos) | Set, change or clear the user's memo on a movie, show or anime, public or private |
 
 Both take the same `movies` / `shows` / `anime` body as [`POST /sync/history`](/api-reference/simkl/add-to-history) and answer `201` with `updated`, `not_found` and `errors`. They need an [AUTH V2](/api-reference/auth-v2) token with `media:write`, and every change moves `/sync/activities`.
+
+Improvement
+
+**Title logos**
+
+A new `logo` field carries the title's name as artwork on a transparent background, next to `poster` and `fanart`: on [`GET /movies/{id}`](/api-reference/simkl/get-movie), [`/tv/{id}`](/api-reference/simkl/get-tv-show) and [`/anime/{id}`](/api-reference/simkl/get-anime) (and their `users_recommendations`, `similar` and `relations` items), in the [trending, DVD and genre files](/api-reference/trending), and in the [v2 calendar files](/api-reference/calendar). It is **AVIF only**, one size, up to 800 px wide, and loads straight from `simkl.in` rather than through wsrv.nl — see [Images → Logos](/conventions/images#logos). `null` when a title has no logo.
 
 **2026-11-13**
 
@@ -13955,11 +13971,11 @@ The full list of status codes Simkl returns lives on the [Errors](/conventions/e
 # Images
 Source: https://api.simkl.org/conventions/images
 
-How to fetch poster, fanart, episode, and avatar images, with all available sizes — with live previews of each.
+How to fetch poster, fanart, logo, episode, and avatar images, with all available sizes — with live previews of each.
 
-Simkl returns image **paths** (not full URLs) inside `poster`, `fanart`, `episode`, and `avatar` fields. You build the final URL by combining a domain prefix, a category prefix, the image path, a size suffix, and a file extension.
+Simkl returns image **paths** (not full URLs) inside `poster`, `fanart`, `logo`, `episode`, and `avatar` fields. You build the final URL by combining a domain prefix, a category prefix, the image path, a size suffix, and a file extension.
 
-We strongly recommend serving images through **[wsrv.nl](https://wsrv.nl)**, a free image proxy that caches, resizes, and converts on the fly. This minimizes load on Simkl's servers and gives you free image transformations.
+We strongly recommend serving images through **[wsrv.nl](https://wsrv.nl)**, a free image proxy that caches, resizes, and converts on the fly. This minimizes load on Simkl's servers and gives you free image transformations. **Logos are the exception:** load them straight from `simkl.in` — see [Logos](#logos).
 
 All examples below append `&q=90` to the wsrv URL — this matches origin image quality. Without it, wsrv's default `&q=80` re-encodes images at noticeably smaller filesize and lower quality. Setting `&q=` above 90 is rarely useful — sizes balloon past origin without visible quality gain.
 
@@ -13969,20 +13985,21 @@ All examples below append `&q=90` to the wsrv URL — this matches origin image 
 
 | Part | Example | Notes |
 | - | - | - |
-| Proxy + domain | `https://wsrv.nl/?url=https://simkl.in` | Always start with this. |
-| **Category** | `/posters/` | One of `/posters/`, `/fanart/`, `/episodes/`, `/avatars/`. |
+| Proxy + domain | `https://wsrv.nl/?url=https://simkl.in` | Start with this — except for logos, which load straight from `https://simkl.in` ([why](#why-not-through-wsrv)). |
+| **Category** | `/posters/` | One of `/posters/`, `/fanart/`, `/logos/`, `/episodes/`, `/avatars/`. |
 | **Image path** | `74/74415673dcdc9cdd` | The value from the API field (`poster`, `fanart`, etc.). |
 | **Size suffix** | `_w` | Determines pixel size — see each section below. |
-| **Extension** | `.webp` | Always `.webp` for posters, episodes, and every fanart size except `_d`. Two exceptions: fanart `_d` is `.jpg` only ([details](#fanart)), avatars are `.jpg` only ([details](#avatars)). |
+| **Extension** | `.webp` | Always `.webp` for posters, episodes, and every fanart size except `_d`. Three exceptions: fanart `_d` is `.jpg` only ([details](#fanart)), logos are `.avif` only ([details](#logos)), avatars are `.jpg` only ([details](#avatars)). |
 | **Quality** | `&q=90` | Quality parameter for the wsrv proxy. `&q=90` matches origin quality (default `&q=80` reduces quality and filesize). Setting `&q=` above 90 is rarely useful — sizes balloon past origin without visible quality gain. |
 
 > [!WARNING]
 >
 > **Use `.webp` for posters, episodes, and fanart.**
 >
-> Two `.jpg` exceptions:
+> Three exceptions:
 >
 > * **Fanart `_d`** — original-resolution, darker tone, smaller filesize than `_medium.webp`. JPG only.
+> * **Logos** — one size, **AVIF only** (`_w.avif`), loaded straight from `simkl.in` without wsrv.nl; see [Logos](#logos).
 > * **Avatars** — small enough that the format doesn't matter; served as JPG without the `wsrv.nl` proxy.
 
 ## Code samples
@@ -14381,6 +14398,80 @@ Wide background art — the cinematic still you typically use behind the title o
 > | `_d` | original | \~103 KB | Darker, smaller filesize. **JPG only — the one fanart size that isn't `.webp`.** | [View](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_d.jpg\&q=90) |
 > | `_s48` | 48 × 27 | \~1 KB | Tiny placeholder for blur-up effects. | [View](https://wsrv.nl/?url=https://simkl.in/fanart/71/710408ec0a1bd207_s48.webp\&q=90) |
 
+## Logos
+
+The title's name as artwork — the treatment you see on a streaming service's title screen — on a **transparent background**. Lay it over the fanart, or over a plain surface, in place of the title text.
+
+**Load logos straight from `simkl.in`, not through wsrv.nl.** They are AVIF because AVIF gives the smallest file with clean edges on transparency, and the files are already cached on our CDN for a year. wsrv.nl cannot produce AVIF, so anything it returns is larger or worse — see [the comparison below](#why-not-through-wsrv).
+
+> [tab] Previews
+>
+> [![wide logo](https://simkl.in/logos/21/211156199585feae79_w.avif)](https://simkl.in/logos/21/211156199585feae79_w.avif)
+>
+> 790 × 137, 31 KB — a wide wordmark
+>
+> [![logo](https://simkl.in/logos/21/21109223c7ff854557_w.avif)](https://simkl.in/logos/21/21109223c7ff854557_w.avif)
+>
+> 800 × 375, 35 KB
+>
+> [![stacked logo](https://simkl.in/logos/21/2111196302e1a758ae_w.avif)](https://simkl.in/logos/21/2111196302e1a758ae_w.avif)
+>
+> 505 × 540, 9 KB — a stacked logo
+
+> [tab] Reference table
+>
+> | Suffix | Size | File size | Format | Example |
+> | - | - | - | - | - |
+> | `_w` | Up to 800 px wide; height follows the artwork | \~9–35 KB | **AVIF only**, with transparency | [View](https://simkl.in/logos/21/211156199585feae79_w.avif) |
+
+```
+https://simkl.in/logos/{logo}_w.avif
+```
+
+**One size, one format.** `_w.avif` is the only file: the same path with `.webp`, `.jpg` or `.png` is a `404`. Artwork narrower than 800 px keeps its own width, and the height is whatever the artwork needs — a wide wordmark can be a fifth as tall as it is wide, a stacked logo taller than it is wide. Size the box by width and let the height follow, or fit the logo inside a fixed box with `object-fit: contain`.
+
+**Where `logo` appears:** [`GET /movies/{id}`](/api-reference/simkl/get-movie), [`GET /tv/{id}`](/api-reference/simkl/get-tv-show) and [`GET /anime/{id}`](/api-reference/simkl/get-anime) — on the title and on every item in `users_recommendations`, `similar` and `relations` — and every item in the [trending, DVD and genre files](/api-reference/trending) and in `metadata` of the [v2 calendar files](/api-reference/calendar). Search, episode lists, sync and list responses do not carry it.
+
+To show it smaller, scale it in your layout (CSS `width`, or your image view's content mode) — the browser or OS does that for free, and one 800 px file serves every screen density.
+
+When `logo` is `null` there is no placeholder — show the title as text instead.
+
+### Why not through wsrv.nl
+
+wsrv.nl can read AVIF but cannot write it (`output=avif` is refused: *Saving to avif is disabled*), so every route through it trades the AVIF away. Typical results, against the file on `simkl.in`:
+
+| Request | Format | Transparency | Size |
+| - | - | - | - |
+| `https://simkl.in/logos/{logo}_w.avif` | AVIF | Yes | **1×** (\~25 KB) |
+| wsrv, no `output` (or `&q=90`, as for posters) | JPEG | **No** — the logo lands on a solid background | 1.2–1.9× |
+| wsrv `&output=webp&q=90` | WebP | Yes | 1.8× |
+| wsrv `&output=png` | PNG | Yes | 5–6× |
+
+The one useful case is a device that **cannot decode AVIF at all** — some older phones, smart TVs and image libraries. Current browsers, iOS 16+, macOS 13+ and Android 12+ can. For those older devices only, ask wsrv for WebP, which keeps the transparency:
+
+```
+https://wsrv.nl/?url=https://simkl.in/logos/{logo}_w.avif&output=webp&q=90
+```
+
+Never leave `output` off for a logo: wsrv's default for an AVIF source is JPEG.
+
+```js theme={"theme":{"light":"github-light","dark":"vesper"}}
+function logoUrl(logo, { avif = true } = {}) {
+  if (!logo) return null;                                   // no logo on file: show the title as text
+  const src = `https://simkl.in/logos/${logo}_w.avif`;
+  return avif ? src : `https://wsrv.nl/?url=${src}&output=webp&q=90`;   // webp only where AVIF can't be decoded
+}
+```
+
+On the web, let the browser choose. Every browser that can decode AVIF takes the first source and never touches wsrv; only the rest fetch the WebP:
+
+```html theme={"theme":{"light":"github-light","dark":"vesper"}}
+<picture>
+  <source srcset="https://simkl.in/logos/{logo}_w.avif" type="image/avif">
+  <img src="https://wsrv.nl/?url=https://simkl.in/logos/{logo}_w.avif&output=webp&q=90" alt="The title">
+</picture>
+```
+
 ## Episodes
 
 > [tab] Previews
@@ -14473,6 +14564,8 @@ default — full size
 > [!NOTE]
 >
 > **Fanart has no dedicated placeholder.** When `fanart` is `null`, hide the fanart element rather than showing a broken/empty image — most apps render a solid color or use the poster's blurred-up `_s48` thumbnail behind a tint instead.
+>
+> **Logos have none either.** When `logo` is `null`, render the title as text.
 
 ## Caching
 
@@ -20304,7 +20397,7 @@ r = requests.get(
 print(r.json())
 ```
 
-You'll get back a JSON object with the full record — `title`, `year`, `ids`, `overview`, `genres`, `ratings`, `poster`, `fanart`, `trailers`, `users_recommendations`, `similar`, and more. Summary endpoints (`/movies/:id`, `/tv/:id`, `/anime/:id`, plus the `/episodes/:id` variants) return this rich shape by default — no `?extended=full` needed. If anything errors out, [Errors and status codes](/conventions/errors) lists every code with cause / fix — `412` typically means a typo in `client_id`.
+You'll get back a JSON object with the full record — `title`, `year`, `ids`, `overview`, `genres`, `ratings`, `poster`, `fanart`, `logo`, `trailers`, `users_recommendations`, `similar`, and more. Summary endpoints (`/movies/:id`, `/tv/:id`, `/anime/:id`, plus the `/episodes/:id` variants) return this rich shape by default — no `?extended=full` needed. If anything errors out, [Errors and status codes](/conventions/errors) lists every code with cause / fix — `412` typically means a typo in `client_id`.
 
 ## 3. Pick an authentication flow
 
