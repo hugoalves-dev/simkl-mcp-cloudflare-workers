@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { SimklClient } from './api/client.js';
 import { simklTrendingPath } from './api/trending.js';
 import { RewatchService } from './api/rewatches.js';
+import { registerHistoryEditTools } from './tools/history-edits';
 import { registerRewatchTools } from './tools/rewatches.js';
 import { CustomListsService } from './api/custom-lists.js';
 import { registerCustomListTools } from './tools/custom-lists.js';
@@ -14,7 +15,7 @@ import { withRating } from './format/media';
 import type { RedirectGuard } from './api/id-resolution';
 
 // Both the deployed agent and build-time MCP discovery use this registration path.
-export function registerCapabilities(server: McpServer, client: SimklClient, library: LibraryAdapter, getToken: () => string | undefined, redirectGuard?: RedirectGuard) {
+export function registerCapabilities(server: McpServer, client: SimklClient, library: LibraryAdapter, getToken: () => string | undefined, redirectGuard?: RedirectGuard, getScope: () => string | undefined = () => undefined) {
     const rewatchService = new RewatchService(client, getToken, Date.now,
       (path, options) => library.write(path, options, options.token),
       token => library.getSettings(token),
@@ -29,6 +30,7 @@ export function registerCapabilities(server: McpServer, client: SimklClient, lib
       redirectGuard,
     });
     registerRewatchTools(server, rewatchService);
+    registerHistoryEditTools(server, library, getToken, getScope);
     // Resolved lazily: discovery registers tools without touching the library.
     registerCustomListTools(server, new CustomListsService(
       (path, options) => library.customListRequest(path, options),

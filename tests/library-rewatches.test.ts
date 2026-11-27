@@ -32,7 +32,7 @@ test('initial baseline excludes canonical items, captures multiple sessions and 
   expect(requests).toHaveLength(1);
   expect(requests[0].path).toBe('/sync/all-items');
   expect(requests[0].options.query).toEqual({
-    allow_rewatch: 'yes', extended: 'full', episode_watched_at: 'yes',
+    allow_rewatch: 'yes', extended: 'full', episode_watched_at: 'yes', include_all_episodes: 'original',
   });
   expect(requests[0].options.responseProfile).toBe('library');
   const output = selectRewatches(snapshot.rows, { mediaType: 'shows', status: 'watching' });

@@ -11,6 +11,10 @@ import {
   type LibraryCandidate, type LibraryItemRow, type MediaType,
 } from './types.js';
 
+export const recordedEpisodeDates = {
+  extended: 'full', episode_watched_at: 'yes', include_all_episodes: 'original',
+};
+
 export async function fetchInitialLibrary(client: SimklClient, accessToken: string, knownActivities?: Record<string, unknown>, run?: LibrarySyncRun): Promise<LibraryCandidate> {
   const telemetry = run ?? createLibrarySyncRun();
   const activities = knownActivities ?? await observeLibrarySyncRequest(
@@ -66,7 +70,7 @@ export async function fetchInitialLibrary(client: SimklClient, accessToken: stri
       { phase: 'initial', operation: 'baseline', media: mediaType, status: path.split('/')[4], queryMode: 'none' },
       async () => {
         const response = await client.request<unknown>(path, {
-          method: 'GET', token: accessToken, responseProfile: 'library',
+          method: 'GET', token: accessToken, responseProfile: 'library', query: { memos: 'yes' },
         });
         append(response, mediaType);
         return response;

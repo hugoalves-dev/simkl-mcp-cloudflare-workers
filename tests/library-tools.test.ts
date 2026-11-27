@@ -45,7 +45,7 @@ test('rejects invalid pagination values', () => {
   expect(() => selectWatchlist(items, { limit: 0 })).toThrow();
   expect(() => selectWatchlist(items, { offset: -1 })).toThrow();
 });
-for (const args of [{ extended: 'ids_only' }, { extended: 'full_anime_seasons' }, { date_from: '2020-01-01' }, { memos: 'yes' }, { episode_watched_at: 'yes' }, { type: 'bad' }, { status: 'bad' }]) test('rejects unsupported watchlist query '+JSON.stringify(args), () => {
+for (const args of [{ extended: 'ids_only' }, { extended: 'full_anime_seasons' }, { date_from: '2020-01-01' }, { memos: 'no' }, { episode_watched_at: 'yes' }, { type: 'bad' }, { status: 'bad' }]) test('rejects unsupported watchlist query '+JSON.stringify(args), () => {
   expect(() => selectWatchlist(items, args)).toThrow();
 });
 test('resource output uses the same compact item format and empty message', () => {
@@ -138,10 +138,10 @@ test('generated mutation prefers the serialized write hook', async () => {
   expect(calls).toEqual(['/sync/ratings:POST']);
 });
 
-test('watchlist schema exposes only cache filters and pagination', () => {
+test('watchlist schema exposes cache filters, memo opt-in and pagination', () => {
   let schema: any;
   registerTools({ registerTool(name: string, config: any) { if (name === 'simkl_get_watchlist') schema = config.inputSchema; } } as any, {}, () => undefined);
-  expect(Object.keys(schema.shape).sort()).toEqual(['limit', 'offset', 'status', 'title', 'type']);
+  expect(Object.keys(schema.shape).sort()).toEqual(['limit', 'memos', 'offset', 'status', 'title', 'type']);
   expect(schema.safeParse({ title: 'planet', limit: 10, offset: 0 }).success).toBe(true);
   expect(schema.safeParse({ date_from: '2020-01-01' }).success).toBe(false);
 });

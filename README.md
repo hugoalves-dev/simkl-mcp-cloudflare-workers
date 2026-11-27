@@ -127,7 +127,7 @@ commit no longer matches `main` skip deployment, including retries of old runs.
 ## Tools
 - **Search**: `simkl_search_by_text`, `simkl_search_by_id`
 - **Scrobble**: `simkl_start_watching`, `simkl_pause_watching`, `simkl_stop_watching`
-- **Sync/tracking**: `simkl_add_to_watchlist`, `simkl_mark_watched`, `simkl_remove_from_history`, `simkl_add_rating`, `simkl_get_watchlist`
+- **Sync/tracking**: `simkl_add_to_watchlist`, `simkl_mark_watched`, `simkl_remove_from_history`, `simkl_edit_watch_dates`, `simkl_edit_memos`, `simkl_add_rating`, `simkl_get_watchlist`
 - **Discovery**: `simkl_get_trending_by_genre`, `simkl_get_trending_shows`, `simkl_get_trending_movies`, `simkl_get_trending_anime`, `simkl_get_best_shows`, `simkl_get_best_anime`, `simkl_get_show_by_id`, `simkl_get_movie_by_id`, `simkl_get_anime_by_id`, `simkl_get_show_episodes`, `simkl_get_anime_episodes`, `simkl_get_shows_by_genre`, `simkl_get_movies_by_genre`, `simkl_get_anime_by_genre`, `simkl_get_airing_shows`, `simkl_get_airing_anime`
 
 Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) accept `date: today | tomorrow | DD-MM-YYYY` and optional `timeZone` (IANA, for example `America/Sao_Paulo`). **Default: UTC** for backwards compatibility. Results are filtered by the requested **local calendar day**, respecting daylight saving time. Returned airing timestamps remain in UTC (`Z`). Explicit dates must fall within Simkl's monthly archives, July 2024 through the current month + 3; other dates are rejected locally. Anime movies and other releases without an `episode` are shown as releases, specials (`season: 0`) as `special ep N`, and sparse or older archive records remain readable.
@@ -138,6 +138,28 @@ Calendar airing tools (`simkl_get_airing_shows` and `simkl_get_airing_anime`) ac
 - **Resources**: `watchlist/{type}/{status}`, `trending/{type}/{interval}`
 
 Under AUTH V2, search, best, live genre, user stats, Custom Lists and all writes need the user's access token; without one these tools fail locally with a clear message and send nothing. Title details, episode lists, `/redirect` ID lookups and `data.simkl.in` files (trending, calendar) stay public and never send a token.
+
+### Edit library dates and memos
+
+Both tools require a Simkl AUTH V2 token with `media:write`. Each accepts a batch under `movies`, `shows` and `anime`. Use each title's canonical Simkl ID where available.
+
+- `simkl_edit_watch_dates` changes `added_at`, a completed movie's `watched_at`, or the dates of recorded episodes. Use `rewatch_id` for an existing PRO/VIP session the user selected. Simkl applies its two-day gap rule and caps future dates at the current time.
+- `simkl_edit_memos` accepts a string to preserve memo privacy, an object with `text` and `is_private` to set it explicitly, or an empty string to clear the memo. New memos default to public. Simkl trims text and strips HTML tags and emoji. Supply at most 140 characters, five line breaks and two consecutive line breaks.
+- `simkl_get_watchlist` with `"memos": "yes"` includes text and privacy. `{}` means Simkl returned no memo. `unavailable` means the cache has yet to fetch the field for that item.
+
+Example arguments for `simkl_edit_watch_dates`:
+
+```json
+{"movies":[{"ids":{"simkl":123},"watched_at":"2026-10-03T20:00:00-03:00"}],"anime":[{"ids":{"simkl":456},"use_tvdb_anime_seasons":true,"seasons":[{"number":1,"episodes":[{"number":2,"watched_at":"2026-10-04T01:00:00Z"}]}]}]}
+```
+
+Example arguments for `simkl_edit_memos`:
+
+```json
+{"movies":[{"ids":{"simkl":123},"memo":{"text":"Watch again with subtitles","is_private":true}}],"shows":[{"ids":{"simkl":789},"memo":""}]}
+```
+
+Read `updated`, `not_found` and `errors` independently. One item can appear among both successful edits and refusals. When `cache_reconciliation` is `pending`, Simkl confirmed the edit and the cache will retry reconciliation on a subsequent library read.
 
 ### ID lookups (`simkl_search_by_id`)
 

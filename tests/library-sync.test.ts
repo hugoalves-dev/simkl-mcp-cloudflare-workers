@@ -25,7 +25,7 @@ test('activities precede sequential non-extended media pulls, retaining all item
   const candidate = await fetchInitialLibrary(client, 'token');
   expect(calls.map(c => c.path)).toEqual(['/sync/activities', '/sync/all-items/shows', '/sync/all-items/movies', '/sync/all-items/anime']);
   expect(peak()).toBe(1);
-  for (const c of calls) { expect(c.options.token).toBe('token'); expect(c.options.query).toBeUndefined(); }
+  for (const c of calls) { expect(c.options.token).toBe('token'); expect(c.options.query).toEqual(c.path === '/sync/activities' ? undefined : { memos: 'yes' }); }
   expect(candidate.activities).toEqual(activities);
   expect(candidate.items).toHaveLength(3);
   expect(JSON.parse(candidate.items[0].itemJson)).toEqual(item('shows'));

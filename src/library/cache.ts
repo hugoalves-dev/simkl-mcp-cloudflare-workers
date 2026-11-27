@@ -9,7 +9,7 @@ import { refreshUserProfile, refreshUserSettings } from './profile.js';
 import { normalizeSimklId } from './identity.js';
 import { refreshRewatches } from './rewatches.js';
 import { LibraryWriteInvalidationError } from './errors.js';
-import type { LibraryInitialization, LibraryItemRow } from './types.js';
+import { isRecord, MEDIA_TYPES, type LibraryInitialization, type LibraryItemRow } from './types.js';
 import { SimklApiError, type RequestOptions } from '../api/client.js';
 import {
   CustomListCooldownError, customListCooldownSeconds, isCustomListRoute,
@@ -98,7 +98,7 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     return this.enqueue(async () => {
       const initialized = this.store.getInitialization() !== null;
       await this.ensureInitializedInternal(accessToken);
-      return this.library.read(accessToken, force && initialized);
+      return this.readLibrary(accessToken, force && initialized);
     });
   }
 
@@ -117,15 +117,22 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
         console.info(JSON.stringify({ component: 'simkl_library_sync', event: 'manual_refresh', outcome: 'cooldown', retryAfterSeconds }));
         // Do not bypass the manual cooldown. A server-side mutation still
         // requires its normal activities check even inside that window.
-        await this.library.read(accessToken);
+        await this.readLibrary(accessToken);
         return { status: 'suppressed', retryAfterSeconds };
       }
       // The cooldown reservation is persisted *before* the upstream request,
       // including when Simkl responds with an error or the object restarts.
       console.info(JSON.stringify({ component: 'simkl_library_sync', event: 'manual_refresh', outcome: 'forced' }));
-      await this.library.read(accessToken, true);
+      await this.readLibrary(accessToken, true);
       return { status: 'refreshed' };
     });
+  }
+
+  private async readLibrary(accessToken: string, force = false) {
+    const pending = this.store.pendingHistoryEdits();
+    const items = await this.library.read(accessToken, force || pending.length > 0, pending);
+    if (pending.length) this.store.savePendingHistoryEdits([]);
+    return items;
   }
 
   invalidate() { return this.enqueue(() => this.library.invalidate()); }
@@ -133,6 +140,36 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
   write(accessToken: string, endpoint: string, options: Omit<RequestOptions, 'token' | 'method'> & { method: 'POST' }) {
     return this.enqueue(async () => {
       const result = await this.library.write(accessToken, endpoint, options);
+      if (endpoint === '/sync/history/edit-dates' || endpoint === '/sync/history/edit-memos') {
+        const statuses = isRecord(result) && isRecord(result.updated) ? result.updated.statuses : undefined;
+        if (!Array.isArray(statuses) || !statuses.length) return result;
+        const body = isRecord(options.body) ? options.body : {};
+        const editedMedia = MEDIA_TYPES.filter(type => Array.isArray(body[type]));
+        const rewatchEdited = endpoint === '/sync/history/edit-dates'
+          && statuses.some(row => isRecord(row) && isRecord(row.request) && row.request.rewatch_id !== undefined);
+        try {
+          const cachedRewatches = rewatchEdited ? this.store.loadRewatches() : undefined;
+          if (cachedRewatches) this.store.invalidateRewatches();
+          if (!this.store.getInitialization()) {
+            // An edit does not need to seed an unused library cache.
+            await this.client.request('/sync/activities', { method: 'GET', token: accessToken });
+            return result;
+          }
+          this.store.savePendingHistoryEdits([...new Set([...this.store.pendingHistoryEdits(), ...editedMedia])]);
+          await this.readLibrary(accessToken);
+          if (cachedRewatches) {
+            const activity = this.store.loadActivitySnapshot();
+            if (activity) {
+              const next = await refreshRewatches(this.client, accessToken, cachedRewatches, activity.activities, true);
+              this.store.saveRewatches(next);
+            }
+          }
+        } catch {
+          // Keep the confirmed response and persisted retry intent; never replay the edit.
+          return { ...(isRecord(result) ? result : {}), cache_reconciliation: 'pending' };
+        }
+        return result;
+      }
       if (['/sync/history', '/sync/history/remove', '/scrobble/stop'].includes(endpoint)) {
         try { this.store.invalidateRewatches(); }
         catch { throw new LibraryWriteInvalidationError(); }
@@ -180,7 +217,7 @@ export class SimklLibraryCache extends DurableObject<LibraryCacheEnv> {
     return this.enqueue(async () => {
       if (!accessToken) throw new Error('Simkl authentication required');
       await this.ensureInitializedInternal(accessToken);
-      await this.library.read(accessToken);
+      await this.readLibrary(accessToken);
       const current = this.store.loadActivitySnapshot();
       if (!current) throw new Error('Simkl library activities unavailable');
       const previous = this.store.loadRewatches();

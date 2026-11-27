@@ -4,8 +4,8 @@ import {
   createLibrarySyncRun, logLibrarySync, observeLibrarySyncRequest,
   type LibrarySyncRun,
 } from './sync-telemetry';
-import { MEDIA_TYPES, type Activities, type LibraryItem, type LibraryItems, type LibrarySnapshot } from './types';
-import { fetchInitialLibrary } from './sync';
+import { MEDIA_TYPES, type Activities, type LibraryItem, type LibraryItems, type LibrarySnapshot, type MediaType } from './types';
+import { fetchInitialLibrary, recordedEpisodeDates } from './sync';
 import { normalizeSimklId } from './identity';
 
 export function parseLibraryCacheTtlSeconds(value: unknown): number {
@@ -70,7 +70,7 @@ function merge(items: LibraryItems, updates: LibraryItems): void {
     items[type] = [...map.values()];
   }
 }
-export async function refreshLibrary(client: SimklClient, token: string, previous: LibrarySnapshot | undefined, options: { ttlSeconds: number; now: number; force?: boolean; telemetry?: LibrarySyncRun }): Promise<LibrarySnapshot> {
+export async function refreshLibrary(client: SimklClient, token: string, previous: LibrarySnapshot | undefined, options: { ttlSeconds: number; now: number; force?: boolean; telemetry?: LibrarySyncRun; editedMedia?: readonly MediaType[] }): Promise<LibrarySnapshot> {
   const telemetry = options.telemetry ?? createLibrarySyncRun();
   if (previous && previous.version !== 1) throw new Error('Unsupported library cache schema');
   if (previous && !previous.forceCheck && !options.force && options.now >= previous.checkedAt && options.now - previous.checkedAt < options.ttlSeconds * 1000) {
@@ -93,15 +93,29 @@ export async function refreshLibrary(client: SimklClient, token: string, previou
   if (!previous || previous.activities.all === null) {
     const initial = await fetchInitialLibrary(client, token, activities, telemetry);
     for (const row of initial.items) items[row.mediaType].push(JSON.parse(row.itemJson));
-  } else if (activities.all !== null && activities.all !== previous.activities.all) {
+  } else if (activities.all !== null && (JSON.stringify(activities) !== JSON.stringify(previous.activities) || options.editedMedia?.length)) {
     const changed = (fields: string[]) => (['tv_shows', 'movies', 'anime'] as const).some(category => fields.some(field => {
       const next = activities[category]?.[field];
       // Missing categories do not imply a change; Simkl may omit unused buckets.
       return next !== undefined && next !== previous.activities[category]?.[field];
     }));
     const query = { date_from: previous.activities.all };
+    const editedMedia = options.editedMedia;
+    // Simkl's cursor is exclusive. Include writes sharing the saved activity second.
+    const deltaCursor = editedMedia?.length || activities.all === previous.activities.all
+      ? { date_from: new Date(Date.parse(previous.activities.all) - 1000).toISOString() }
+      : query;
+    const deltaMedia = editedMedia?.length
+      ? MEDIA_TYPES.filter(type => {
+        const category = type === 'shows' ? 'tv_shows' : type;
+        return editedMedia.includes(type) || statuses.some(status => {
+          const next = activities[category]?.[status];
+          return next !== undefined && next !== previous.activities[category]?.[status];
+        });
+      })
+      : undefined;
     const routes = {
-      delta: changed(statuses),
+      delta: Boolean(deltaMedia?.length) || changed(statuses),
       ratings: changed(['rated_at']),
       membership: changed(['removed_from_list']),
     };
@@ -110,10 +124,14 @@ export async function refreshLibrary(client: SimklClient, token: string, previou
         phase: 'incremental', operation, outcome: routes[operation] ? 'required' : 'skipped',
       });
     }
-    if (routes.delta) merge(items, await fetchPartitionedLibrary(client, token, 'delta', query, validateItems, telemetry));
+    if (routes.delta) {
+      const detailed = editedMedia?.some(type => type !== 'movies');
+      const deltaQuery = { ...deltaCursor, memos: 'yes', ...(detailed ? recordedEpisodeDates : {}) };
+      merge(items, await fetchPartitionedLibrary(client, token, 'delta', deltaQuery, validateItems, telemetry, deltaMedia));
+    }
     // Official synchronization guide documents GET /sync/ratings for reads;
     // POST /sync/ratings is the add-rating mutation, despite the blueprint typo.
-    if (routes.ratings) merge(items, await fetchPartitionedLibrary(client, token, 'ratings', query, validateItems, telemetry));
+    if (routes.ratings) merge(items, await fetchPartitionedLibrary(client, token, 'ratings', deltaCursor, validateItems, telemetry));
     if (routes.membership) {
       const membership = await fetchPartitionedLibrary(client, token, 'membership', { extended: 'simkl_ids_only' }, validateItems, telemetry);
       for (const type of MEDIA_TYPES) {

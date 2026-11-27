@@ -1,5 +1,5 @@
 import { SimklApiError, type RequestOptions, type SimklClient } from '../api/client';
-import type { LibraryItems, LibrarySnapshot } from './types';
+import type { LibraryItems, LibrarySnapshot, MediaType } from './types';
 import { refreshLibrary } from './refresh';
 import { LibrarySyncLimitError, LibraryWriteInvalidationError } from './errors';
 import { createLibrarySyncRun, logLibrarySync } from './sync-telemetry';
@@ -27,7 +27,7 @@ export class CachedLibrary {
   withExclusive<T>(operation: () => Promise<T>): Promise<T> {
     return this.enqueue(operation);
   }
-  read(token: string, force = false): Promise<LibraryItems> {
+  read(token: string, force = false, editedMedia?: readonly MediaType[]): Promise<LibraryItems> {
     return this.enqueue(async () => {
       const telemetry = createLibrarySyncRun();
       let syncPhase: 'initial' | 'incremental' = 'incremental';
@@ -47,7 +47,7 @@ export class CachedLibrary {
           else await this.store.save(previous);
         }
         const snapshot = await refreshLibrary(this.client, token, previous, {
-          ttlSeconds: this.ttlSeconds, now: this.now(), force: forceRefresh, telemetry,
+          ttlSeconds: this.ttlSeconds, now: this.now(), force: forceRefresh, telemetry, editedMedia,
         });
         if (snapshot === previous) {
           // The TTL shortcut served the persisted snapshot without an upstream check.
@@ -55,7 +55,8 @@ export class CachedLibrary {
         } else {
           const activitiesUnchanged = previous
             && JSON.stringify(snapshot.activities) === JSON.stringify(previous.activities);
-          if (activitiesUnchanged && this.store.saveFreshness) {
+          const freshnessOnly = activitiesUnchanged && !editedMedia?.length;
+          if (freshnessOnly && this.store.saveFreshness) {
             await this.store.saveFreshness(snapshot);
           } else {
             await this.store.save(snapshot);
@@ -63,7 +64,7 @@ export class CachedLibrary {
           // Only log after persistence succeeds; never report a failed refresh as successful.
           logLibrarySync(telemetry, 'snapshot_committed', {
             phase: !previous || previous.activities.all === null ? 'initial' : 'incremental',
-            outcome: activitiesUnchanged ? 'freshness_saved' : 'saved',
+            outcome: freshnessOnly ? 'freshness_saved' : 'saved',
             rows: Object.values(snapshot.items).reduce((sum, rows) => sum + rows.length, 0),
             requests: telemetry.requests,
           });
@@ -105,7 +106,7 @@ export class CachedLibrary {
 
   write<T = unknown>(token: string, endpoint: string, options: Omit<RequestOptions, 'method' | 'token'> & { method?: 'POST' } = {}): Promise<T> {
     return this.enqueue(async () => {
-      const allowed = new Set(['/scrobble/start', '/scrobble/pause', '/scrobble/stop', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/ratings', '/sync/ratings/remove']);
+      const allowed = new Set(['/scrobble/start', '/scrobble/pause', '/scrobble/stop', '/sync/add-to-list', '/sync/history', '/sync/history/remove', '/sync/history/edit-dates', '/sync/history/edit-memos', '/sync/ratings', '/sync/ratings/remove']);
       if (!allowed.has(endpoint)) throw new Error('Unsupported Simkl write endpoint');
       if (!token) throw new Error('Simkl authentication required');
       const request = () => this.client.request<T>(endpoint, { ...options, method: 'POST', token, rateLimitRetry: false });

@@ -35,7 +35,9 @@ export function jsonBytes(value: string): number {
 }
 
 export interface MediaMetadata { ids: { simkl: number | string; [key: string]: unknown }; title?: string; [key: string]: unknown }
+export type LibraryMemo = { text: string; is_private: boolean } | { text?: never; is_private?: never };
 export interface LibraryItem {
+  memo?: LibraryMemo;
   status?: string;
   show?: MediaMetadata;
   movie?: MediaMetadata;

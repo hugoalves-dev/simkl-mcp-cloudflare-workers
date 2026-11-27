@@ -7,7 +7,7 @@ const DEFAULT_WATCHLIST_LIMIT = 50;
 
 export class LibraryQueryError extends Error {}
 
-function formatWatchlistItem(item: LibraryItem, type: MediaType): string {
+function formatWatchlistItem(item: LibraryItem, type: MediaType, includeMemo: boolean): string {
   const media = (item.show || item.movie || item.anime || {}) as NonNullable<LibraryItem['show']>;
   const ids = media.ids || {};
   const simklId = ids.simkl;
@@ -30,18 +30,22 @@ function formatWatchlistItem(item: LibraryItem, type: MediaType): string {
     ? ` | next episode: ${item.next_to_watch}`
     : '';
 
-  return `${title} (${year}) | status: ${item.status || 'unknown'} | progress: ${progress}${next} | rating: ${rating} | Simkl: <${url}>`;
+  const memo = includeMemo
+    ? item.memo === undefined ? ' | memo: unavailable' : ` | memo: ${JSON.stringify(item.memo)}`
+    : '';
+  return `${title} (${year}) | status: ${item.status || 'unknown'} | progress: ${progress}${next} | rating: ${rating}${memo} | Simkl: <${url}>`;
 }
 
 export function selectWatchlist(items: LibraryItems, args: Record<string, unknown>): string[] {
-  const { type, status, title, limit = DEFAULT_WATCHLIST_LIMIT, offset = 0 } = args;
+  const { type, status, title, memos, limit = DEFAULT_WATCHLIST_LIMIT, offset = 0 } = args;
   if (type !== undefined && !MEDIA_TYPES.includes(type as MediaType)) throw new LibraryQueryError('Invalid watchlist type');
   if (status !== undefined && !statuses.includes(status as string)) throw new LibraryQueryError('Invalid watchlist status');
   if (title !== undefined && typeof title !== 'string') throw new LibraryQueryError('Invalid watchlist title');
   if (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > 100) throw new LibraryQueryError('Watchlist limit must be an integer from 1 to 100');
   if (!Number.isSafeInteger(offset) || (offset as number) < 0) throw new LibraryQueryError('Watchlist offset must be a non-negative integer');
 
-  for (const key of ['date_from', 'extended', 'allow_rewatch', 'next_watch_info', 'episode_watched_at', 'memos']) {
+  if (memos !== undefined && memos !== 'yes') throw new LibraryQueryError('Invalid memos option');
+  for (const key of ['date_from', 'extended', 'allow_rewatch', 'next_watch_info', 'episode_watched_at']) {
     if (args[key] !== undefined) throw new LibraryQueryError(`Unsupported cached watchlist option: ${key}`);
   }
 
@@ -59,7 +63,7 @@ export function selectWatchlist(items: LibraryItems, args: Record<string, unknow
 
   return selected
     .slice(offset as number, (offset as number) + (limit as number))
-    .map(({ item, mediaType }) => formatWatchlistItem(item, mediaType));
+    .map(({ item, mediaType }) => formatWatchlistItem(item, mediaType, memos === 'yes'));
 }
 
 export function watchlistResourceContents(uri: string, type: string, status: string, items: LibraryItems) {

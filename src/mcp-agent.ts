@@ -12,6 +12,7 @@ interface Env extends WorkerEnv, SimklOAuthEnv {}
 interface SimklAuthProps extends Record<string, unknown> {
   simklToken: string;
   simklUserId?: string;
+  simklScope?: string;
 }
 
 export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
@@ -26,6 +27,6 @@ export class SimklMCP extends McpAgent<Env, unknown, SimklAuthProps> {
       clientId: this.env?.SIMKL_CLIENT_ID || '',
     });
     const library = createLibraryAdapter(this.env, client, () => this.props);
-    registerCapabilities(this.server, client, library, () => this.props?.simklToken, createRedirectGuard(this.env?.SIMKL_ID_RESOLUTION));
+    registerCapabilities(this.server, client, library, () => this.props?.simklToken, createRedirectGuard(this.env?.SIMKL_ID_RESOLUTION), () => this.props?.simklScope);
   }
 }
